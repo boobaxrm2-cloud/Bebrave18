@@ -1680,17 +1680,32 @@ async function loadStudentContracts() {
         ${c.status === 'complete'
           ? `<span class="badge b-done badge-complete">✅ Assinado</span>
              <a href="/api/contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar PDF</a>`
-          : `<button class="btn-primary" style="font-size:13px" onclick="openStudentContractSign(${c.$loki})">✍️ Assinar</button>`
+          : `<button class="btn-primary" style="font-size:13px" onclick="openStudentContractSign(${c.$loki},'${c.contractId}')">✍️ Assinar</button>`
         }
       </div>
     </div>`).join('');
 }
 
-function openStudentContractSign(lokiId) {
+function openStudentContractSign(lokiId, contractId) {
   document.getElementById('sign-contract-id').value = lokiId;
+  document.getElementById('sign-contract-ctr-id').value = contractId;
   document.getElementById('sign-contract-cpf').value = '';
   initSigPad('sig-contract-student');
   openModal('modal-student-contract-sign');
+}
+
+async function previewStudentContract() {
+  const contractId = document.getElementById('sign-contract-ctr-id').value;
+  if (!contractId) { showToast('⚠️ Contrato não identificado'); return; }
+  try {
+    const res = await fetch(`/api/contracts/${contractId}/download`);
+    if (!res.ok) { showToast('❌ Erro ao carregar contrato'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    document.getElementById('pdf-preview-frame').src = url;
+    document.querySelector('#modal-pdf-preview .mh h3').textContent = 'Contrato — Leitura';
+    openModal('modal-pdf-preview');
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 async function submitStudentContractSign() {

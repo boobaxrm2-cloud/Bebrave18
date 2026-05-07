@@ -704,7 +704,11 @@
   <div class="modal-card" style="max-width:500px;width:95vw">
     <div class="mh"><h3>✍️ Assinar Contrato</h3><button class="mc-close" onclick="closeModal('modal-student-contract-sign')">✕</button></div>
     <input type="hidden" id="sign-contract-id">
-    <p style="color:var(--g600);font-size:14px;margin-bottom:16px">Para assinar, confirme seu CPF e desenhe sua assinatura abaixo.</p>
+    <input type="hidden" id="sign-contract-ctr-id">
+    <p style="color:var(--g600);font-size:14px;margin-bottom:12px">Leia o contrato antes de assinar. Após a leitura, confirme seu CPF e desenhe sua assinatura.</p>
+    <div style="margin-bottom:16px">
+      <button class="btn-secondary" style="width:100%" onclick="previewStudentContract()">📄 Ler o Contrato</button>
+    </div>
     <div class="field-group"><label>Confirme seu CPF *</label><input id="sign-contract-cpf" type="text" placeholder="000.000.000-00"></div>
     <div class="field-group">
       <label>Sua assinatura *</label>
