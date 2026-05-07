@@ -93,8 +93,8 @@ function generateContract(data) {
       doc.fillColor(GRAY).font('Helvetica').text(' ' + (cpf || '___.___.___-__'));
       y += 15;
     };
-    party('CONTRATANTE (Professor):', data.teacher_name || '', data.teacher_cpf || '');
-    party('CONTRATADO(A) (Aluno):', data.student_name || '', data.student_cpf || '');
+    party('CONTRATANTE (Aluno):', data.student_name || '', data.student_cpf || '');
+    party('CONTRATADO(A) (Professor):', data.teacher_name || '', data.teacher_cpf || '');
 
     y += 4;
     doc.moveTo(ML, y).lineTo(W - ML, y).lineWidth(0.5).strokeColor(GOLD_LT).stroke();
@@ -170,8 +170,8 @@ function generateContract(data) {
       }
     };
 
-    drawSig(tX, data.teacher_name || 'Professor(a)', 'CONTRATANTE', data.teacher_cpf || '', data.teacher_signature || '');
-    drawSig(sX, data.student_name || 'Aluno(a)',     'CONTRATADO(A)', data.student_cpf || '', data.student_signature || '');
+    drawSig(tX, data.student_name || 'Aluno(a)',     'CONTRATANTE', data.student_cpf || '', data.student_signature || '');
+    drawSig(sX, data.teacher_name || 'Professor(a)', 'CONTRATADO(A)', data.teacher_cpf || '', data.teacher_signature || '');
 
     doc.end();
   });
