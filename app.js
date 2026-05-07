@@ -311,6 +311,7 @@ async function refreshTeacherAll() {
   renderTeacherCalendar(lessons);
   renderTeacherFiles(files, students);
   populateStudentSelects(students);
+  loadTeacherContracts();
 }
 
 function renderTeacherOverview(students, lessons) {
@@ -583,6 +584,7 @@ async function refreshStudentAll() {
   renderStudentCalendar(lessons);
   renderStudentFiles(files);
   renderStudentProgress(lessons, notes);
+  loadStudentContracts();
 }
 
 function renderStudentDashboard(lessons, notes) {
@@ -1551,4 +1553,156 @@ function _updateSidebarAvatar(photoDataURL) {
     el.style.backgroundImage = '';
     el.textContent = ME ? ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') : '?';
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CONTRACTS
+// ══════════════════════════════════════════════════════════════
+let _contractStudents = [];
+
+async function openContractModal() {
+  _contractStudents = await api('GET', '/api/students');
+  const sel = document.getElementById('ctr-student');
+  sel.innerHTML = '<option value="">Selecione o aluno...</option>' +
+    _contractStudents.map(s => `<option value="${s.matricula}" data-lang="${s.lang||''}" data-price="${s.price||''}" data-payday="${s.payday||''}">${s.name}</option>`).join('');
+  sel.onchange = () => {
+    const opt = sel.selectedOptions[0];
+    if (!opt) return;
+    if (opt.dataset.lang)   document.getElementById('ctr-course').value  = opt.dataset.lang;
+    if (opt.dataset.price)  document.getElementById('ctr-price').value   = opt.dataset.price;
+    if (opt.dataset.payday) document.getElementById('ctr-payday').value  = opt.dataset.payday;
+  };
+  document.getElementById('ctr-months').value = '';
+  document.getElementById('ctr-hours').value  = '';
+  document.getElementById('ctr-course').value = '';
+  document.getElementById('ctr-price').value  = '';
+  document.getElementById('ctr-payday').value = '';
+  document.getElementById('ctr-start').value  = '';
+  document.getElementById('ctr-teacher-cpf').value = '';
+  initSigPad('sig-contract-teacher');
+  openModal('modal-contract');
+}
+
+function _getContractPayload() {
+  const mat = document.getElementById('ctr-student').value;
+  const s = _contractStudents.find(x => x.matricula === mat);
+  return {
+    studentMatricula: mat,
+    student_name: s ? s.name : '',
+    student_cpf:  s ? (s.cpf || '') : '',
+    teacher_name: ME.name,
+    course:         document.getElementById('ctr-course').value.trim() || (s?.lang || 'inglês'),
+    months:         document.getElementById('ctr-months').value.trim(),
+    hours_per_week: document.getElementById('ctr-hours').value.trim(),
+    price:          document.getElementById('ctr-price').value.trim(),
+    payday:         document.getElementById('ctr-payday').value.trim(),
+    start_date:     document.getElementById('ctr-start').value
+                      ? new Date(document.getElementById('ctr-start').value).toLocaleDateString('pt-BR')
+                      : new Date().toLocaleDateString('pt-BR'),
+    teacher_cpf:    document.getElementById('ctr-teacher-cpf').value.trim(),
+    teacher_signature: getSigDataURL('sig-contract-teacher'),
+  };
+}
+
+async function previewContract() {
+  const payload = _getContractPayload();
+  if (!payload.studentMatricula) { showToast('⚠️ Selecione um aluno'); return; }
+  if (!payload.months)           { showToast('⚠️ Informe a duração'); return; }
+  try {
+    const r = await api('POST', '/api/contracts/preview', payload);
+    const blob = new Blob([Uint8Array.from(atob(r.pdf), c => c.charCodeAt(0))], { type: 'application/pdf' });
+    const url  = URL.createObjectURL(blob);
+    document.getElementById('pdf-preview-frame').src = url;
+    document.querySelector('#modal-pdf-preview .mh h3').textContent = 'Pré-visualização do Contrato';
+    openModal('modal-pdf-preview');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function issueContract() {
+  const payload = _getContractPayload();
+  if (!payload.studentMatricula)   { showToast('⚠️ Selecione um aluno'); return; }
+  if (!payload.months)             { showToast('⚠️ Informe a duração'); return; }
+  if (!payload.hours_per_week)     { showToast('⚠️ Informe as horas por semana'); return; }
+  if (!payload.teacher_cpf)        { showToast('⚠️ Informe seu CPF'); return; }
+  if (!payload.teacher_signature || payload.teacher_signature.length < 200)
+    { showToast('⚠️ Assine o contrato'); return; }
+  try {
+    await api('POST', '/api/contracts', payload);
+    closeModal('modal-contract');
+    showToast('✅ Contrato gerado! O aluno precisará assinar.');
+    loadTeacherContracts();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function loadTeacherContracts() {
+  const contracts = await api('GET', '/api/contracts');
+  const el = document.getElementById('t-contracts-list');
+  if (!el) return;
+  if (!contracts.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Nenhum contrato emitido ainda.</p></div>';
+    return;
+  }
+  el.innerHTML = contracts.map(c => `
+    <div class="cert-card">
+      <div class="cert-icon">📋</div>
+      <div class="cert-info">
+        <div class="cert-title">${c.studentName}</div>
+        <div class="cert-meta">${c.course} &nbsp;•&nbsp; ${c.months} ${parseInt(c.months)===1?'mês':'meses'} &nbsp;•&nbsp; ${c.hoursPerWeek}h/sem &nbsp;•&nbsp; R$ ${c.price}/mês &nbsp;•&nbsp; ${c.issuedDate}</div>
+        <div class="cert-id">ID: ${c.contractId}</div>
+      </div>
+      <div class="cert-actions">
+        ${c.status === 'complete'
+          ? `<span class="badge b-done badge-complete">✅ Assinado</span>
+             <a href="/api/contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar PDF</a>`
+          : `<span class="badge b-sched" style="background:#fef3c7;color:#92400e">⏳ Aguardando aluno</span>`
+        }
+      </div>
+    </div>`).join('');
+}
+
+async function loadStudentContracts() {
+  const contracts = await api('GET', '/api/contracts');
+  const el = document.getElementById('s-contracts-list');
+  if (!el) return;
+  if (!contracts.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Nenhum contrato emitido ainda.</p></div>';
+    return;
+  }
+  el.innerHTML = contracts.map(c => `
+    <div class="cert-card">
+      <div class="cert-icon">📋</div>
+      <div class="cert-info">
+        <div class="cert-title">Contrato — ${c.course}</div>
+        <div class="cert-meta">${c.months} ${parseInt(c.months)===1?'mês':'meses'} &nbsp;•&nbsp; ${c.hoursPerWeek}h/sem &nbsp;•&nbsp; R$ ${c.price}/mês &nbsp;•&nbsp; Prof. ${c.teacherName} &nbsp;•&nbsp; ${c.issuedDate}</div>
+        <div class="cert-id">ID: ${c.contractId}</div>
+      </div>
+      <div class="cert-actions">
+        ${c.status === 'complete'
+          ? `<span class="badge b-done badge-complete">✅ Assinado</span>
+             <a href="/api/contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar PDF</a>`
+          : `<button class="btn-primary" style="font-size:13px" onclick="openStudentContractSign(${c.$loki})">✍️ Assinar</button>`
+        }
+      </div>
+    </div>`).join('');
+}
+
+function openStudentContractSign(lokiId) {
+  document.getElementById('sign-contract-id').value = lokiId;
+  document.getElementById('sign-contract-cpf').value = '';
+  initSigPad('sig-contract-student');
+  openModal('modal-student-contract-sign');
+}
+
+async function submitStudentContractSign() {
+  const id  = document.getElementById('sign-contract-id').value;
+  const cpf = document.getElementById('sign-contract-cpf').value.trim();
+  const sig  = getSigDataURL('sig-contract-student');
+  if (!cpf)                 { showToast('⚠️ Informe seu CPF'); return; }
+  if (!sig || sig.length < 200) { showToast('⚠️ Assine o contrato'); return; }
+  try {
+    await api('PUT', `/api/contracts/${id}/student-sign`, { student_signature: sig, student_cpf: cpf });
+    closeModal('modal-student-contract-sign');
+    showToast('✅ Contrato assinado! Disponível para download.');
+    loadStudentContracts();
+  } catch(e) { showToast('❌ ' + e.message); }
 }

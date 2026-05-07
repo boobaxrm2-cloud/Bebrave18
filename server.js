@@ -7,6 +7,7 @@ const path     = require('path');
 const fs       = require('fs');
 const Loki     = require('lokijs');
 const { generateCertificate } = require('./certGenerator');
+const { generateContract }    = require('./contractGenerator');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -14,8 +15,9 @@ const PORT = process.env.PORT || 3000;
 // ── Directories ──────────────────────────────────────────────
 const DATA_DIR    = process.env.DATA_DIR    || path.join(__dirname, 'data');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
-const CERT_DIR    = path.join(UPLOADS_DIR, 'certs');
-[DATA_DIR, UPLOADS_DIR, CERT_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+const CERT_DIR      = path.join(UPLOADS_DIR, 'certs');
+const CONTRACTS_DIR = path.join(UPLOADS_DIR, 'contracts');
+[DATA_DIR, UPLOADS_DIR, CERT_DIR, CONTRACTS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 // ── Database ─────────────────────────────────────────────────
 const DB_PATH = path.join(DATA_DIR, 'bebrave.db');
@@ -24,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -35,6 +37,7 @@ function dbReady() {
   Notes        = db.getCollection('notes')        || db.addCollection('notes',        { indices: ['studentMatricula'] });
   Certificates    = db.getCollection('certificates')    || db.addCollection('certificates',    { indices: ['studentMatricula', 'certId'] });
   DeletedStudents = db.getCollection('deletedStudents') || db.addCollection('deletedStudents', { indices: ['matricula'] });
+  Contracts       = db.getCollection('contracts')       || db.addCollection('contracts',       { indices: ['studentMatricula', 'contractId', 'teacherLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -55,6 +58,9 @@ function genMatricula() {
 }
 function genCertId() {
   return 'CERT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+function genContractId() {
+  return 'CTR-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 function initials(name) {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
@@ -453,6 +459,97 @@ app.delete('/api/certificates/:id', auth, isTeach, (req, res) => {
   res.json({ ok: true });
 });
 
+// ════════════════════════════════════════════════════════════════
+//  CONTRACTS
+// ════════════════════════════════════════════════════════════════
+
+app.get('/api/contracts', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role === 'student') return res.json(Contracts.find({ studentMatricula: u.login }));
+  if (u.role === 'teacher') return res.json(Contracts.find({ teacherLogin: u.login }));
+  res.json(Contracts.find());
+});
+
+app.post('/api/contracts/preview', auth, isTeach, async (req, res) => {
+  const data = { ...req.body, contract_id: 'PREVIEW' };
+  if (!data.student_name) return res.status(400).json({ error: 'Dados incompletos' });
+  try {
+    const pdfBuf = await generateContract(data);
+    res.json({ pdf: pdfBuf.toString('base64') });
+  } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar contrato' }); }
+});
+
+app.post('/api/contracts', auth, isTeach, async (req, res) => {
+  const { studentMatricula, course, months, hours_per_week, price, payday,
+          start_date, teacher_cpf, teacher_signature } = req.body;
+  if (!studentMatricula) return res.status(400).json({ error: 'Aluno obrigatório' });
+  if (!teacher_signature) return res.status(400).json({ error: 'Assinatura do professor obrigatória' });
+  const s = Students.findOne({ matricula: studentMatricula });
+  if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
+  const t = Teachers.findOne({ login: req.session.user.login });
+  const contractId = genContractId();
+  const filename   = contractId + '.pdf';
+  const outPath    = path.join(CONTRACTS_DIR, filename);
+  const issuedDate = new Date().toLocaleDateString('pt-BR');
+  const data = {
+    student_name: s.name, student_cpf: s.cpf || '',
+    teacher_name: req.session.user.name, teacher_cpf: teacher_cpf || (t?.cpf || ''),
+    course: course || s.lang || 'inglês', months, hours_per_week,
+    price: price || s.price || '', payday: payday || s.payday || '',
+    start_date: start_date || issuedDate, issued_date: issuedDate,
+    contract_id: contractId, teacher_signature, student_signature: '',
+  };
+  try {
+    const pdfBuf = await generateContract(data);
+    fs.writeFileSync(outPath, pdfBuf);
+    const c = Contracts.insert({
+      contractId, filename, studentMatricula, studentName: s.name, studentCpf: s.cpf || '',
+      teacherLogin: req.session.user.login, teacherName: req.session.user.name,
+      teacherCpf: data.teacher_cpf, course: data.course, months, hoursPerWeek: hours_per_week,
+      price: data.price, payday: data.payday, startDate: data.start_date, issuedDate,
+      teacherSignature: teacher_signature, studentSignature: '', status: 'pending_student', createdAt: now(),
+    });
+    res.json({ ok: true, contractId, $loki: c.$loki });
+  } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar contrato' }); }
+});
+
+app.put('/api/contracts/:id/student-sign', auth, async (req, res) => {
+  const c = Contracts.get(parseInt(req.params.id));
+  if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
+  if (req.session.user.role === 'student' && c.studentMatricula !== req.session.user.login)
+    return res.status(403).json({ error: 'Sem permissão' });
+  const { student_signature, student_cpf } = req.body;
+  if (!student_signature) return res.status(400).json({ error: 'Assinatura obrigatória' });
+  if (c.studentCpf && student_cpf && c.studentCpf.replace(/\D/g,'') !== student_cpf.replace(/\D/g,''))
+    return res.status(400).json({ error: 'CPF informado não corresponde ao cadastro' });
+  const data = {
+    student_name: c.studentName, student_cpf: c.studentCpf,
+    teacher_name: c.teacherName, teacher_cpf: c.teacherCpf,
+    course: c.course, months: c.months, hours_per_week: c.hoursPerWeek,
+    price: c.price, payday: c.payday, start_date: c.startDate, issued_date: c.issuedDate,
+    contract_id: c.contractId, teacher_signature: c.teacherSignature, student_signature,
+  };
+  try {
+    const pdfBuf = await generateContract(data);
+    fs.writeFileSync(path.join(CONTRACTS_DIR, c.filename), pdfBuf);
+    c.studentSignature = student_signature;
+    c.studentCpf = student_cpf || c.studentCpf;
+    c.status = 'complete';
+    Contracts.update(c);
+    res.json({ ok: true, contractId: c.contractId });
+  } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao finalizar contrato' }); }
+});
+
+app.get('/api/contracts/:contractId/download', auth, (req, res) => {
+  const c = Contracts.findOne({ contractId: req.params.contractId });
+  if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
+  const u = req.session.user;
+  if (u.role === 'student' && c.studentMatricula !== u.login) return res.status(403).json({ error: 'Sem permissão' });
+  if (u.role === 'teacher' && c.teacherLogin !== u.login)     return res.status(403).json({ error: 'Sem permissão' });
+  const filePath = path.join(CONTRACTS_DIR, c.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Arquivo não encontrado' });
+  res.download(filePath, `Contrato_${c.studentName.replace(/\s+/g,'_')}.pdf`);
+});
 
 // ════════════════════════════════════════════════════════════════
 //  PROFILE
