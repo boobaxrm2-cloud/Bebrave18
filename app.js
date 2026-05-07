@@ -61,6 +61,22 @@ async function doLogout() {
 // ══════════════════════════════════════════════════════════════
 async function loadAdmin() {
   showPage('page-admin');
+  // Set admin name and initials
+  const initials = ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+  const avatarEl = document.getElementById('adm-avatar-img');
+  if (avatarEl) {
+    avatarEl.style.backgroundImage = '';
+    avatarEl.style.padding = '';
+    avatarEl.innerHTML = '';
+    avatarEl.textContent = initials;
+  }
+  const nameEl = document.getElementById('adm-name');
+  if (nameEl) nameEl.textContent = ME.name;
+  // Load admin profile photo
+  try {
+    const profile = await api('GET', '/api/profile');
+    if (profile.photo) updateSidebarAvatar(profile.photo);
+  } catch(e) {}
   loadAdminOverview();
   loadAdminTeachers();
   loadAdminStudents('');
@@ -271,9 +287,12 @@ function showAdmin(sec, el) {
 // ══════════════════════════════════════════════════════════════
 async function loadTeacher() {
   const initials = ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-  document.getElementById('t-avatar').textContent = initials;
-  document.getElementById('t-name').textContent   = ME.name;
-  // Load profile photo if exists
+  const tAv = document.getElementById('t-avatar');
+  tAv.style.backgroundImage = '';
+  tAv.style.padding = '';
+  tAv.innerHTML = '';
+  tAv.textContent = initials;
+  document.getElementById('t-name').textContent = ME.name;
   try {
     const profile = await api('GET', '/api/profile');
     if (profile.photo) updateSidebarAvatar(profile.photo);
@@ -533,10 +552,14 @@ function showTeacher(sec, el) {
 //  STUDENT
 // ══════════════════════════════════════════════════════════════
 async function loadStudent() {
-  document.getElementById('s-avatar').textContent = ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-  document.getElementById('s-name').textContent   = ME.name;
-  document.getElementById('s-greet').textContent  = ME.name.split(' ')[0];
-  // Load profile photo if exists
+  const initials = ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+  const sAv = document.getElementById('s-avatar');
+  sAv.style.backgroundImage = '';
+  sAv.style.padding = '';
+  sAv.innerHTML = '';
+  sAv.textContent = initials;
+  document.getElementById('s-name').textContent  = ME.name;
+  document.getElementById('s-greet').textContent = ME.name.split(' ')[0];
   try { const p = await api('GET','/api/profile'); if(p.photo) updateSidebarAvatar(p.photo); } catch(e) {}
   // Fetch teacher name from lessons if not in session
   let teacherName = ME.teacherName || '';
@@ -1386,14 +1409,14 @@ async function saveProfile() {
 }
 
 function updateSidebarAvatar(photoB64) {
-  // Update avatar in whichever sidebar is active
-  ['t-avatar', 's-avatar', 'adm-avatar-img'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.innerHTML = `<img src="${photoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-      el.style.padding = '0';
-    }
-  });
+  const roleToId = { admin: 'adm-avatar-img', teacher: 't-avatar', student: 's-avatar' };
+  const id = ME ? roleToId[ME.role] : null;
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (el) {
+    el.innerHTML = `<img src="${photoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    el.style.padding = '0';
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1514,19 +1537,18 @@ async function saveProfile() {
 }
 
 function _updateSidebarAvatar(photoDataURL) {
-  // Update all avatar elements with photo or initials
-  const avatarIds = ['t-avatar', 's-avatar', 'adm-avatar-img'];
-  avatarIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (photoDataURL) {
-      el.style.backgroundImage = `url(${photoDataURL})`;
-      el.style.backgroundSize  = 'cover';
-      el.style.backgroundPosition = 'center';
-      el.textContent = '';
-    } else {
-      el.style.backgroundImage = '';
-      el.textContent = ME ? ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') : '?';
-    }
-  });
+  const roleToId = { admin: 'adm-avatar-img', teacher: 't-avatar', student: 's-avatar' };
+  const id = ME ? roleToId[ME.role] : null;
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (photoDataURL) {
+    el.style.backgroundImage = `url(${photoDataURL})`;
+    el.style.backgroundSize  = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = ME ? ME.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') : '?';
+  }
 }
