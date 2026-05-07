@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, Sessions;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -38,6 +38,7 @@ function dbReady() {
   Certificates    = db.getCollection('certificates')    || db.addCollection('certificates',    { indices: ['studentMatricula', 'certId'] });
   DeletedStudents = db.getCollection('deletedStudents') || db.addCollection('deletedStudents', { indices: ['matricula'] });
   Contracts       = db.getCollection('contracts')       || db.addCollection('contracts',       { indices: ['studentMatricula', 'contractId', 'teacherLogin'] });
+  Sessions        = db.getCollection('sessions')        || db.addCollection('sessions',        { indices: ['sid'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -81,11 +82,39 @@ app.use(express.static(PUBLIC_DIR));
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', dir: __dirname, files: require('fs').readdirSync(__dirname).filter(f => f.endsWith('.html') || f.endsWith('.js') || f.endsWith('.css')) }));
 app.use('/uploads', express.static(UPLOADS_DIR));
+// ── LokiJS Session Store ─────────────────────────────────────
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+class LokiStore extends session.Store {
+  get(sid, cb) {
+    if (!Sessions) return cb(null, null);
+    const r = Sessions.findOne({ sid });
+    if (!r) return cb(null, null);
+    if (r.expires && Date.now() > r.expires) { Sessions.remove(r); return cb(null, null); }
+    cb(null, r.data);
+  }
+  set(sid, data, cb) {
+    if (!Sessions) return cb && cb();
+    const existing = Sessions.findOne({ sid });
+    const expires  = Date.now() + SESSION_TTL;
+    if (existing) { existing.data = data; existing.expires = expires; Sessions.update(existing); }
+    else           { Sessions.insert({ sid, data, expires }); }
+    cb && cb();
+  }
+  destroy(sid, cb) {
+    if (!Sessions) return cb && cb();
+    const r = Sessions.findOne({ sid });
+    if (r) Sessions.remove(r);
+    cb && cb();
+  }
+  touch(sid, data, cb) { this.set(sid, data, cb); }
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'bebrave-secret-xK9pQ2026',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
+  store: new LokiStore(),
+  cookie: { maxAge: SESSION_TTL }
 }));
 
 // ── Multer ───────────────────────────────────────────────────

@@ -802,6 +802,12 @@ async function api(method, url, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
+  if (r.status === 401) {
+    ME = null;
+    showPage('page-login');
+    showToast('⚠️ Sua sessão expirou. Faça login novamente.');
+    throw new Error('Sessão expirada');
+  }
   const json = await r.json();
   if (!r.ok) throw new Error(json.error || 'Erro desconhecido');
   return json;
