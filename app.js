@@ -1698,7 +1698,7 @@ async function previewStudentContract() {
   const contractId = document.getElementById('sign-contract-ctr-id').value;
   if (!contractId) { showToast('⚠️ Contrato não identificado'); return; }
   try {
-    const res = await fetch(`/api/contracts/${contractId}/download`);
+    const res = await fetch(`/api/contracts/${contractId}/view`);
     if (!res.ok) { showToast('❌ Erro ao carregar contrato'); return; }
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);

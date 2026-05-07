@@ -540,15 +540,39 @@ app.put('/api/contracts/:id/student-sign', auth, async (req, res) => {
   } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao finalizar contrato' }); }
 });
 
-app.get('/api/contracts/:contractId/download', auth, (req, res) => {
+async function _serveContract(c, res, inline = false) {
+  const data = {
+    student_name: c.studentName, student_cpf: c.studentCpf,
+    teacher_name: c.teacherName, teacher_cpf: c.teacherCpf,
+    course: c.course, months: c.months, hours_per_week: c.hoursPerWeek,
+    price: c.price, payday: c.payday, start_date: c.startDate, issued_date: c.issuedDate,
+    contract_id: c.contractId, teacher_signature: c.teacherSignature, student_signature: c.studentSignature || '',
+  };
+  const pdfBuf = await generateContract(data);
+  const filename = `Contrato_${c.studentName.replace(/\s+/g,'_')}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${filename}"`);
+  res.send(pdfBuf);
+}
+
+app.get('/api/contracts/:contractId/download', auth, async (req, res) => {
   const c = Contracts.findOne({ contractId: req.params.contractId });
   if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
   const u = req.session.user;
   if (u.role === 'student' && c.studentMatricula !== u.login) return res.status(403).json({ error: 'Sem permissão' });
   if (u.role === 'teacher' && c.teacherLogin !== u.login)     return res.status(403).json({ error: 'Sem permissão' });
-  const filePath = path.join(CONTRACTS_DIR, c.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Arquivo não encontrado' });
-  res.download(filePath, `Contrato_${c.studentName.replace(/\s+/g,'_')}.pdf`);
+  try { await _serveContract(c, res, false); }
+  catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar PDF' }); }
+});
+
+app.get('/api/contracts/:contractId/view', auth, async (req, res) => {
+  const c = Contracts.findOne({ contractId: req.params.contractId });
+  if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
+  const u = req.session.user;
+  if (u.role === 'student' && c.studentMatricula !== u.login) return res.status(403).json({ error: 'Sem permissão' });
+  if (u.role === 'teacher' && c.teacherLogin !== u.login)     return res.status(403).json({ error: 'Sem permissão' });
+  try { await _serveContract(c, res, true); }
+  catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar PDF' }); }
 });
 
 // ════════════════════════════════════════════════════════════════
