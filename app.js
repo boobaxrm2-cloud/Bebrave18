@@ -1694,18 +1694,10 @@ function openStudentContractSign(lokiId, contractId) {
   openModal('modal-student-contract-sign');
 }
 
-async function previewStudentContract() {
+function previewStudentContract() {
   const contractId = document.getElementById('sign-contract-ctr-id').value;
   if (!contractId) { showToast('⚠️ Contrato não identificado'); return; }
-  try {
-    const res = await fetch(`/api/contracts/${contractId}/view`);
-    if (!res.ok) { showToast('❌ Erro ao carregar contrato'); return; }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    document.getElementById('pdf-preview-frame').src = url;
-    document.querySelector('#modal-pdf-preview .mh h3').textContent = 'Contrato — Leitura';
-    openModal('modal-pdf-preview');
-  } catch(e) { showToast('❌ ' + e.message); }
+  window.open(`/api/contracts/${contractId}/view`, '_blank');
 }
 
 async function submitStudentContractSign() {
