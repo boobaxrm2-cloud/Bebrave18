@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -43,6 +43,7 @@ function dbReady() {
   ForumPosts       = db.getCollection('forumPosts')       || db.addCollection('forumPosts',       { indices: ['teacherLogin'] });
   ForumReplies     = db.getCollection('forumReplies')     || db.addCollection('forumReplies',     { indices: ['postId'] });
   Suggestions      = db.getCollection('suggestions')      || db.addCollection('suggestions',      { indices: ['teacherLogin'] });
+  Payments         = db.getCollection('payments')         || db.addCollection('payments',         { indices: ['studentMatricula', 'teacherLogin', 'month'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -1054,6 +1055,100 @@ app.put('/api/admin/suggestions/:id/read', auth, isAdmin, (req, res) => {
   if (!s) return res.status(404).json({ error: 'Sugestão não encontrada' });
   s.read = true;
   Suggestions.update(s);
+  res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════
+//  PAYMENTS
+// ════════════════════════════════════════════════════════════
+function ensurePaymentForStudent(student, month) {
+  if (!student.price || !student.payday) return;
+  const [y, m] = month.split('-').map(Number);
+  const today = Date.now();
+  const existing = Payments.findOne({ studentMatricula: student.matricula, month });
+  if (!existing) {
+    const dueDate = new Date(y, m - 1, parseInt(student.payday) || 1).setHours(23, 59, 59, 0);
+    Payments.insert({
+      studentMatricula: student.matricula, studentName: student.name,
+      teacherLogin: student.teacherLogin, month,
+      amount: parseFloat(student.price) || 0,
+      dueDate, paidAt: null,
+      status: dueDate < today ? 'overdue' : 'pending',
+    });
+  } else if (existing.status === 'pending' && existing.dueDate < today) {
+    existing.status = 'overdue';
+    Payments.update(existing);
+  }
+}
+
+function ensureMonthlyPayments(teacherLogin, month) {
+  Students.find({ teacherLogin }).forEach(s => ensurePaymentForStudent(s, month));
+}
+
+app.get('/api/payments', auth, isTeach, (req, res) => {
+  const tLogin = req.session.user.login;
+  const month  = req.query.month || new Date().toISOString().slice(0, 7);
+  ensureMonthlyPayments(tLogin, month);
+  const payments = Payments.find({ teacherLogin: tLogin, month })
+    .sort((a, b) => a.studentName.localeCompare(b.studentName));
+  const paid     = payments.filter(p => p.status === 'paid');
+  const pending  = payments.filter(p => p.status === 'pending');
+  const overdue  = payments.filter(p => p.status === 'overdue');
+  const totalAmount    = payments.reduce((s, p) => s + p.amount, 0);
+  const receivedAmount = paid.reduce((s, p) => s + p.amount, 0);
+  res.json({ payments, month, summary: { total: payments.length, paid: paid.length, pending: pending.length, overdue: overdue.length, totalAmount, receivedAmount } });
+});
+
+app.put('/api/payments/:id/mark-paid', auth, isTeach, (req, res) => {
+  const p = Payments.get(parseInt(req.params.id));
+  if (!p) return res.status(404).json({ error: 'Pagamento não encontrado' });
+  if (p.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
+  p.status = 'paid'; p.paidAt = Date.now();
+  Payments.update(p);
+  res.json({ ok: true });
+});
+
+app.put('/api/payments/:id/mark-unpaid', auth, isTeach, (req, res) => {
+  const p = Payments.get(parseInt(req.params.id));
+  if (!p) return res.status(404).json({ error: 'Pagamento não encontrado' });
+  if (p.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
+  p.status = p.dueDate < Date.now() ? 'overdue' : 'pending'; p.paidAt = null;
+  Payments.update(p);
+  res.json({ ok: true });
+});
+
+app.get('/api/payments/student', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Sem permissão' });
+  const student = Students.findOne({ matricula: u.login });
+  if (!student?.price || !student?.payday) return res.json({ hasPaymentPlan: false, payments: [] });
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  ensurePaymentForStudent(student, currentMonth);
+  const payments = Payments.find({ studentMatricula: u.login })
+    .sort((a, b) => b.month.localeCompare(a.month));
+  res.json({ hasPaymentPlan: true, price: student.price, payday: student.payday, payments });
+});
+
+app.get('/api/payments/student/alert', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.json({ alert: false });
+  const student = Students.findOne({ matricula: u.login });
+  if (!student?.price || !student?.payday) return res.json({ alert: false });
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  ensurePaymentForStudent(student, currentMonth);
+  const p = Payments.findOne({ studentMatricula: u.login, month: currentMonth });
+  if (!p || p.status === 'paid') return res.json({ alert: false });
+  const daysUntilDue = Math.ceil((p.dueDate - Date.now()) / 86400000);
+  res.json({ alert: p.status === 'overdue' || daysUntilDue <= 2, status: p.status, daysUntilDue, amount: p.amount, dueDate: p.dueDate });
+});
+
+app.put('/api/students/:matricula/payment-plan', auth, isTeach, (req, res) => {
+  const s = Students.findOne({ matricula: req.params.matricula });
+  if (!s || s.teacherLogin !== req.session.user.login) return res.status(404).json({ error: 'Aluno não encontrado' });
+  const { price, payday } = req.body;
+  if (price  !== undefined) s.price  = price;
+  if (payday !== undefined) s.payday = payday;
+  Students.update(s);
   res.json({ ok: true });
 });
 

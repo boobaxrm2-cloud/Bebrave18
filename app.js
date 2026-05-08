@@ -391,6 +391,7 @@ function renderTeacherStudents(students, lessons) {
           <select onchange="updateStudentLevel('${s.matricula}',this.value)" style="font-size:13px;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);cursor:pointer;font-family:'DM Sans',sans-serif">
             ${['A1','A2','B1','B2','C1','C2'].map(l=>`<option value="${l}"${l===s.level?' selected':''}>${l}</option>`).join('')}
           </select>
+          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
           <button class="btn-danger" style="font-size:13px;padding:8px 16px" onclick="confirmDeleteStudentTeacher('${s.matricula}','${escJs(s.name)}')">🗑 Excluir Aluno</button>
         </div>
       </div>
@@ -589,6 +590,7 @@ async function loadStudent() {
   document.getElementById('s-teacher-name').textContent = teacherName || '—';
   await refreshStudentAll();
   checkPendingContracts('student');
+  checkPaymentAlert();
 }
 
 async function refreshStudentAll() {
@@ -1935,6 +1937,185 @@ async function submitStudentContractSign() {
     showToast('✅ Contrato assinado! Disponível para download.');
     loadStudentContracts();
   } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PAYMENTS
+// ══════════════════════════════════════════════════════════════
+let _paymentMonth = new Date().toISOString().slice(0, 7);
+
+function fmtMonthLabel(ym) {
+  const [y, m] = ym.split('-');
+  return MONTHS_PT[parseInt(m) - 1] + ' / ' + y;
+}
+
+function changePaymentMonth(delta) {
+  const [y, m] = _paymentMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  _paymentMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  loadTeacherPayments();
+}
+
+async function loadTeacherPayments() {
+  const data = await api('GET', `/api/payments?month=${_paymentMonth}`).catch(() => null);
+  if (!data) return;
+  const { payments, summary, month } = data;
+
+  document.getElementById('t-payments-header').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn-sm" onclick="changePaymentMonth(-1)">&#8249; Anterior</button>
+      <span style="font-weight:700;font-size:17px;color:var(--navy)">${fmtMonthLabel(month)}</span>
+      <button class="btn-sm" onclick="changePaymentMonth(1)">Próximo &#8250;</button>
+    </div>`;
+
+  renderStats('t-payments-stats', [
+    { icon: '💰', val: 'R$ ' + summary.totalAmount.toFixed(2).replace('.', ','), lbl: 'Total previsto',   cls: 'bc-blue'  },
+    { icon: '✅', val: 'R$ ' + summary.receivedAmount.toFixed(2).replace('.', ','), lbl: summary.paid + ' pago' + (summary.paid !== 1 ? 's' : ''), cls: 'bc-green' },
+    { icon: '⏳', val: summary.pending, lbl: 'Pendente' + (summary.pending !== 1 ? 's' : ''), cls: 'bc-amber' },
+    { icon: '🔴', val: summary.overdue, lbl: 'Atrasado' + (summary.overdue !== 1 ? 's' : ''), cls: 'bc-red'   },
+  ]);
+
+  const el = document.getElementById('t-payments-list');
+  if (!payments.length) {
+    el.innerHTML = `<p class="empty" style="padding:24px">Nenhum aluno com mensalidade configurada neste mês.<br>
+      <small style="color:var(--g400)">Configure o valor e dia de vencimento ao cadastrar o aluno ou clique em ⚙️ na tabela de alunos.</small></p>`;
+    return;
+  }
+
+  const statusHtml = {
+    paid:    '<span style="background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">✅ Pago</span>',
+    pending: '<span style="background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ Pendente</span>',
+    overdue: '<span style="background:#fee2e2;color:#991b1b;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">🔴 Atrasado</span>',
+  };
+
+  el.innerHTML = `<table class="list-table"><thead><tr>
+    <th>Aluno</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Pago em</th><th>Ação</th>
+  </tr></thead><tbody>
+    ${payments.map(p => {
+      const due   = new Date(p.dueDate).toLocaleDateString('pt-BR');
+      const paidAt = p.paidAt ? new Date(p.paidAt).toLocaleDateString('pt-BR') : '—';
+      const action = p.status === 'paid'
+        ? `<button class="btn-sm" style="background:#fee2e2;color:#991b1b;font-size:12px" onclick="markPaymentUnpaid(${p.$loki})">Desfazer</button>`
+        : `<button class="btn-sm" style="background:#d1fae5;color:#065f46;font-size:12px" onclick="markPaymentPaid(${p.$loki})">Marcar pago</button>`;
+      return `<tr>
+        <td><strong>${p.studentName}</strong></td>
+        <td>R$ ${p.amount.toFixed(2).replace('.', ',')}</td>
+        <td>dia ${new Date(p.dueDate).getDate()}</td>
+        <td>${statusHtml[p.status]}</td>
+        <td style="color:var(--g500);font-size:13px">${paidAt}</td>
+        <td>${action}</td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+async function markPaymentPaid(id) {
+  try {
+    await api('PUT', `/api/payments/${id}/mark-paid`);
+    showToast('✅ Pagamento registrado!');
+    loadTeacherPayments();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function markPaymentUnpaid(id) {
+  if (!confirm('Desfazer o registro deste pagamento?')) return;
+  try {
+    await api('PUT', `/api/payments/${id}/mark-unpaid`);
+    showToast('↩️ Pagamento desmarcado.');
+    loadTeacherPayments();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+function openPaymentPlanModal(matricula, name, price, payday) {
+  document.getElementById('pp-matricula').value = matricula;
+  document.getElementById('pp-student-name').textContent = name;
+  document.getElementById('pp-price').value  = price  || '';
+  document.getElementById('pp-payday').value = payday || '';
+  openModal('modal-payment-plan');
+}
+
+async function savePaymentPlan() {
+  const matricula = document.getElementById('pp-matricula').value;
+  const price     = document.getElementById('pp-price').value;
+  const payday    = document.getElementById('pp-payday').value;
+  if (!price || !payday) { showToast('⚠️ Preencha valor e dia de vencimento'); return; }
+  if (parseInt(payday) < 1 || parseInt(payday) > 31) { showToast('⚠️ Dia inválido (1–31)'); return; }
+  try {
+    await api('PUT', `/api/students/${matricula}/payment-plan`, { price: parseFloat(price), payday: parseInt(payday) });
+    closeModal('modal-payment-plan');
+    showToast('✅ Mensalidade configurada!');
+    loadTeacherPayments();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function loadStudentPayments() {
+  const data = await api('GET', '/api/payments/student').catch(() => null);
+  const el = document.getElementById('s-payments-content');
+  if (!data?.hasPaymentPlan) {
+    el.innerHTML = '<div class="card"><p class="empty">Nenhuma mensalidade configurada pelo seu professor ainda.</p></div>';
+    return;
+  }
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const current = data.payments.find(p => p.month === currentMonth);
+  const history = data.payments.filter(p => p.month !== currentMonth);
+
+  const stMap = {
+    paid:    { label: '✅ Pago',      bg: '#d1fae5', color: '#065f46' },
+    pending: { label: '⏳ Pendente',  bg: '#fef3c7', color: '#92400e' },
+    overdue: { label: '🔴 Atrasado',  bg: '#fee2e2', color: '#991b1b' },
+  };
+
+  let html = '';
+  if (current) {
+    const st  = stMap[current.status];
+    const due = new Date(current.dueDate).toLocaleDateString('pt-BR');
+    html += `<div class="card" style="margin-bottom:16px;border-left:4px solid ${st.color}">
+      <div class="ch"><h3>Mensalidade Atual — ${fmtMonthLabel(current.month)}</h3></div>
+      <div style="display:flex;gap:40px;flex-wrap:wrap;margin-top:8px;padding-bottom:8px">
+        <div><div style="font-size:12px;color:var(--g400);margin-bottom:4px">Valor</div><div style="font-size:26px;font-weight:700">R$ ${current.amount.toFixed(2).replace('.', ',')}</div></div>
+        <div><div style="font-size:12px;color:var(--g400);margin-bottom:4px">Vencimento</div><div style="font-size:18px;font-weight:600">${due}</div></div>
+        <div><div style="font-size:12px;color:var(--g400);margin-bottom:4px">Status</div><span style="background:${st.bg};color:${st.color};padding:5px 16px;border-radius:20px;font-weight:600;font-size:14px">${st.label}</span></div>
+        ${current.paidAt ? `<div><div style="font-size:12px;color:var(--g400);margin-bottom:4px">Pago em</div><div style="font-size:16px;font-weight:600">${new Date(current.paidAt).toLocaleDateString('pt-BR')}</div></div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  if (history.length) {
+    html += `<div class="card"><div class="ch"><h3>Histórico de Mensalidades</h3></div>
+      <table class="list-table"><thead><tr><th>Mês</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Pago em</th></tr></thead><tbody>
+        ${history.map(p => {
+          const st = stMap[p.status];
+          return `<tr>
+            <td>${fmtMonthLabel(p.month)}</td>
+            <td>R$ ${p.amount.toFixed(2).replace('.', ',')}</td>
+            <td>${new Date(p.dueDate).toLocaleDateString('pt-BR')}</td>
+            <td><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">${st.label}</span></td>
+            <td style="color:var(--g500);font-size:13px">${p.paidAt ? new Date(p.paidAt).toLocaleDateString('pt-BR') : '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody></table></div>`;
+  }
+
+  el.innerHTML = html || '<div class="card"><p class="empty">Nenhum registro de mensalidade ainda.</p></div>';
+}
+
+async function checkPaymentAlert() {
+  try {
+    const r = await api('GET', '/api/payments/student/alert');
+    if (!r.alert) return;
+    const isOverdue = r.status === 'overdue';
+    const dias = r.daysUntilDue <= 0 ? 'hoje' : `em ${r.daysUntilDue} dia${r.daysUntilDue !== 1 ? 's' : ''}`;
+    const msg  = isOverdue
+      ? `🔴 Sua mensalidade de R$ ${r.amount.toFixed(2).replace('.', ',')} está em atraso!`
+      : `📅 Sua mensalidade de R$ ${r.amount.toFixed(2).replace('.', ',')} vence ${dias}.`;
+    const banner = document.getElementById('s-payment-alert-banner');
+    if (banner) banner.innerHTML = `
+      <div style="background:${isOverdue ? '#fee2e2' : '#fef3c7'};color:${isOverdue ? '#991b1b' : '#92400e'};padding:14px 18px;border-radius:var(--r-sm);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <span style="font-weight:600;font-size:14px">${msg}</span>
+        <button class="btn-sm" onclick="showStudent('s-payments',document.querySelector('#student-sidebar .nav-item:nth-child(7)'))">Ver detalhes</button>
+      </div>`;
+  } catch(e) {}
 }
 
 // ══════════════════════════════════════════════════════════════
