@@ -49,8 +49,10 @@ document.addEventListener('keydown', e => {
 });
 
 async function doLogout() {
-  await api('POST', '/api/auth/logout');
+  try { await api('POST', '/api/auth/logout'); } catch(e) {}
   ME = null;
+  const ov = document.getElementById('teacher-blocked-overlay');
+  if (ov) ov.style.display = 'none';
   showPage('page-login');
   document.getElementById('li-login').value = '';
   document.getElementById('li-pass').value = '';
