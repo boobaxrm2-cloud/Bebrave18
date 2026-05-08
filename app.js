@@ -298,6 +298,7 @@ async function loadTeacher() {
     if (profile.photo) updateSidebarAvatar(profile.photo);
   } catch(e) {}
   await refreshTeacherAll();
+  checkPendingContracts('teacher');
 }
 
 async function refreshTeacherAll() {
@@ -312,6 +313,7 @@ async function refreshTeacherAll() {
   renderTeacherFiles(files, students);
   populateStudentSelects(students);
   loadTeacherContracts();
+  loadTeacherBebraveContracts();
 }
 
 function renderTeacherOverview(students, lessons) {
@@ -572,6 +574,7 @@ async function loadStudent() {
   }
   document.getElementById('s-teacher-name').textContent = teacherName || '—';
   await refreshStudentAll();
+  checkPendingContracts('student');
 }
 
 async function refreshStudentAll() {
@@ -1704,6 +1707,183 @@ function previewStudentContract() {
   const contractId = document.getElementById('sign-contract-ctr-id').value;
   if (!contractId) { showToast('⚠️ Contrato não identificado'); return; }
   window.open(`/api/contracts/${contractId}/view`, '_blank');
+}
+
+// ── Admin contract tabs ────────────────────────────────────────
+function showAdmContractTab(tab) {
+  document.getElementById('adm-teacher-contracts-list').classList.toggle('hidden', tab !== 'teacher');
+  document.getElementById('adm-student-contracts-list').classList.toggle('hidden', tab !== 'student');
+  document.getElementById('adm-ctr-tab-teacher').style.background = tab === 'teacher' ? 'var(--navy)' : '';
+  document.getElementById('adm-ctr-tab-teacher').style.color      = tab === 'teacher' ? '#fff' : '';
+  document.getElementById('adm-ctr-tab-student').style.background = tab === 'student' ? 'var(--navy)' : '';
+  document.getElementById('adm-ctr-tab-student').style.color      = tab === 'student' ? '#fff' : '';
+}
+
+// ── Teacher contract tabs ──────────────────────────────────────
+function showTeacherContractTab(tab) {
+  document.getElementById('t-contracts-list').classList.toggle('hidden', tab !== 'students');
+  document.getElementById('t-bebrave-contracts-list').classList.toggle('hidden', tab !== 'bebrave');
+  document.getElementById('t-ctr-tab-students').style.background = tab === 'students' ? 'var(--navy)' : '';
+  document.getElementById('t-ctr-tab-students').style.color      = tab === 'students' ? '#fff' : '';
+  document.getElementById('t-ctr-tab-bebrave').style.background  = tab === 'bebrave'  ? 'var(--navy)' : '';
+  document.getElementById('t-ctr-tab-bebrave').style.color       = tab === 'bebrave'  ? '#fff' : '';
+}
+
+// ── Admin: load all contracts ──────────────────────────────────
+async function loadAdminContracts() {
+  const [teacherCtrs, studentCtrs] = await Promise.all([
+    api('GET', '/api/admin/teacher-contracts'),
+    api('GET', '/api/admin/contracts'),
+  ]);
+
+  const tel = document.getElementById('adm-teacher-contracts-list');
+  tel.innerHTML = teacherCtrs.length
+    ? teacherCtrs.map(c => `
+      <div class="cert-card">
+        <div class="cert-icon">📋</div>
+        <div class="cert-info">
+          <div class="cert-title">${c.teacherName}</div>
+          <div class="cert-meta">${c.plan === 'trial' ? 'Teste gratuito' : `Mensalidade R$ ${c.monthlyValue}`} &nbsp;•&nbsp; ${c.issuedDate}</div>
+          <div class="cert-id">ID: ${c.contractId}</div>
+        </div>
+        <div class="cert-actions">
+          ${c.status === 'complete'
+            ? `<span class="badge b-done badge-complete">✅ Assinado</span>
+               <a href="/api/teacher-contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar</a>`
+            : `<span class="badge b-sched" style="background:#fef3c7;color:#92400e">⏳ Aguardando professor</span>`}
+        </div>
+      </div>`).join('')
+    : '<div class="card"><p class="empty">Nenhum contrato de professor emitido ainda.</p></div>';
+
+  const sel = document.getElementById('adm-student-contracts-list');
+  sel.innerHTML = studentCtrs.length
+    ? studentCtrs.map(c => `
+      <div class="cert-card">
+        <div class="cert-icon">📋</div>
+        <div class="cert-info">
+          <div class="cert-title">${c.studentName} <span style="color:var(--g400);font-size:12px">• Prof. ${c.teacherName}</span></div>
+          <div class="cert-meta">${c.course} &nbsp;•&nbsp; ${c.months} ${parseInt(c.months)===1?'mês':'meses'} &nbsp;•&nbsp; R$ ${c.price}/mês &nbsp;•&nbsp; ${c.issuedDate}</div>
+          <div class="cert-id">ID: ${c.contractId}</div>
+        </div>
+        <div class="cert-actions">
+          ${c.status === 'complete'
+            ? `<span class="badge b-done badge-complete">✅ Assinado</span>
+               <a href="/api/contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar</a>`
+            : `<span class="badge b-sched" style="background:#fef3c7;color:#92400e">⏳ Aguardando aluno</span>`}
+        </div>
+      </div>`).join('')
+    : '<div class="card"><p class="empty">Nenhum contrato de aluno emitido ainda.</p></div>';
+}
+
+// ── Admin: open teacher contract modal ────────────────────────
+async function openTeacherContractModal() {
+  const teachers = await api('GET', '/api/admin/teachers');
+  const sel = document.getElementById('tctr-teacher');
+  sel.innerHTML = '<option value="">Selecione o professor...</option>' +
+    teachers.map(t => `<option value="${t.login}">${t.name}</option>`).join('');
+  document.getElementById('tctr-plan').value = 'trial';
+  document.getElementById('tctr-value').value = '';
+  document.getElementById('tctr-value-wrap').style.display = 'none';
+  initSigPad('sig-teacher-contract-admin');
+  openModal('modal-teacher-contract');
+}
+function toggleTeacherContractPlan() {
+  const isMon = document.getElementById('tctr-plan').value === 'monthly';
+  document.getElementById('tctr-value-wrap').style.display = isMon ? '' : 'none';
+}
+async function issueTeacherContract() {
+  const teacherLogin = document.getElementById('tctr-teacher').value;
+  const plan         = document.getElementById('tctr-plan').value;
+  const monthly_value = document.getElementById('tctr-value').value.trim();
+  const sig          = getSigDataURL('sig-teacher-contract-admin');
+  if (!teacherLogin)          { showToast('⚠️ Selecione um professor'); return; }
+  if (plan === 'monthly' && !monthly_value) { showToast('⚠️ Informe o valor mensal'); return; }
+  if (!sig || sig.length < 200) { showToast('⚠️ Assine o contrato'); return; }
+  try {
+    await api('POST', '/api/teacher-contracts', { teacherLogin, plan, monthly_value, admin_signature: sig });
+    closeModal('modal-teacher-contract');
+    showToast('✅ Contrato enviado ao professor para assinatura!');
+    loadAdminContracts();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── Teacher: load BeBrave contracts ───────────────────────────
+async function loadTeacherBebraveContracts() {
+  const contracts = await api('GET', '/api/teacher-contracts');
+  const el = document.getElementById('t-bebrave-contracts-list');
+  if (!el) return;
+  el.innerHTML = !contracts.length
+    ? '<div class="card"><p class="empty">Nenhum contrato com a BeBrave emitido ainda.</p></div>'
+    : contracts.map(c => `
+      <div class="cert-card">
+        <div class="cert-icon">📋</div>
+        <div class="cert-info">
+          <div class="cert-title">Contrato BeBrave — ${c.plan === 'trial' ? 'Teste gratuito' : `Mensalidade R$ ${c.monthlyValue}`}</div>
+          <div class="cert-meta">Emitido em ${c.issuedDate}</div>
+          <div class="cert-id">ID: ${c.contractId}</div>
+        </div>
+        <div class="cert-actions">
+          ${c.status === 'complete'
+            ? `<span class="badge b-done badge-complete">✅ Assinado</span>
+               <a href="/api/teacher-contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar PDF</a>`
+            : `<button class="btn-primary" style="font-size:13px" onclick="openTeacherSelfSign(${c.$loki},'${c.contractId}')">✍️ Assinar</button>`}
+        </div>
+      </div>`).join('');
+}
+function openTeacherSelfSign(lokiId, contractId) {
+  document.getElementById('sign-tctr-id').value     = lokiId;
+  document.getElementById('sign-tctr-ctr-id').value = contractId;
+  document.getElementById('sign-tctr-cpf').value    = '';
+  initSigPad('sig-teacher-self');
+  openModal('modal-teacher-self-sign');
+}
+function previewTeacherSelfContract() {
+  const contractId = document.getElementById('sign-tctr-ctr-id').value;
+  if (!contractId) { showToast('⚠️ Contrato não identificado'); return; }
+  window.open(`/api/teacher-contracts/${contractId}/view`, '_blank');
+}
+async function submitTeacherSelfSign() {
+  const id  = document.getElementById('sign-tctr-id').value;
+  const cpf = document.getElementById('sign-tctr-cpf').value.trim();
+  const sig  = getSigDataURL('sig-teacher-self');
+  if (!cpf)                { showToast('⚠️ Informe seu CPF'); return; }
+  if (!sig || sig.length < 200) { showToast('⚠️ Assine o contrato'); return; }
+  try {
+    await api('PUT', `/api/teacher-contracts/${id}/sign`, { teacher_signature: sig, teacher_cpf: cpf });
+    closeModal('modal-teacher-self-sign');
+    showToast('✅ Contrato assinado! Disponível para download.');
+    loadTeacherBebraveContracts();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── Pending contracts popup ────────────────────────────────────
+async function checkPendingContracts(role) {
+  try {
+    if (role === 'student') {
+      const r = await api('GET', '/api/contracts/pending-count');
+      if (r.count > 0) {
+        document.getElementById('pending-contracts-msg').textContent =
+          `Você tem ${r.count} contrato${r.count > 1 ? 's' : ''} pendente${r.count > 1 ? 's' : ''} de assinatura. Assine para regularizar seu acesso à plataforma.`;
+        document.getElementById('pending-contracts-btn').onclick = () => {
+          closeModal('modal-pending-contracts');
+          showStudent('s-contracts', document.querySelector('#student-sidebar .nav-item:last-child'));
+        };
+        openModal('modal-pending-contracts');
+      }
+    } else if (role === 'teacher') {
+      const r = await api('GET', '/api/teacher-contracts/pending-count');
+      if (r.count > 0) {
+        document.getElementById('pending-contracts-msg').textContent =
+          `Você tem ${r.count} contrato${r.count > 1 ? 's' : ''} com a BeBrave pendente${r.count > 1 ? 's' : ''} de assinatura.`;
+        document.getElementById('pending-contracts-btn').onclick = () => {
+          closeModal('modal-pending-contracts');
+          showTeacher('t-contracts', document.querySelector('#teacher-sidebar .nav-item:last-child'));
+          showTeacherContractTab('bebrave');
+        };
+        openModal('modal-pending-contracts');
+      }
+    }
+  } catch(_) {}
 }
 
 async function submitStudentContractSign() {

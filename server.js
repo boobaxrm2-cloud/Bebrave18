@@ -7,7 +7,7 @@ const path     = require('path');
 const fs       = require('fs');
 const Loki     = require('lokijs');
 const { generateCertificate } = require('./certGenerator');
-const { generateContract }    = require('./contractGenerator');
+const { generateContract, generateTeacherContract } = require('./contractGenerator');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, Sessions;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -37,8 +37,9 @@ function dbReady() {
   Notes        = db.getCollection('notes')        || db.addCollection('notes',        { indices: ['studentMatricula'] });
   Certificates    = db.getCollection('certificates')    || db.addCollection('certificates',    { indices: ['studentMatricula', 'certId'] });
   DeletedStudents = db.getCollection('deletedStudents') || db.addCollection('deletedStudents', { indices: ['matricula'] });
-  Contracts       = db.getCollection('contracts')       || db.addCollection('contracts',       { indices: ['studentMatricula', 'contractId', 'teacherLogin'] });
-  Sessions        = db.getCollection('sessions')        || db.addCollection('sessions',        { indices: ['sid'] });
+  Contracts        = db.getCollection('contracts')        || db.addCollection('contracts',        { indices: ['studentMatricula', 'contractId', 'teacherLogin'] });
+  TeacherContracts = db.getCollection('teacherContracts') || db.addCollection('teacherContracts', { indices: ['teacherLogin', 'contractId'] });
+  Sessions         = db.getCollection('sessions')         || db.addCollection('sessions',         { indices: ['sid'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -601,6 +602,112 @@ app.get('/api/contracts/:contractId/view', auth, async (req, res) => {
   if (u.role === 'student' && c.studentMatricula !== u.login) return res.status(403).json({ error: 'Sem permissão' });
   if (u.role === 'teacher' && c.teacherLogin !== u.login)     return res.status(403).json({ error: 'Sem permissão' });
   try { await _serveContract(c, res, true); }
+  catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar PDF' }); }
+});
+
+// ════════════════════════════════════════════════════════════════
+//  TEACHER CONTRACTS (admin creates, teacher signs)
+// ════════════════════════════════════════════════════════════════
+
+// Admin: view all student contracts
+app.get('/api/admin/contracts', auth, isAdmin, (req, res) => {
+  const all = Contracts.find().map(c => ({ ...c, teacherName: c.teacherName, studentName: c.studentName }));
+  res.json(all);
+});
+
+// Admin: view all teacher contracts
+app.get('/api/admin/teacher-contracts', auth, isAdmin, (req, res) => res.json(TeacherContracts.find()));
+
+// Teacher: get own teacher contracts (pending/signed with BeBrave)
+app.get('/api/teacher-contracts', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role === 'teacher') return res.json(TeacherContracts.find({ teacherLogin: u.login }));
+  if (u.role === 'admin')   return res.json(TeacherContracts.find());
+  res.json([]);
+});
+
+// Teacher: check pending count (for popup)
+app.get('/api/teacher-contracts/pending-count', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'teacher') return res.json({ count: 0 });
+  const count = TeacherContracts.find({ teacherLogin: u.login, status: 'pending_teacher' }).length;
+  res.json({ count });
+});
+
+// Student: check pending count (for popup)
+app.get('/api/contracts/pending-count', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.json({ count: 0 });
+  const count = Contracts.find({ studentMatricula: u.login, status: 'pending_student' }).length;
+  res.json({ count });
+});
+
+// Admin: create teacher contract
+app.post('/api/teacher-contracts', auth, isAdmin, async (req, res) => {
+  const { teacherLogin, plan, monthly_value, admin_signature } = req.body;
+  if (!teacherLogin) return res.status(400).json({ error: 'Professor obrigatório' });
+  if (!admin_signature) return res.status(400).json({ error: 'Assinatura do admin obrigatória' });
+  const t = Teachers.findOne({ login: teacherLogin });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  const contractId = 'TCR-' + Date.now() + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+  const issuedDate = new Date().toLocaleDateString('pt-BR');
+  const c = TeacherContracts.insert({
+    contractId, teacherLogin, teacherName: t.name, teacherCpf: t.cpf || '',
+    plan: plan || 'trial', monthlyValue: monthly_value || '',
+    startDate: issuedDate, issuedDate,
+    adminSignature: admin_signature, teacherSignature: '',
+    status: 'pending_teacher', createdAt: now(),
+  });
+  res.json({ ok: true, contractId, $loki: c.$loki });
+});
+
+// Teacher: sign own teacher contract
+app.put('/api/teacher-contracts/:id/sign', auth, async (req, res) => {
+  const c = TeacherContracts.get(parseInt(req.params.id));
+  if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
+  if (req.session.user.role === 'teacher' && c.teacherLogin !== req.session.user.login)
+    return res.status(403).json({ error: 'Sem permissão' });
+  const { teacher_signature, teacher_cpf } = req.body;
+  if (!teacher_signature) return res.status(400).json({ error: 'Assinatura obrigatória' });
+  if (c.teacherCpf && teacher_cpf && c.teacherCpf.replace(/\D/g,'') !== teacher_cpf.replace(/\D/g,''))
+    return res.status(400).json({ error: 'CPF informado não corresponde ao cadastro' });
+  c.teacherSignature = teacher_signature;
+  c.teacherCpf = teacher_cpf || c.teacherCpf;
+  c.status = 'complete';
+  TeacherContracts.update(c);
+  res.json({ ok: true, contractId: c.contractId });
+});
+
+async function _serveTeacherContract(c, res, inline = false) {
+  const data = {
+    teacher_name: c.teacherName, teacher_cpf: c.teacherCpf,
+    plan: c.plan, monthly_value: c.monthlyValue,
+    start_date: c.startDate, issued_date: c.issuedDate,
+    contract_id: c.contractId,
+    admin_signature: c.adminSignature, teacher_signature: c.teacherSignature || '',
+  };
+  const pdfBuf = await generateTeacherContract(data);
+  const filename = `Contrato_BeBrave_${(c.teacherName||'').replace(/\s+/g,'_')}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `${inline?'inline':'attachment'}; filename="${filename}"`);
+  res.send(pdfBuf);
+}
+
+app.get('/api/teacher-contracts/:contractId/view', auth, async (req, res) => {
+  const c = TeacherContracts.findOne({ contractId: req.params.contractId });
+  if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
+  const u = req.session.user;
+  if (u.role === 'teacher' && c.teacherLogin !== u.login) return res.status(403).json({ error: 'Sem permissão' });
+  try { await _serveTeacherContract(c, res, true); }
+  catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar PDF' }); }
+});
+
+app.get('/api/teacher-contracts/:contractId/download', auth, async (req, res) => {
+  const c = TeacherContracts.findOne({ contractId: req.params.contractId });
+  if (!c) return res.status(404).json({ error: 'Contrato não encontrado' });
+  const u = req.session.user;
+  if (u.role === 'teacher' && c.teacherLogin !== u.login) return res.status(403).json({ error: 'Sem permissão' });
+  try { await _serveTeacherContract(c, res, false); }
   catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar PDF' }); }
 });
 

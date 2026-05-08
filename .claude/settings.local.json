@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Jonas\\\\OneDrive\\\\Área de Trabalho\\\\Site\\\\Bebrave18\" -Recurse)",
+      "Bash(Select-Object -First 50)",
+      "Bash(git commit -m 'Remove preview button from contract generation modal *)",
+      "Bash(git commit -m 'Open contract PDF in new tab to avoid modal overlap *)",
+      "Bash(git commit -m 'Fix contract party roles: student is CONTRATANTE, teacher is CONTRATADO *)"
+    ]
+  }
+}
