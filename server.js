@@ -961,13 +961,23 @@ function getTeacherLoginForUser(user) {
   return null;
 }
 
+function getAuthorPhoto(authorLogin, authorRole) {
+  if (authorRole === 'teacher') return Teachers.findOne({ login: authorLogin })?.photo || '';
+  if (authorRole === 'student') return Students.findOne({ matricula: authorLogin })?.photo || '';
+  return Users.findOne({ login: authorLogin })?.photo || '';
+}
+
 app.get('/api/forum', auth, (req, res) => {
   const tLogin = getTeacherLoginForUser(req.session.user);
   if (!tLogin) return res.json([]);
   const posts = ForumPosts.find({ teacherLogin: tLogin }).sort((a, b) => b.createdAt - a.createdAt);
   const result = posts.map(p => ({
     ...p,
-    replies: ForumReplies.find({ postId: p.$loki }).sort((a, b) => a.createdAt - b.createdAt),
+    authorPhoto: getAuthorPhoto(p.authorLogin, p.authorRole),
+    replies: ForumReplies.find({ postId: p.$loki }).sort((a, b) => a.createdAt - b.createdAt).map(r => ({
+      ...r,
+      authorPhoto: getAuthorPhoto(r.authorLogin, r.authorRole),
+    })),
   }));
   res.json(result);
 });

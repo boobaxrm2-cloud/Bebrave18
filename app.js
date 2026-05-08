@@ -1948,6 +1948,12 @@ function fmtTimeAgo(ts) {
   return new Date(ts).toLocaleDateString('pt-BR');
 }
 
+function forumAvatar(photo, name, size) {
+  const s = size || 40;
+  if (photo) return `<img src="${photo}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="${name}">`;
+  return `<div style="width:${s}px;height:${s}px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:${Math.round(s*0.38)}px;font-weight:600;flex-shrink:0">${name.charAt(0).toUpperCase()}</div>`;
+}
+
 function renderForumPosts(posts, role, listId, inputId) {
   const el = document.getElementById(listId);
   if (!posts.length) {
@@ -1969,7 +1975,7 @@ function renderForumPosts(posts, role, listId, inputId) {
         ? `<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:20px;font-weight:600">Professor</span>`
         : `<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 7px;border-radius:20px;font-weight:600">Aluno</span>`;
       return `<div style="display:flex;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--g100)">
-        <div style="width:32px;height:32px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${r.authorName.charAt(0)}</div>
+        ${forumAvatar(r.authorPhoto, r.authorName, 32)}
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <span style="font-weight:600;font-size:13px">${r.authorName}</span>${rBadge}
@@ -1983,7 +1989,7 @@ function renderForumPosts(posts, role, listId, inputId) {
 
     return `<div class="card" style="margin-bottom:14px">
       <div style="display:flex;gap:12px">
-        <div style="width:40px;height:40px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;flex-shrink:0">${p.authorName.charAt(0)}</div>
+        ${forumAvatar(p.authorPhoto, p.authorName, 40)}
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
             <span style="font-weight:700;font-size:14px">${p.authorName}</span>${roleBadge}
