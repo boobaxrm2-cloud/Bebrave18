@@ -128,8 +128,20 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 // ── Auth Guards ──────────────────────────────────────────────
 const auth         = (req, res, next) => req.session.user ? next() : res.status(401).json({ error: 'Não autenticado' });
 const isAdmin      = (req, res, next) => req.session.user?.role === 'admin'   ? next() : res.status(403).json({ error: 'Acesso negado' });
-const isTeach      = (req, res, next) => req.session.user?.role === 'teacher' ? next() : res.status(403).json({ error: 'Acesso negado' });
-const isAdminOrTeach = (req, res, next) => ['admin','teacher'].includes(req.session.user?.role) ? next() : res.status(403).json({ error: 'Acesso negado' });
+const isTeach      = (req, res, next) => {
+  if (req.session.user?.role !== 'teacher') return res.status(403).json({ error: 'Acesso negado' });
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (t?.blocked) return res.status(403).json({ error: 'TEACHER_BLOCKED', message: 'Sua conta está bloqueada. Entre em contato com o administrador.' });
+  next();
+};
+const isAdminOrTeach = (req, res, next) => {
+  if (!['admin','teacher'].includes(req.session.user?.role)) return res.status(403).json({ error: 'Acesso negado' });
+  if (req.session.user.role === 'teacher') {
+    const t = Teachers.findOne({ login: req.session.user.login });
+    if (t?.blocked) return res.status(403).json({ error: 'TEACHER_BLOCKED', message: 'Sua conta está bloqueada. Entre em contato com o administrador.' });
+  }
+  next();
+};
 
 // ════════════════════════════════════════════════════════════
 //  AUTH
@@ -141,6 +153,13 @@ app.post('/api/auth/login', (req, res) => {
   if (!user || !bcrypt.compareSync(password, user.password))
     return res.status(401).json({ error: 'Login ou senha incorretos' });
   if (user.inactive) return res.status(403).json({ error: 'Acesso inativo. Entre em contato com seu professor.' });
+  if (user.role === 'student') {
+    const student = Students.findOne({ matricula: user.login });
+    if (student) {
+      const teacher = Teachers.findOne({ login: student.teacherLogin });
+      if (teacher?.blocked) return res.status(403).json({ error: 'Seu professor está temporariamente indisponível. Entre em contato com seu professor para regularizar o acesso.' });
+    }
+  }
   req.session.user = { id: user.$loki, login: user.login, role: user.role, name: user.name };
   res.json({ role: user.role, name: user.name, login: user.login });
 });
@@ -197,6 +216,15 @@ app.put('/api/admin/reset-password', auth, isAdmin, (req, res) => {
   user.password = bcrypt.hashSync(newPassword, 10);
   Users.update(user);
   res.json({ ok: true });
+});
+
+app.put('/api/admin/teachers/:login/toggle-block', auth, isAdmin, (req, res) => {
+  const login = req.params.login;
+  const t = Teachers.findOne({ login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  t.blocked = !t.blocked;
+  Teachers.update(t);
+  res.json({ ok: true, blocked: t.blocked });
 });
 
 app.delete('/api/admin/teachers/:login', auth, isAdmin, (req, res) => {

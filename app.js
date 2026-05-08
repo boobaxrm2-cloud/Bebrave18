@@ -109,11 +109,12 @@ async function loadAdminTeachers() {
   if (!teachers.length) { el.innerHTML = '<p class="empty">Nenhum professor cadastrado ainda.</p>'; return; }
   el.innerHTML = `<table class="list-table"><thead><tr><th>Professor</th><th>Login</th><th>Alunos</th><th>Cadastrado em</th><th>Ações</th></tr></thead><tbody>
     ${teachers.map(t=>`<tr>
-      <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'}">${t.initials}</div>${t.name}</div></td>
+      <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'}">${t.initials}</div><div><div>${t.name}</div>${t.blocked?'<span style="font-size:11px;color:#ef4444;font-weight:600">● Bloqueado</span>':''}</div></div></td>
       <td><span class="mat-badge" style="background:var(--navy2)">${t.login}</span></td>
       <td>${t.studentCount} aluno${t.studentCount!==1?'s':''}</td>
       <td>${fmtDate(t.createdAt)}</td>
       <td><div class="lt-actions">
+        <button class="btn-icon" title="${t.blocked?'Desbloquear':'Bloquear'} professor" onclick="toggleBlockTeacher('${t.login}',${!!t.blocked})" style="${t.blocked?'color:#22c55e':'color:#ef4444'}">${t.blocked?'🔓':'🔒'}</button>
         <button class="btn-icon" title="Redefinir senha" onclick="openResetPw('${t.login}','${t.name}')">🔑</button>
         <button class="btn-icon danger" title="Excluir" onclick="confirmDelete('teacher','${t.login}','${escJs(t.name)}')">🗑</button>
       </div></td>
@@ -231,6 +232,17 @@ async function adminResetPw() {
     document.getElementById('adm-reset-login').value='';
     document.getElementById('adm-reset-pw').value='';
   } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── Block / unblock teacher ───────────────────────────────────
+async function toggleBlockTeacher(login, isCurrentlyBlocked) {
+  const action = isCurrentlyBlocked ? 'desbloquear' : 'bloquear';
+  if (!confirm(`Tem certeza que deseja ${action} este professor?`)) return;
+  try {
+    const r = await api('PUT', `/api/admin/teachers/${login}/toggle-block`);
+    showToast(r.blocked ? '🔒 Professor bloqueado.' : '✅ Professor desbloqueado.');
+    loadAdminTeachers();
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 // ── Delete confirm ────────────────────────────────────────────
@@ -812,7 +824,13 @@ async function api(method, url, body) {
     throw new Error('Sessão expirada');
   }
   const json = await r.json();
-  if (!r.ok) throw new Error(json.error || 'Erro desconhecido');
+  if (!r.ok) {
+    if (json.error === 'TEACHER_BLOCKED') {
+      showTeacherBlockedOverlay();
+      throw new Error('TEACHER_BLOCKED');
+    }
+    throw new Error(json.error || 'Erro desconhecido');
+  }
   return json;
 }
 
@@ -824,6 +842,23 @@ function showPage(id) {
 function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function closeModalOv(ev, id) { if(ev.target===ev.currentTarget) closeModal(id); }
+
+function showTeacherBlockedOverlay() {
+  let ov = document.getElementById('teacher-blocked-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'teacher-blocked-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;text-align:center;padding:32px';
+    ov.innerHTML = `
+      <div style="font-size:56px;margin-bottom:24px">🔒</div>
+      <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;font-family:'DM Sans',sans-serif">Conta Bloqueada</h2>
+      <p style="font-size:15px;color:#94a3b8;max-width:420px;line-height:1.7;margin-bottom:28px;font-family:'DM Sans',sans-serif">Sua conta foi temporariamente bloqueada pelo administrador. Entre em contato com o administrador para regularizar o acesso.</p>
+      <button onclick="doLogout()" style="background:#3b6ef5;color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Sair</button>
+    `;
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+}
 
 let toastT;
 function showToast(msg) {
