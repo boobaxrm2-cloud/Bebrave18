@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -40,6 +40,9 @@ function dbReady() {
   Contracts        = db.getCollection('contracts')        || db.addCollection('contracts',        { indices: ['studentMatricula', 'contractId', 'teacherLogin'] });
   TeacherContracts = db.getCollection('teacherContracts') || db.addCollection('teacherContracts', { indices: ['teacherLogin', 'contractId'] });
   Sessions         = db.getCollection('sessions')         || db.addCollection('sessions',         { indices: ['sid'] });
+  ForumPosts       = db.getCollection('forumPosts')       || db.addCollection('forumPosts',       { indices: ['teacherLogin'] });
+  ForumReplies     = db.getCollection('forumReplies')     || db.addCollection('forumReplies',     { indices: ['postId'] });
+  Suggestions      = db.getCollection('suggestions')      || db.addCollection('suggestions',      { indices: ['teacherLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -943,6 +946,104 @@ app.put('/api/profile/admin-update/:login', auth, isAdmin, (req, res) => {
   const s = Students.findOne({ matricula: targetLogin });
   if (s) { if (name) s.name = name.trim(); if (cpf) s.cpf = cpf; Students.update(s); }
 
+  res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════
+//  FORUM
+// ════════════════════════════════════════════════════════════
+function getTeacherLoginForUser(user) {
+  if (user.role === 'teacher') return user.login;
+  if (user.role === 'student') {
+    const s = Students.findOne({ matricula: user.login });
+    return s ? s.teacherLogin : null;
+  }
+  return null;
+}
+
+app.get('/api/forum', auth, (req, res) => {
+  const tLogin = getTeacherLoginForUser(req.session.user);
+  if (!tLogin) return res.json([]);
+  const posts = ForumPosts.find({ teacherLogin: tLogin }).sort((a, b) => b.createdAt - a.createdAt);
+  const result = posts.map(p => ({
+    ...p,
+    replies: ForumReplies.find({ postId: p.$loki }).sort((a, b) => a.createdAt - b.createdAt),
+  }));
+  res.json(result);
+});
+
+app.post('/api/forum', auth, (req, res) => {
+  const { content } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
+  const u = req.session.user;
+  if (u.role === 'teacher') {
+    const t = Teachers.findOne({ login: u.login });
+    if (t?.blocked) return res.status(403).json({ error: 'TEACHER_BLOCKED' });
+  }
+  const tLogin = getTeacherLoginForUser(u);
+  if (!tLogin) return res.status(400).json({ error: 'Grupo não encontrado' });
+  const post = ForumPosts.insert({ teacherLogin: tLogin, authorLogin: u.login, authorName: u.name, authorRole: u.role, content: content.trim(), createdAt: Date.now() });
+  res.json({ ok: true, post });
+});
+
+app.delete('/api/forum/:id', auth, (req, res) => {
+  const post = ForumPosts.get(parseInt(req.params.id));
+  if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+  const u = req.session.user;
+  const canDelete = u.role === 'admin' || post.authorLogin === u.login || (u.role === 'teacher' && post.teacherLogin === u.login);
+  if (!canDelete) return res.status(403).json({ error: 'Sem permissão' });
+  ForumReplies.find({ postId: post.$loki }).forEach(r => ForumReplies.remove(r));
+  ForumPosts.remove(post);
+  res.json({ ok: true });
+});
+
+app.post('/api/forum/:id/replies', auth, (req, res) => {
+  const post = ForumPosts.get(parseInt(req.params.id));
+  if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+  const { content } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
+  const u = req.session.user;
+  if (u.role === 'teacher') {
+    const t = Teachers.findOne({ login: u.login });
+    if (t?.blocked) return res.status(403).json({ error: 'TEACHER_BLOCKED' });
+  }
+  const tLogin = getTeacherLoginForUser(u);
+  if (tLogin !== post.teacherLogin) return res.status(403).json({ error: 'Sem permissão' });
+  const reply = ForumReplies.insert({ postId: post.$loki, authorLogin: u.login, authorName: u.name, authorRole: u.role, content: content.trim(), createdAt: Date.now() });
+  res.json({ ok: true, reply });
+});
+
+app.delete('/api/forum/replies/:id', auth, (req, res) => {
+  const reply = ForumReplies.get(parseInt(req.params.id));
+  if (!reply) return res.status(404).json({ error: 'Resposta não encontrada' });
+  const u = req.session.user;
+  const post = ForumPosts.get(reply.postId);
+  const canDelete = u.role === 'admin' || reply.authorLogin === u.login || (u.role === 'teacher' && post?.teacherLogin === u.login);
+  if (!canDelete) return res.status(403).json({ error: 'Sem permissão' });
+  ForumReplies.remove(reply);
+  res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════
+//  SUGGESTIONS
+// ════════════════════════════════════════════════════════════
+app.post('/api/suggestions', auth, isTeach, (req, res) => {
+  const { content } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
+  const u = req.session.user;
+  Suggestions.insert({ teacherLogin: u.login, teacherName: u.name, content: content.trim(), createdAt: Date.now(), read: false });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/suggestions', auth, isAdmin, (req, res) => {
+  res.json(Suggestions.find().sort((a, b) => b.createdAt - a.createdAt));
+});
+
+app.put('/api/admin/suggestions/:id/read', auth, isAdmin, (req, res) => {
+  const s = Suggestions.get(parseInt(req.params.id));
+  if (!s) return res.status(404).json({ error: 'Sugestão não encontrada' });
+  s.read = true;
+  Suggestions.update(s);
   res.json({ ok: true });
 });
 

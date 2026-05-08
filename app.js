@@ -1936,3 +1936,172 @@ async function submitStudentContractSign() {
     loadStudentContracts();
   } catch(e) { showToast('❌ ' + e.message); }
 }
+
+// ══════════════════════════════════════════════════════════════
+//  FORUM
+// ══════════════════════════════════════════════════════════════
+function fmtTimeAgo(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'agora mesmo';
+  if (diff < 3600000) return Math.floor(diff / 60000) + ' min atrás';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h atrás';
+  return new Date(ts).toLocaleDateString('pt-BR');
+}
+
+function renderForumPosts(posts, role, listId, inputId) {
+  const el = document.getElementById(listId);
+  if (!posts.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Nenhuma publicação ainda. Seja o primeiro a escrever!</p></div>';
+    return;
+  }
+  el.innerHTML = posts.map(p => {
+    const isAuthor = p.authorLogin === ME.login;
+    const isTeacherOfGroup = ME.role === 'teacher';
+    const canDelete = isAuthor || isTeacherOfGroup;
+    const roleBadge = p.authorRole === 'teacher'
+      ? `<span style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:20px;font-weight:600">Professor</span>`
+      : `<span style="font-size:11px;background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:20px;font-weight:600">Aluno</span>`;
+
+    const repliesHtml = p.replies.map(r => {
+      const rIsAuthor = r.authorLogin === ME.login;
+      const rCanDelete = rIsAuthor || isTeacherOfGroup;
+      const rBadge = r.authorRole === 'teacher'
+        ? `<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 7px;border-radius:20px;font-weight:600">Professor</span>`
+        : `<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 7px;border-radius:20px;font-weight:600">Aluno</span>`;
+      return `<div style="display:flex;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--g100)">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${r.authorName.charAt(0)}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-weight:600;font-size:13px">${r.authorName}</span>${rBadge}
+            <span style="font-size:11px;color:var(--g400)">${fmtTimeAgo(r.createdAt)}</span>
+            ${rCanDelete ? `<button onclick="deleteForumReply(${r.$loki},'${listId}','${inputId}')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--g400);font-size:12px" title="Excluir">🗑</button>` : ''}
+          </div>
+          <p style="margin:0;font-size:14px;color:var(--g700);line-height:1.5">${escHtml(r.content)}</p>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:12px">
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;flex-shrink:0">${p.authorName.charAt(0)}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">${p.authorName}</span>${roleBadge}
+            <span style="font-size:12px;color:var(--g400)">${fmtTimeAgo(p.createdAt)}</span>
+            ${canDelete ? `<button onclick="deleteForumPost(${p.$loki},'${listId}','${inputId}')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--g400);font-size:13px" title="Excluir">🗑</button>` : ''}
+          </div>
+          <p style="margin:0 0 12px;font-size:15px;color:var(--g800);line-height:1.6">${escHtml(p.content)}</p>
+          <div class="forum-replies">${repliesHtml}</div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <input type="text" placeholder="Responder..." id="reply-${p.$loki}" style="flex:1;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px" onkeydown="if(event.key==='Enter')submitForumReply(${p.$loki},'${listId}','${inputId}')">
+            <button class="btn-sm" onclick="submitForumReply(${p.$loki},'${listId}','${inputId}')">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+async function loadTeacherForum() {
+  try {
+    const posts = await api('GET', '/api/forum');
+    renderForumPosts(posts, 'teacher', 't-forum-list', 't-forum-input');
+  } catch(e) { if (e.message !== 'TEACHER_BLOCKED') showToast('❌ ' + e.message); }
+}
+
+async function loadStudentForum() {
+  try {
+    const posts = await api('GET', '/api/forum');
+    renderForumPosts(posts, 'student', 's-forum-list', 's-forum-input');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function submitForumPost(role) {
+  const inputId = role === 'teacher' ? 't-forum-input' : 's-forum-input';
+  const listId  = role === 'teacher' ? 't-forum-list'  : 's-forum-list';
+  const el = document.getElementById(inputId);
+  const content = el.value.trim();
+  if (!content) { showToast('⚠️ Escreva algo antes de publicar'); return; }
+  try {
+    await api('POST', '/api/forum', { content });
+    el.value = '';
+    role === 'teacher' ? loadTeacherForum() : loadStudentForum();
+  } catch(e) { if (e.message !== 'TEACHER_BLOCKED') showToast('❌ ' + e.message); }
+}
+
+async function submitForumReply(postId, listId, inputId) {
+  const el = document.getElementById(`reply-${postId}`);
+  const content = el ? el.value.trim() : '';
+  if (!content) return;
+  try {
+    await api('POST', `/api/forum/${postId}/replies`, { content });
+    el.value = '';
+    listId === 't-forum-list' ? loadTeacherForum() : loadStudentForum();
+  } catch(e) { if (e.message !== 'TEACHER_BLOCKED') showToast('❌ ' + e.message); }
+}
+
+async function deleteForumPost(id, listId, inputId) {
+  if (!confirm('Excluir esta publicação?')) return;
+  try {
+    await api('DELETE', `/api/forum/${id}`);
+    listId === 't-forum-list' ? loadTeacherForum() : loadStudentForum();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function deleteForumReply(id, listId, inputId) {
+  if (!confirm('Excluir esta resposta?')) return;
+  try {
+    await api('DELETE', `/api/forum/replies/${id}`);
+    listId === 't-forum-list' ? loadTeacherForum() : loadStudentForum();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUGGESTIONS
+// ══════════════════════════════════════════════════════════════
+async function submitSuggestion() {
+  const el = document.getElementById('t-suggestion-input');
+  const content = el.value.trim();
+  if (!content) { showToast('⚠️ Escreva sua sugestão antes de enviar'); return; }
+  try {
+    await api('POST', '/api/suggestions', { content });
+    el.value = '';
+    showToast('✅ Sugestão enviada com sucesso!');
+  } catch(e) { if (e.message !== 'TEACHER_BLOCKED') showToast('❌ ' + e.message); }
+}
+
+async function loadAdminSuggestions() {
+  const suggestions = await api('GET', '/api/admin/suggestions').catch(() => []);
+  const el = document.getElementById('adm-suggestions-list');
+  if (!suggestions.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Nenhuma sugestão recebida ainda.</p></div>';
+    // Clear badge
+    const nav = document.getElementById('adm-nav-suggestions');
+    if (nav) nav.querySelector('.notif-badge')?.remove();
+    return;
+  }
+  el.innerHTML = suggestions.map(s => `
+    <div class="card" style="margin-bottom:14px;${s.read ? 'opacity:0.7' : 'border-left:3px solid var(--navy)'}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">${s.teacherName.charAt(0)}</div>
+        <div>
+          <div style="font-weight:600;font-size:14px">${s.teacherName}</div>
+          <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)}${s.read ? ' · Lida' : ' · <strong style="color:var(--navy)">Nova</strong>'}</div>
+        </div>
+        ${!s.read ? `<button class="btn-sm" style="margin-left:auto" onclick="markSuggestionRead(${s.$loki})">Marcar como lida</button>` : ''}
+      </div>
+      <p style="margin:0;font-size:14px;color:var(--g700);line-height:1.6;white-space:pre-wrap">${escHtml(s.content)}</p>
+    </div>
+  `).join('');
+}
+
+async function markSuggestionRead(id) {
+  try {
+    await api('PUT', `/api/admin/suggestions/${id}/read`);
+    loadAdminSuggestions();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
