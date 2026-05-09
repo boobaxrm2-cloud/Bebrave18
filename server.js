@@ -153,20 +153,18 @@ const isAdminOrTeach = (req, res, next) => {
 // ════════════════════════════════════════════════════════════
 // ── Teacher self-registration (public) ────────────────────────
 app.post('/api/auth/register-teacher', (req, res) => {
-  const { name, cpf, languages, email, whatsapp, password } = req.body;
-  if (!name || !cpf || !email || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
+  const { name, languages, email, whatsapp, password } = req.body;
+  if (!name || !email || !whatsapp || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
   if (password.length < 4) return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres' });
-  const cpfDigits = cpf.replace(/\D/g, '');
-  if (cpfDigits.length < 11) return res.status(400).json({ error: 'CPF inválido — informe os 11 dígitos' });
-  let login = cpfDigits.slice(0, 5);
-  if (Users.findOne({ login })) {
-    login = cpfDigits.slice(0, 6);
-    if (Users.findOne({ login })) return res.status(409).json({ error: 'Login já existente. Entre em contato com o administrador.' });
-  }
+  // Generate temporary numeric login (10001, 10002, ...)
+  let login = String(10000 + Teachers.count() + 1);
+  let tries = 0;
+  while (Users.findOne({ login }) && tries < 200) { tries++; login = String(10000 + Teachers.count() + 1 + tries); }
+  if (Users.findOne({ login })) return res.status(500).json({ error: 'Não foi possível gerar login. Tente novamente.' });
   const ini = initials(name);
   const { color, bg } = pickColor(Teachers.count());
   Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
-  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: cpf.trim(), whatsapp: whatsapp || '', languages: languages || '', initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true });
+  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true });
   res.json({ ok: true, login, name: name.trim() });
 });
 
@@ -209,13 +207,44 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 app.post('/api/teacher/accept-terms', auth, isTeach, (req, res) => {
-  const { signature } = req.body;
+  const { signature, cpf } = req.body;
   if (!signature) return res.status(400).json({ error: 'Assinatura obrigatória' });
+  if (!cpf) return res.status(400).json({ error: 'CPF obrigatório' });
+  const cpfDigits = cpf.replace(/\D/g, '');
+  if (cpfDigits.length < 11) return res.status(400).json({ error: 'CPF inválido — informe os 11 dígitos' });
+  const oldLogin = req.session.user.login;
+  const t = Teachers.findOne({ login: oldLogin });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  // Generate CPF-based login
+  let newLogin = cpfDigits.slice(0, 5);
+  const conflict1 = Users.findOne({ login: newLogin });
+  if (conflict1 && conflict1.login !== oldLogin) {
+    newLogin = cpfDigits.slice(0, 6);
+    const conflict2 = Users.findOne({ login: newLogin });
+    if (conflict2 && conflict2.login !== oldLogin) return res.status(409).json({ error: 'Esse CPF já está cadastrado. Entre em contato com o administrador.' });
+  }
+  // Update Users record
+  const u = Users.findOne({ login: oldLogin });
+  u.login = newLogin;
+  Users.update(u);
+  // Update students referencing this teacher
+  Students.find({ teacherLogin: oldLogin }).forEach(s => { s.teacherLogin = newLogin; Students.update(s); });
+  // Update teacher record
+  t.login = newLogin;
+  t.cpf = cpf.trim();
+  t.termsAccepted = true;
+  t.termsAcceptedAt = Date.now();
+  t.termsSignature = signature;
+  Teachers.update(t);
+  // Update session
+  req.session.user.login = newLogin;
+  res.json({ ok: true, newLogin });
+});
+
+app.get('/api/teacher/my-terms', auth, isTeach, (req, res) => {
   const t = Teachers.findOne({ login: req.session.user.login });
   if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
-  t.termsAccepted = true; t.termsAcceptedAt = Date.now(); t.termsSignature = signature;
-  Teachers.update(t);
-  res.json({ ok: true });
+  res.json({ accepted: t.termsAccepted || false, acceptedAt: t.termsAcceptedAt || null, signature: t.termsSignature || null, name: t.name, cpf: t.cpf || '' });
 });
 
 app.post('/api/auth/change-password', auth, (req, res) => {

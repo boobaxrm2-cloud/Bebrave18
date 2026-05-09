@@ -1871,28 +1871,54 @@ async function issueTeacherContract() {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
-// ── Teacher: load BeBrave contracts ───────────────────────────
+// ── Teacher: load Termo de Uso ────────────────────────────────
 async function loadTeacherBebraveContracts() {
-  const contracts = await api('GET', '/api/teacher-contracts');
   const el = document.getElementById('t-bebrave-contracts-list');
   if (!el) return;
-  el.innerHTML = !contracts.length
-    ? '<div class="card"><p class="empty">Nenhum contrato com a BeBrave emitido ainda.</p></div>'
-    : contracts.map(c => `
-      <div class="cert-card">
-        <div class="cert-icon">📋</div>
-        <div class="cert-info">
-          <div class="cert-title">Contrato BeBrave — ${c.plan === 'trial' ? 'Teste gratuito' : `Mensalidade R$ ${c.monthlyValue}`}</div>
-          <div class="cert-meta">Emitido em ${c.issuedDate}</div>
-          <div class="cert-id">ID: ${c.contractId}</div>
+  try {
+    const d = await api('GET', '/api/teacher/my-terms');
+    if (!d.accepted) {
+      el.innerHTML = `<div class="card" style="text-align:center;padding:32px 24px">
+        <div style="font-size:40px;margin-bottom:12px">📋</div>
+        <p style="font-weight:600;color:var(--g700);margin-bottom:8px">Termo de Uso não assinado</p>
+        <p style="font-size:14px;color:var(--g500)">O Termo de Uso será exibido automaticamente no próximo login.</p>
+      </div>`;
+      return;
+    }
+    const dateStr = d.acceptedAt ? new Date(d.acceptedAt).toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' }) : '—';
+    el.innerHTML = `
+      <div style="border:1.5px solid var(--g200);border-radius:var(--r);background:#fff;overflow:hidden;max-width:680px;margin:0 auto">
+        <div style="background:var(--navy);color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px">
+          <span style="font-size:24px">📋</span>
+          <div>
+            <div style="font-size:16px;font-weight:700">Termo de Uso — BeBrave</div>
+            <div style="font-size:12px;opacity:.8">Assinado em ${dateStr}</div>
+          </div>
+          <span style="margin-left:auto;background:#22c55e;color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px">✅ Aceito</span>
         </div>
-        <div class="cert-actions">
-          ${c.status === 'complete'
-            ? `<span class="badge b-done badge-complete">✅ Assinado</span>
-               <a href="/api/teacher-contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar PDF</a>`
-            : `<button class="btn-primary" style="font-size:13px" onclick="openTeacherSelfSign(${c.$loki},'${c.contractId}')">✍️ Assinar</button>`}
+        <div style="padding:24px;font-size:13px;color:var(--g700);line-height:1.75;border-bottom:1px solid var(--g100)">
+          <p><strong>TERMO DE USO DA PLATAFORMA BEBRAVE</strong></p><br>
+          <p><strong>1. PERÍODO DE TESTE GRATUITO</strong><br>O acesso à plataforma BeBrave é concedido de forma gratuita durante o período de teste, com duração determinada e comunicada ao professor.</p><br>
+          <p><strong>2. ENCERRAMENTO DO PERÍODO DE TESTE</strong><br>Após o término do período de testes, o acesso será automaticamente bloqueado, com notificação prévia.</p><br>
+          <p><strong>3. CONTINUIDADE DO SERVIÇO</strong><br>Ao término do período de teste, o professor poderá continuar utilizando a plataforma mediante aceitação dos novos termos e condições comerciais vigentes.</p><br>
+          <p><strong>4. DADOS E PRIVACIDADE</strong><br>Os dados cadastrados são utilizados exclusivamente para o funcionamento dos serviços da BeBrave, em conformidade com a legislação aplicável.</p><br>
+          <p><strong>5. RESPONSABILIDADES</strong><br>O professor se compromete a utilizar a plataforma de forma ética e legal, respeitando os dados dos alunos e as políticas da BeBrave.</p><br>
+          <p><strong>6. ALTERAÇÕES NOS TERMOS</strong><br>A BeBrave pode alterar estes termos mediante comunicação prévia. A continuidade do uso implica aceitação das novas condições.</p>
         </div>
-      </div>`).join('');
+        <div style="padding:20px 24px;background:var(--g50)">
+          <div style="font-size:12px;color:var(--g500);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Assinatura do Professor</div>
+          <div style="background:#fff;border:1px solid var(--g200);border-radius:var(--r-sm);padding:8px;display:inline-block">
+            <img src="${d.signature}" alt="Assinatura" style="max-height:80px;display:block">
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:var(--g600)">
+            <strong>${escHtml(d.name)}</strong>${d.cpf ? ' · CPF: ' + d.cpf : ''}<br>
+            <span style="font-size:12px;color:var(--g400)">Aceito digitalmente em ${dateStr}</span>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '<p class="empty">Não foi possível carregar o Termo de Uso.</p>';
+  }
 }
 function openTeacherSelfSign(lokiId, contractId) {
   document.getElementById('sign-tctr-id').value     = lokiId;
@@ -2510,30 +2536,28 @@ function fmtCpf(input) {
 }
 
 async function submitTeacherRegistration() {
-  const name      = document.getElementById('reg-name').value.trim();
-  const cpf       = document.getElementById('reg-cpf').value.trim();
-  const languagesRaw = document.getElementById('reg-languages').value.trim();
-  const languages = languagesRaw ? languagesRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
-  const email     = document.getElementById('reg-email').value.trim();
-  const whatsapp  = document.getElementById('reg-whatsapp').value.trim();
-  const password  = document.getElementById('reg-password').value;
+  const name     = document.getElementById('reg-name').value.trim();
+  const languages = Array.from(document.querySelectorAll('.reg-lang-cb:checked')).map(cb => cb.value);
+  const email    = document.getElementById('reg-email').value.trim();
+  const whatsapp = document.getElementById('reg-whatsapp').value.trim();
+  const password = document.getElementById('reg-password').value;
 
-  if (!name)          { showToast('⚠️ Informe o nome completo'); return; }
-  if (cpf.replace(/\D/g,'').length < 11) { showToast('⚠️ CPF inválido'); return; }
-  if (!languagesRaw)  { showToast('⚠️ Informe ao menos um idioma'); return; }
+  if (!name)               { showToast('⚠️ Informe o nome completo'); return; }
+  if (!languages.length)   { showToast('⚠️ Selecione ao menos um idioma'); return; }
   if (!email || !email.includes('@')) { showToast('⚠️ Informe um e-mail válido'); return; }
-  if (!whatsapp)      { showToast('⚠️ Informe o WhatsApp'); return; }
+  if (!whatsapp)           { showToast('⚠️ Informe o WhatsApp'); return; }
   if (password.length < 4) { showToast('⚠️ A senha deve ter ao menos 4 caracteres'); return; }
 
   try {
-    const r = await api('POST', '/api/auth/register-teacher', { name, cpf, languages, email, whatsapp, password });
+    const r = await api('POST', '/api/auth/register-teacher', { name, languages, email, whatsapp, password });
     document.getElementById('reg-success-login').textContent    = r.login;
     document.getElementById('reg-success-password').textContent = password;
     openModal('modal-registration-success');
-    // Clear form
-    ['reg-name','reg-cpf','reg-languages','reg-email','reg-whatsapp','reg-password'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.value = '';
-    });
+    document.getElementById('reg-name').value = '';
+    document.getElementById('reg-email').value = '';
+    document.getElementById('reg-whatsapp').value = '';
+    document.getElementById('reg-password').value = '';
+    document.querySelectorAll('.reg-lang-cb').forEach(cb => cb.checked = false);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
@@ -2550,16 +2574,21 @@ function checkTermsAccepted() {
 }
 
 async function submitTermsAcceptance() {
+  const cpf     = document.getElementById('terms-cpf')?.value.trim();
   const checked = document.getElementById('terms-agree-check')?.checked;
+
+  if (!cpf || cpf.replace(/\D/g,'').length < 11) { showToast('⚠️ Informe um CPF válido'); return; }
   if (!checked) { showToast('⚠️ Marque que leu e concorda com os termos'); return; }
 
   const signature = getSigDataURL('canvas-terms-sig');
   if (!signature) { showToast('⚠️ Assine o termo antes de continuar'); return; }
 
   try {
-    await api('POST', '/api/teacher/accept-terms', { signature });
+    const r = await api('POST', '/api/teacher/accept-terms', { signature, cpf });
     ME.termsAccepted = true;
+    ME.login = r.newLogin;
     closeModal('modal-terms-of-use');
-    showToast('✅ Termo de uso aceito!');
+    showToast(`✅ Termo aceito! Seu novo login é: ${r.newLogin}`);
+    loadTeacherBebraveContracts();
   } catch(e) { showToast('❌ ' + e.message); }
 }

@@ -115,7 +115,7 @@
         <button class="lv2-btn" onclick="doLogin()">Entrar</button>
         <div style="margin-top:18px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:18px">
           <p style="font-size:13px;color:#94a3b8;margin:0 0 10px">É professor e quer usar a plataforma?</p>
-          <button onclick="showPage('page-register')" style="background:transparent;border:1.5px solid rgba(255,255,255,0.2);color:#cbd5e1;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:all .2s" onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='transparent'">Cadastrar-se como Professor</button>
+          <button onclick="showPage('page-register')" style="background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.55);color:#ffffff;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:all .2s;letter-spacing:.02em" onmouseenter="this.style.background='rgba(255,255,255,0.28)'" onmouseleave="this.style.background='rgba(255,255,255,0.18)'">Cadastrar-se como Professor</button>
         </div>
       </div>
 
@@ -147,8 +147,23 @@
         <p class="lv2-sub">Preencha seus dados para criar sua conta</p>
         <div id="reg-err" class="alert-err hidden"></div>
         <div class="lv2-field"><label class="lv2-label">Nome completo *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><input id="reg-name" type="text" class="lv2-input" placeholder="Seu nome completo"></div></div>
-        <div class="lv2-field"><label class="lv2-label">CPF *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg><input id="reg-cpf" type="text" class="lv2-input" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)"></div></div>
-        <div class="lv2-field"><label class="lv2-label">Idiomas que leciona *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><input id="reg-languages" type="text" class="lv2-input" placeholder="Ex: Inglês, Espanhol, Francês"></div></div>
+        <div class="lv2-field">
+          <label class="lv2-label">Idiomas que leciona *</label>
+          <div style="background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 12px">
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="en"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇺🇸 Inglês</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="es"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇪🇸 Espanhol</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="fr"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇫🇷 Francês</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="de"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇩🇪 Alemão</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="it"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇮🇹 Italiano</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="jp"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇯🇵 Japonês</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="zh"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇨🇳 Mandarim</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="ko"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇰🇷 Coreano</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="ru"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇷🇺 Russo</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="ar"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇸🇦 Árabe</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="pt"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇧🇷 Português</label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="other" style="accent-color:#3b6ef5;width:15px;height:15px"> 🌐 Outro</label>
+          </div>
+        </div>
         <div class="lv2-field"><label class="lv2-label">E-mail *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg><input id="reg-email" type="email" class="lv2-input" placeholder="seu@email.com"></div></div>
         <div class="lv2-field"><label class="lv2-label">WhatsApp</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
         <div class="lv2-field"><label class="lv2-label">Senha de acesso *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input id="reg-password" type="password" class="lv2-input" placeholder="Mínimo 4 caracteres"><button type="button" class="lv2-eye" onclick="togglePw('reg-password',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
@@ -654,6 +669,11 @@
       <p>O professor se compromete a utilizar a plataforma de forma ética e legal, respeitando os dados dos alunos e as políticas da BeBrave. O uso inadequado poderá resultar no bloqueio imediato do acesso.</p><br>
       <p><strong>6. ALTERAÇÕES NOS TERMOS</strong></p>
       <p>A BeBrave reserva-se o direito de alterar os presentes termos a qualquer momento, mediante comunicação prévia ao professor. A continuidade do uso da plataforma implica aceitação das novas condições.</p>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;color:var(--g600);margin-bottom:6px;display:block;font-weight:600">CPF *</label>
+      <input id="terms-cpf" type="text" maxlength="14" oninput="fmtCpf(this)" placeholder="000.000.000-00"
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-size:14px;font-family:'DM Sans',sans-serif;box-sizing:border-box">
     </div>
     <div style="margin-bottom:16px">
       <label style="font-size:13px;color:var(--g600);margin-bottom:8px;display:block;font-weight:600">Assine abaixo (mouse ou dedo)</label>
