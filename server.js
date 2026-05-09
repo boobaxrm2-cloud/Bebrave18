@@ -889,7 +889,7 @@ app.get('/api/profile', auth, (req, res) => {
     const s = Students.findOne({ matricula: u.login });
     extra = { email: s?.email||'', whatsapp: s?.whatsapp||'', cpf: s?.cpf||'', socialname: s?.socialname||'', photo: s?.photo||'' };
   } else {
-    extra = { email: '', whatsapp: '', cpf: '', socialname: '', photo: user.photo||'' };
+    extra = { email: user.email||'', whatsapp: user.whatsapp||'', cpf: '', socialname: '', photo: user.photo||'' };
   }
   res.json({ name: u.name, role: u.role, login: u.login, ...extra });
 });
@@ -936,7 +936,13 @@ app.put('/api/profile', auth, (req, res) => {
     }
   } else if (u.role === 'admin') {
     const userRec = Users.findOne({ login: u.login });
-    if (userRec && photo !== undefined) { userRec.photo = photo; Users.update(userRec); }
+    if (userRec) {
+      if (photo    !== undefined) userRec.photo    = photo;
+      if (email    !== undefined) userRec.email    = email;
+      if (whatsapp !== undefined) userRec.whatsapp = whatsapp;
+      if (req.body.name) { userRec.name = req.body.name.trim(); req.session.user.name = userRec.name; }
+      Users.update(userRec);
+    }
   }
 
   res.json({ ok: true });
@@ -989,72 +995,6 @@ app.post('/api/admin/students/reactivate', auth, isAdmin, (req, res) => {
 });
 
 
-// ════════════════════════════════════════════════════════════════
-//  PROFILE
-// ════════════════════════════════════════════════════════════════
-
-// GET /api/profile — get own profile
-app.get('/api/profile', auth, (req, res) => {
-  const u = req.session.user;
-  const user = Users.findOne({ login: u.login });
-  if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-
-  let extra = {};
-  if (u.role === 'teacher') {
-    const t = Teachers.findOne({ login: u.login });
-    extra = { email: t?.email||'', cpf: t?.cpf||'', whatsapp: t?.whatsapp||'', photo: t?.photo||'' };
-  } else if (u.role === 'student') {
-    const s = Students.findOne({ matricula: u.login });
-    extra = { email: s?.email||'', cpf: s?.cpf||'', whatsapp: s?.whatsapp||'', photo: s?.photo||'' };
-  } else {
-    extra = { email: user.email||'', photo: user.photo||'' };
-  }
-  res.json({ login: u.login, name: u.name, role: u.role, ...extra });
-});
-
-// PUT /api/profile — update own profile (email, whatsapp, photo, password)
-app.put('/api/profile', auth, (req, res) => {
-  const u = req.session.user;
-  const { email, whatsapp, photo, currentPassword, newPassword } = req.body;
-
-  // Handle password change
-  if (newPassword) {
-    if (!currentPassword) return res.status(400).json({ error: 'Senha atual é obrigatória' });
-    const user = Users.findOne({ login: u.login });
-    if (!bcrypt.compareSync(currentPassword, user.password)) return res.status(400).json({ error: 'Senha atual incorreta' });
-    if (newPassword.length < 4) return res.status(400).json({ error: 'Nova senha deve ter ao menos 4 caracteres' });
-    user.password = bcrypt.hashSync(newPassword, 10);
-    Users.update(user);
-  }
-
-  // Update contact info
-  if (u.role === 'teacher') {
-    const t = Teachers.findOne({ login: u.login });
-    if (t) {
-      if (email     !== undefined) t.email     = email;
-      if (whatsapp  !== undefined) t.whatsapp  = whatsapp;
-      if (photo     !== undefined) t.photo     = photo;
-      Teachers.update(t);
-    }
-  } else if (u.role === 'student') {
-    const s = Students.findOne({ matricula: u.login });
-    if (s) {
-      if (email     !== undefined) s.email     = email;
-      if (whatsapp  !== undefined) s.whatsapp  = whatsapp;
-      if (photo     !== undefined) s.photo     = photo;
-      Students.update(s);
-    }
-  } else if (u.role === 'admin') {
-    const user = Users.findOne({ login: u.login });
-    if (user) {
-      if (email !== undefined) user.email = email;
-      if (photo !== undefined) user.photo = photo;
-      Users.update(user);
-    }
-  }
-
-  res.json({ ok: true });
-});
 
 // PUT /api/profile/admin-update/:login — admin updates name/CPF of any user
 app.put('/api/profile/admin-update/:login', auth, isAdmin, (req, res) => {

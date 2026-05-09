@@ -1346,24 +1346,39 @@ function meetBtnHTML(lesson) {
 //  PROFILE EDIT
 // ══════════════════════════════════════════════════════════════
 let _profilePhotoB64 = null;
+let _cropState = { src: null, x: 0, y: 0, zoom: 1, dragging: false, sx: 0, sy: 0, imgNW: 0, imgNH: 0 };
 
 async function openProfile() {
   try {
     const profile = await api('GET', '/api/profile');
-    
-    // Fill fields
-    document.getElementById('profile-name').value    = profile.name    || '';
-    document.getElementById('profile-login').value   = profile.login   || '';
-    document.getElementById('profile-email').value   = profile.email   || '';
-    document.getElementById('profile-whatsapp').value= profile.whatsapp|| '';
+
+    // Admin can edit their own name
+    const nameInput = document.getElementById('profile-name');
+    const nameLabel = document.getElementById('profile-name-label');
+    if (ME && ME.role === 'admin') {
+      nameInput.disabled = false;
+      nameInput.style.opacity = '';
+      nameInput.style.cursor = '';
+      if (nameLabel) nameLabel.innerHTML = 'Nome completo';
+    } else {
+      nameInput.disabled = true;
+      nameInput.style.opacity = '.6';
+      nameInput.style.cursor = 'not-allowed';
+    }
+
+    nameInput.value                                    = profile.name     || '';
+    document.getElementById('profile-login').value    = profile.login    || '';
+    document.getElementById('profile-email').value    = profile.email    || '';
+    document.getElementById('profile-whatsapp').value = profile.whatsapp || '';
     document.getElementById('profile-pw-current').value = '';
     document.getElementById('profile-pw-new').value     = '';
     _profilePhotoB64 = null;
+    document.getElementById('profile-photo-input').value = '';
 
     // CPF field
-    const cpfWrap = document.getElementById('profile-cpf-wrap');
+    const cpfWrap  = document.getElementById('profile-cpf-wrap');
     const cpfInput = document.getElementById('profile-cpf');
-    if (profile.cpf !== undefined) {
+    if (profile.cpf !== undefined && profile.cpf !== '') {
       cpfWrap.style.display = '';
       cpfInput.value = profile.cpf || '';
     } else {
@@ -1374,32 +1389,92 @@ async function openProfile() {
     const preview = document.getElementById('profile-photo-preview');
     if (profile.photo) {
       preview.innerHTML = `<img src="${profile.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      preview.style.fontSize = '';
     } else {
-      const initials = profile.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
-      preview.textContent = initials;
+      const ini = (profile.name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+      preview.innerHTML = '';
+      preview.textContent = ini;
       preview.style.fontSize = '24px';
     }
 
-    // Hide msg
-    const msg = document.getElementById('profile-save-msg');
-    msg.classList.add('hidden');
-
+    document.getElementById('profile-save-msg').classList.add('hidden');
     openModal('modal-profile');
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+// ── Crop photo ──────────────────────────────────────────────
 function previewProfilePhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
   if (file.size > 2 * 1024 * 1024) { showToast('⚠️ Foto deve ter no máximo 2MB'); return; }
   const reader = new FileReader();
-  reader.onload = (e) => {
-    _profilePhotoB64 = e.target.result;
-    const preview = document.getElementById('profile-photo-preview');
-    preview.innerHTML = `<img src="${_profilePhotoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-  };
+  reader.onload = (e) => _initCropModal(e.target.result);
   reader.readAsDataURL(file);
+  event.target.value = '';
 }
+
+function _initCropModal(src) {
+  _cropState = { src, x: 0, y: 0, zoom: 1, dragging: false, sx: 0, sy: 0, imgNW: 0, imgNH: 0 };
+  const img = document.getElementById('crop-img');
+  img.onload = () => {
+    _cropState.imgNW = img.naturalWidth;
+    _cropState.imgNH = img.naturalHeight;
+    _applyCropTransform();
+  };
+  img.src = src;
+  document.getElementById('crop-zoom').value = 1;
+
+  const area = document.getElementById('crop-area');
+  area.onmousedown  = (e) => { e.preventDefault(); _cropState.dragging=true; _cropState.sx=e.clientX-_cropState.x; _cropState.sy=e.clientY-_cropState.y; area.style.cursor='grabbing'; };
+  area.onmousemove  = (e) => { if(!_cropState.dragging)return; _cropState.x=e.clientX-_cropState.sx; _cropState.y=e.clientY-_cropState.sy; _applyCropTransform(); };
+  area.onmouseup    = () => { _cropState.dragging=false; area.style.cursor='grab'; };
+  area.onmouseleave = () => { _cropState.dragging=false; area.style.cursor='grab'; };
+  area.ontouchstart = (e) => { e.preventDefault(); _cropState.dragging=true; _cropState.sx=e.touches[0].clientX-_cropState.x; _cropState.sy=e.touches[0].clientY-_cropState.y; };
+  area.ontouchmove  = (e) => { e.preventDefault(); if(!_cropState.dragging)return; _cropState.x=e.touches[0].clientX-_cropState.sx; _cropState.y=e.touches[0].clientY-_cropState.sy; _applyCropTransform(); };
+  area.ontouchend   = () => { _cropState.dragging=false; };
+
+  openModal('modal-crop-photo');
+}
+
+function _applyCropTransform() {
+  const SIZE = 280, nw = _cropState.imgNW, nh = _cropState.imgNH;
+  if (!nw || !nh) return;
+  const base  = Math.max(SIZE/nw, SIZE/nh) * _cropState.zoom;
+  const w = nw * base, h = nh * base;
+  const img = document.getElementById('crop-img');
+  img.style.width  = w + 'px';
+  img.style.height = h + 'px';
+  img.style.left   = (SIZE/2 + _cropState.x - w/2) + 'px';
+  img.style.top    = (SIZE/2 + _cropState.y - h/2) + 'px';
+}
+
+function updateCropZoom() {
+  _cropState.zoom = parseFloat(document.getElementById('crop-zoom').value);
+  _applyCropTransform();
+}
+
+function applyCrop() {
+  const SIZE = 280, OUT = 300;
+  const nw = _cropState.imgNW, nh = _cropState.imgNH;
+  const base  = Math.max(SIZE/nw, SIZE/nh) * _cropState.zoom * (OUT/SIZE);
+  const w = nw * base, h = nh * base;
+  const cx = OUT/2 + _cropState.x * (OUT/SIZE);
+  const cy = OUT/2 + _cropState.y * (OUT/SIZE);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = OUT; canvas.height = OUT;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath(); ctx.arc(OUT/2, OUT/2, OUT/2, 0, Math.PI*2); ctx.clip();
+  const img = new Image(); img.src = _cropState.src;
+  ctx.drawImage(img, cx - w/2, cy - h/2, w, h);
+
+  _profilePhotoB64 = canvas.toDataURL('image/jpeg', 0.85);
+  const preview = document.getElementById('profile-photo-preview');
+  preview.innerHTML = `<img src="${_profilePhotoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  preview.style.fontSize = '';
+  closeModal('modal-crop-photo');
+}
+// ── /Crop photo ─────────────────────────────────────────────
 
 async function saveProfile() {
   const email    = document.getElementById('profile-email').value.trim();
@@ -1408,6 +1483,7 @@ async function saveProfile() {
   const newPw    = document.getElementById('profile-pw-new').value;
 
   const payload = { email, whatsapp };
+  if (ME && ME.role === 'admin') payload.name = document.getElementById('profile-name').value.trim();
   if (_profilePhotoB64) payload.photo = _profilePhotoB64;
   if (newPw) { payload.currentPassword = curPw; payload.newPassword = newPw; }
 
@@ -1421,9 +1497,12 @@ async function saveProfile() {
     msg.style.border = '1px solid #6ee7b7';
     msg.classList.remove('hidden');
 
-    // Update avatar in sidebar if photo changed
     if (_profilePhotoB64) updateSidebarAvatar(_profilePhotoB64);
-
+    if (ME && ME.role === 'admin' && payload.name) {
+      ME.name = payload.name;
+      const el = document.getElementById('adm-name');
+      if (el) el.textContent = payload.name;
+    }
     setTimeout(() => closeModal('modal-profile'), 1500);
     showToast('✅ Perfil salvo!');
   } catch(e) {

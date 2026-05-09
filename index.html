@@ -1113,11 +1113,11 @@
       </div>
     </div>
 
-    <!-- Read-only fields -->
+    <!-- Fields -->
     <div id="profile-readonly-fields">
       <div class="field-row">
         <div class="field-group">
-          <label>Nome completo <span style="color:var(--g400);font-size:11px">(somente admin pode alterar)</span></label>
+          <label id="profile-name-label">Nome completo <span style="color:var(--g400);font-size:11px">(somente admin pode alterar)</span></label>
           <input id="profile-name" type="text" disabled style="opacity:.6;cursor:not-allowed">
         </div>
         <div class="field-group" id="profile-cpf-wrap">
@@ -1154,61 +1154,21 @@
   </div>
 </div>
 
-<!-- ═══════ Modal: Editar Perfil ═══════ -->
-<div id="modal-profile" class="modal-ov hidden" onclick="closeModalOv(event,'modal-profile')">
-  <div class="modal-card modal-wide">
-    <div class="mh"><h3>✏️ Editar Perfil</h3><button class="mc-close" onclick="closeModal('modal-profile')">✕</button></div>
-
-    <!-- Avatar section -->
-    <div class="profile-avatar-section">
-      <div class="profile-avatar-preview" id="profile-avatar-preview">?</div>
-      <div class="profile-avatar-actions">
-        <div class="profile-avatar-img-wrap" id="profile-avatar-img-wrap" style="display:none">
-          <img id="profile-avatar-img" src="" alt="Foto de perfil" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--blue)">
-        </div>
-        <button class="btn-secondary" onclick="document.getElementById('profile-photo-input').click()" style="font-size:13px">📷 Alterar foto</button>
-        <button class="btn-secondary" id="profile-remove-photo-btn" onclick="removeProfilePhoto()" style="font-size:13px;display:none">🗑 Remover foto</button>
-        <input type="file" id="profile-photo-input" hidden accept="image/*" onchange="previewProfilePhoto(event)">
-        <p style="font-size:12px;color:var(--g400);margin-top:4px">JPG, PNG ou GIF — máx. 2MB</p>
-      </div>
+<!-- Modal: Crop Foto -->
+<div id="modal-crop-photo" class="modal-ov hidden">
+  <div class="modal-card" style="max-width:360px;width:95vw">
+    <div class="mh"><h3>Ajustar foto de perfil</h3></div>
+    <p style="font-size:13px;color:var(--g500);margin-bottom:12px;text-align:center">Arraste para posicionar · deslize para dar zoom</p>
+    <div id="crop-area" style="position:relative;width:280px;height:280px;margin:0 auto 16px;overflow:hidden;border-radius:50%;border:3px solid var(--blue);cursor:grab;user-select:none;background:#111;touch-action:none">
+      <img id="crop-img" src="" draggable="false" style="position:absolute;max-width:none;pointer-events:none">
     </div>
-
-    <div class="section-divider" style="margin:16px 0"></div>
-
-    <!-- Read-only info -->
-    <div class="profile-readonly-info">
-      <div class="profile-readonly-field">
-        <span class="profile-readonly-label">Nome completo</span>
-        <span class="profile-readonly-value" id="profile-name-display">—</span>
-      </div>
-      <div class="profile-readonly-field" id="profile-cpf-wrap">
-        <span class="profile-readonly-label">CPF</span>
-        <span class="profile-readonly-value" id="profile-cpf-display">—</span>
-      </div>
+    <div style="margin-bottom:20px;padding:0 8px">
+      <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Zoom</label>
+      <input type="range" id="crop-zoom" min="1" max="4" step="0.05" value="1" style="width:100%" oninput="updateCropZoom()">
     </div>
-    <p style="font-size:12px;color:var(--g400);margin-bottom:16px">⚠️ Nome e CPF não podem ser alterados. Entre em contato com o administrador se necessário.</p>
-
-    <!-- Editable fields -->
-    <div class="field-row">
-      <div class="field-group"><label>Nome social</label><input id="profile-socialname" type="text" placeholder="Como prefere ser chamado(a)"></div>
-    </div>
-    <div class="field-row">
-      <div class="field-group"><label>E-mail</label><input id="profile-email" type="email" placeholder="seu@email.com"></div>
-      <div class="field-group"><label>WhatsApp</label><input id="profile-whatsapp" type="text" placeholder="(21) 99999-9999"></div>
-    </div>
-
-    <div class="section-divider" style="margin:16px 0"></div>
-    <div class="field-group" style="margin-bottom:0">
-      <label>Alterar senha</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <input id="profile-cur-pw" type="password" placeholder="Senha atual">
-        <input id="profile-new-pw" type="password" placeholder="Nova senha (mín. 4 caracteres)">
-      </div>
-    </div>
-
     <div class="mf">
-      <button class="btn-secondary" onclick="closeModal('modal-profile')">Cancelar</button>
-      <button class="btn-primary" onclick="saveProfile()">Salvar alterações</button>
+      <button class="btn-secondary" onclick="closeModal('modal-crop-photo')">Cancelar</button>
+      <button class="btn-primary" onclick="applyCrop()">✅ Usar esta foto</button>
     </div>
   </div>
 </div>
