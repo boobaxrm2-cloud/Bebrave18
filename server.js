@@ -247,6 +247,41 @@ app.get('/api/teacher/my-terms', auth, isTeach, (req, res) => {
   res.json({ accepted: t.termsAccepted || false, acceptedAt: t.termsAcceptedAt || null, signature: t.termsSignature || null, name: t.name, cpf: t.cpf || '' });
 });
 
+app.get('/api/admin/teachers/:login/terms-view', auth, isAdmin, (req, res) => {
+  const t = Teachers.findOne({ login: req.params.login });
+  if (!t || !t.termsAccepted) return res.status(404).send('<p>Termo não encontrado ou não assinado.</p>');
+  const dateStr = new Date(t.termsAcceptedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  <title>Termo de Uso — ${t.name}</title>
+  <style>body{font-family:'Helvetica Neue',Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 24px;color:#1e293b;line-height:1.7}
+  h1{font-size:20px;margin-bottom:4px}.sub{color:#64748b;font-size:14px;margin-bottom:32px}
+  .section{margin-bottom:20px}.section h2{font-size:15px;margin-bottom:4px}
+  .sig-box{border:1.5px solid #e2e8f0;border-radius:10px;padding:20px;margin-top:32px;background:#f8fafc}
+  .sig-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:700;margin-bottom:8px}
+  .sig-name{font-size:15px;font-weight:700;margin-top:12px}.sig-date{font-size:13px;color:#64748b}
+  .stamp{display:inline-block;border:2px solid #22c55e;color:#15803d;border-radius:8px;padding:6px 18px;font-size:13px;font-weight:700;margin-top:20px}
+  @media print{body{margin:20px}}</style></head><body>
+  <h1>TERMO DE USO DA PLATAFORMA BEBRAVE</h1>
+  <p class="sub">Documento aceito digitalmente em ${dateStr}</p>
+  <div class="section"><h2>1. PERÍODO DE TESTE GRATUITO</h2><p>O acesso à plataforma BeBrave é concedido de forma gratuita durante o período de teste, com duração determinada e comunicada ao professor.</p></div>
+  <div class="section"><h2>2. ENCERRAMENTO DO PERÍODO DE TESTE</h2><p>Após o término do período de testes, o acesso será automaticamente bloqueado, com notificação prévia ao professor.</p></div>
+  <div class="section"><h2>3. CONTINUIDADE DO SERVIÇO</h2><p>Ao término do período de teste, o professor poderá continuar utilizando a plataforma mediante aceitação dos novos termos e condições comerciais vigentes.</p></div>
+  <div class="section"><h2>4. DADOS E PRIVACIDADE</h2><p>Os dados cadastrados são utilizados exclusivamente para o funcionamento dos serviços da BeBrave, em conformidade com a legislação aplicável.</p></div>
+  <div class="section"><h2>5. RESPONSABILIDADES</h2><p>O professor se compromete a utilizar a plataforma de forma ética e legal, respeitando os dados dos alunos e as políticas da BeBrave.</p></div>
+  <div class="section"><h2>6. ALTERAÇÕES NOS TERMOS</h2><p>A BeBrave pode alterar estes termos mediante comunicação prévia. A continuidade do uso implica aceitação das novas condições.</p></div>
+  <div class="sig-box">
+    <div class="sig-label">Assinatura do Professor</div>
+    <img src="${t.termsSignature}" alt="Assinatura" style="max-height:90px;display:block">
+    <div class="sig-name">${t.name}${t.cpf ? ' · CPF: ' + t.cpf : ''}</div>
+    <div class="sig-date">Aceito digitalmente em ${dateStr}</div>
+    <div class="stamp">✅ Aceito e assinado digitalmente</div>
+  </div>
+  <script>window.onload=()=>window.print()</script>
+  </body></html>`;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 app.post('/api/auth/change-password', auth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres' });

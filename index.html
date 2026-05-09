@@ -115,7 +115,7 @@
         <button class="lv2-btn" onclick="doLogin()">Entrar</button>
         <div style="margin-top:18px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:18px">
           <p style="font-size:13px;color:#94a3b8;margin:0 0 10px">É professor e quer usar a plataforma?</p>
-          <button onclick="showPage('page-register')" style="background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.55);color:#ffffff;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:all .2s;letter-spacing:.02em" onmouseenter="this.style.background='rgba(255,255,255,0.28)'" onmouseleave="this.style.background='rgba(255,255,255,0.18)'">Cadastrar-se como Professor</button>
+          <button onclick="showPage('page-register')" style="background:#2A5FCC;border:none;color:#fff;border-radius:10px;padding:13px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:background .2s;letter-spacing:.02em" onmouseenter="this.style.background='#1A4FB8'" onmouseleave="this.style.background='#2A5FCC'">Cadastre-se</button>
         </div>
       </div>
 
@@ -149,23 +149,24 @@
         <div class="lv2-field"><label class="lv2-label">Nome completo *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><input id="reg-name" type="text" class="lv2-input" placeholder="Seu nome completo"></div></div>
         <div class="lv2-field">
           <label class="lv2-label">Idiomas que leciona *</label>
-          <div style="background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 12px">
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="en"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇺🇸 Inglês</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="es"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇪🇸 Espanhol</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="fr"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇫🇷 Francês</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="de"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇩🇪 Alemão</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="it"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇮🇹 Italiano</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="jp"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇯🇵 Japonês</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="zh"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇨🇳 Mandarim</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="ko"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇰🇷 Coreano</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="ru"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇷🇺 Russo</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="ar"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇸🇦 Árabe</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="pt"  style="accent-color:#3b6ef5;width:15px;height:15px"> 🇧🇷 Português</label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#e2e8f0;cursor:pointer"><input type="checkbox" class="reg-lang-cb" value="other" style="accent-color:#3b6ef5;width:15px;height:15px"> 🌐 Outro</label>
-          </div>
+          <select id="reg-languages" multiple size="5" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;color:#1e293b;background:#fff;outline:none;transition:border-color .18s;box-sizing:border-box">
+            <option value="en">🇺🇸 Inglês</option>
+            <option value="es">🇪🇸 Espanhol</option>
+            <option value="fr">🇫🇷 Francês</option>
+            <option value="de">🇩🇪 Alemão</option>
+            <option value="it">🇮🇹 Italiano</option>
+            <option value="jp">🇯🇵 Japonês</option>
+            <option value="zh">🇨🇳 Mandarim</option>
+            <option value="ko">🇰🇷 Coreano</option>
+            <option value="ru">🇷🇺 Russo</option>
+            <option value="ar">🇸🇦 Árabe</option>
+            <option value="pt">🇧🇷 Português</option>
+            <option value="other">🌐 Outro</option>
+          </select>
+          <p style="font-size:11px;color:#94a3b8;margin:5px 0 0">Segure Ctrl (ou Cmd no Mac) para selecionar mais de um idioma</p>
         </div>
         <div class="lv2-field"><label class="lv2-label">E-mail *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg><input id="reg-email" type="email" class="lv2-input" placeholder="seu@email.com"></div></div>
-        <div class="lv2-field"><label class="lv2-label">WhatsApp</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
+        <div class="lv2-field"><label class="lv2-label">WhatsApp *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
         <div class="lv2-field"><label class="lv2-label">Senha de acesso *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input id="reg-password" type="password" class="lv2-input" placeholder="Mínimo 4 caracteres"><button type="button" class="lv2-eye" onclick="togglePw('reg-password',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
         <button class="lv2-btn" onclick="submitTeacherRegistration()">Criar Conta</button>
         <p style="text-align:center;margin-top:14px"><button onclick="showPage('page-login')" style="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">← Voltar ao login</button></p>
@@ -647,6 +648,20 @@
     </div>
     <p style="font-size:12px;color:var(--g400);margin-bottom:20px">Use estes dados para entrar na plataforma BeBrave.</p>
     <button class="btn-primary" style="width:100%" onclick="closeModal('modal-registration-success');showPage('page-login')">Ir para Login</button>
+  </div>
+</div>
+
+<!-- ═══════ Modal: Novo Login após aceitar termos ═══════ -->
+<div id="modal-new-login" class="modal-ov hidden">
+  <div class="modal-card" style="max-width:400px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">🔑</div>
+    <h3 style="margin-bottom:8px;color:#0f172a">Este é o seu novo LOGIN</h3>
+    <p style="font-size:14px;color:#64748b;margin-bottom:20px">Guarde este código — você precisará dele para entrar na plataforma.</p>
+    <div style="background:#f1f5f9;border-radius:12px;padding:20px 24px;margin-bottom:20px;border:2px solid #2A5FCC">
+      <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Seu login</div>
+      <div id="new-login-display" style="font-size:36px;font-weight:800;color:#2A5FCC;font-family:monospace;letter-spacing:.15em"></div>
+    </div>
+    <button class="btn-primary" style="width:100%;font-size:15px;padding:13px" onclick="closeModal('modal-new-login')">Entendi, vou guardar!</button>
   </div>
 </div>
 

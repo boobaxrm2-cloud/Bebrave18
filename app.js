@@ -115,7 +115,11 @@ async function loadAdminTeachers() {
   </tr></thead><tbody>
     ${teachers.map(t=>{
       const termsHtml = t.termsAccepted
-        ? `<span style="color:#22c55e;font-size:12px;font-weight:600">✅ Aceito</span>`
+        ? `<div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#22c55e;font-size:12px;font-weight:600">✅ Aceito</span>
+            <a href="/api/admin/teachers/${encodeURIComponent(t.login)}/terms-view" target="_blank"
+               style="font-size:11px;background:#e0f2fe;color:#0369a1;border:none;border-radius:6px;padding:3px 8px;text-decoration:none;font-weight:600;cursor:pointer">⬇ Ver</a>
+           </div>`
         : `<span style="color:#f59e0b;font-size:12px;font-weight:600">⏳ Pendente</span>`;
       const pwId = `pw-${t.login.replace(/\W/g,'_')}`;
       const pwHtml = t.plainPassword
@@ -2537,7 +2541,7 @@ function fmtCpf(input) {
 
 async function submitTeacherRegistration() {
   const name     = document.getElementById('reg-name').value.trim();
-  const languages = Array.from(document.querySelectorAll('.reg-lang-cb:checked')).map(cb => cb.value);
+  const languages = Array.from(document.getElementById('reg-languages').selectedOptions).map(o => o.value);
   const email    = document.getElementById('reg-email').value.trim();
   const whatsapp = document.getElementById('reg-whatsapp').value.trim();
   const password = document.getElementById('reg-password').value;
@@ -2557,7 +2561,7 @@ async function submitTeacherRegistration() {
     document.getElementById('reg-email').value = '';
     document.getElementById('reg-whatsapp').value = '';
     document.getElementById('reg-password').value = '';
-    document.querySelectorAll('.reg-lang-cb').forEach(cb => cb.checked = false);
+    Array.from(document.getElementById('reg-languages').options).forEach(o => o.selected = false);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
@@ -2588,7 +2592,8 @@ async function submitTermsAcceptance() {
     ME.termsAccepted = true;
     ME.login = r.newLogin;
     closeModal('modal-terms-of-use');
-    showToast(`✅ Termo aceito! Seu novo login é: ${r.newLogin}`);
+    document.getElementById('new-login-display').textContent = r.newLogin;
+    openModal('modal-new-login');
     loadTeacherBebraveContracts();
   } catch(e) { showToast('❌ ' + e.message); }
 }
