@@ -633,20 +633,6 @@ async function saveEditStudent() {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
-async function startTeacherRoom(lessonId, title, sub) {
-  try {
-    const r = await api('POST', `/api/lessons/${lessonId}/start-room`);
-    openClassroom(r.room, title, sub);
-  } catch(e) { showToast('❌ ' + e.message); }
-}
-
-async function joinStudentRoom(lessonId, title, sub) {
-  try {
-    const r = await api('GET', `/api/lessons/${lessonId}/active-room`);
-    if (!r.room) return showToast('⏳ O professor ainda não iniciou a aula. Tente novamente em instantes!');
-    openClassroom(r.room, title, sub);
-  } catch(e) { showToast('❌ ' + e.message); }
-}
 
 async function changeMonthT(dir) { calMonthT=addMonth(calMonthT,dir); const lessons=await api('GET','/api/lessons'); _calLessonsT=lessons; renderCal(calMonthT,'cal-t','cal-lbl-t',day=>showCalDayT(day),_calLessonsT,null); }
 
@@ -866,8 +852,7 @@ function lessonItemHTML(l, isTeacher) {
     <div class="li-info">
       <div class="li-topic">📖 ${l.subject||l.topic}${l.topic&&l.topic!==l.subject?` <span style="font-weight:400;color:var(--g500);font-size:12px">— ${l.topic}</span>`:''}</div>
       <div class="li-meta">${DAYS_PT[d.getDay()]} • ${l.time} • ${l.duration}min${isTeacher?` • ${l.studentName}`:''}</div>
-      ${jitsiBtnHTML(l, isTeacher)}
-      ${l.meetLink?`<a class="meet-link" href="${l.meetLink}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 Meet externo</a>`:''}
+      ${meetBtnHTML(l)}
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
       <span class="badge b-sched">Agendada</span>
@@ -883,8 +868,7 @@ function dayEventHTML(l, isTeacher) {
   return `<div class="dev ${statusClass}">
     <div class="dev-topic">📖 ${l.subject||l.topic}</div>
     <div class="dev-meta">⏰ ${l.time} • ${l.duration}min${isTeacher?` • 👤 ${l.studentName}`:''} • <span class="badge ${badgeClass}">${badgeLabel}</span></div>
-    ${jitsiBtnHTML(l, isTeacher)}
-    ${l.meetLink&&l.status==='scheduled'?`<a class="meet-link" href="${l.meetLink}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="margin-left:4px">🔗 Meet externo</a>`:''}
+    ${meetBtnHTML(l)}
     ${l.feedback&&l.status!=='scheduled'?`<div style="font-size:12px;color:var(--g600);margin-top:6px;background:var(--g50);padding:6px 10px;border-radius:6px">📝 ${l.feedback}</div>`:''}
     ${l.homework?`<div style="font-size:12px;color:#065f46;margin-top:4px;background:var(--green-pale);padding:5px 10px;border-radius:6px">📚 Tarefa: ${l.homework}</div>`:''}
     ${isTeacher&&l.status==='scheduled'?`<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
@@ -1333,140 +1317,23 @@ async function markAbsent(id) {
 
 
 // ══════════════════════════════════════════════════════════════
-//  JITSI CLASSROOM
+//  GOOGLE MEET BUTTON
 // ══════════════════════════════════════════════════════════════
-let _jitsiAPI  = null;
-let _jitsiRoom = null;
-
-function openClassroom(room, title, sub) {
-  if (!room) return showToast('⚠️ Sala não configurada para esta aula.');
-  _jitsiRoom = room;
-  document.getElementById('classroom-title').textContent = title || 'Sala de Aula';
-  document.getElementById('classroom-sub').textContent   = sub   || '';
-  document.getElementById('modal-classroom').classList.remove('hidden');
-  setTimeout(() => _mountJitsi(room), 250);
-}
-
-function _mountJitsi(room) {
-  const container = document.getElementById('jitsi-container');
-  container.innerHTML = '';
-
-  const startJitsi = () => {
-    if (_jitsiAPI) { try { _jitsiAPI.dispose(); } catch(e){} _jitsiAPI = null; }
-    try {
-      const cH = container.offsetHeight || 600;
-      _jitsiAPI = new window.JitsiMeetExternalAPI('meet.jit.si', {
-        roomName:   room,
-        parentNode: container,
-        width:  '100%',
-        height: cH,
-        lang: 'pt',
-        configOverwrite: {
-          startWithAudioMuted:           false,
-          startWithVideoMuted:           false,
-          enableWelcomePage:             false,
-          disableDeepLinking:            true,
-          prejoinPageEnabled:            false,
-          enableLobbyChat:               false,
-          disableProfile:                false,
-          enableInsecureRoomNameWarning: false,
-          disableThirdPartyRequests:     true,
-          requireDisplayName:            false,
-          enableUserRolesBasedOnToken:   false,
-          toolbarButtons: ['microphone','camera','desktop','fullscreen',
-            'fodeviceselection','hangup','chat','raisehand','tileview'],
-          securityUi: { hideLobbyButton: true },
-        },
-        interfaceConfigOverwrite: {
-          SHOW_JITSI_WATERMARK:      false,
-          SHOW_WATERMARK_FOR_GUESTS: false,
-          SHOW_POWERED_BY:           false,
-          MOBILE_APP_PROMO:          false,
-          APP_NAME:                  'BeBrave',
-          DEFAULT_BACKGROUND:        '#0f1b35',
-        },
-        userInfo: { displayName: ME ? ME.name : 'Participante' },
-      });
-      _jitsiAPI.addEventListener('readyToClose', closeClassroom);
-      // Force iframe to fill container fully
-      setTimeout(() => {
-        const iframe = container.querySelector('iframe');
-        if (iframe) {
-          iframe.style.width  = '100%';
-          iframe.style.height = '100%';
-          iframe.style.position = 'absolute';
-          iframe.style.top = '0';
-          iframe.style.left = '0';
-        }
-        container.style.position = 'relative';
-      }, 800);
-    } catch(e) {
-      container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#fff;gap:16px;padding:32px;text-align:center">
-        <div style="font-size:40px">⚠️</div>
-        <p>Erro ao iniciar a sala.</p>
-        <a href="https://meet.jit.si/${room}" target="_blank" rel="noopener noreferrer"
-           style="background:#3b6ef5;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">
-          Abrir em nova aba
-        </a>
-      </div>`;
-    }
-  };
-
-  if (window.JitsiMeetExternalAPI) {
-    startJitsi();
-  } else {
-    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:14px">Carregando sala…</div>';
-    const s = document.createElement('script');
-    s.src = 'https://meet.jit.si/external_api.js';
-    s.onload  = startJitsi;
-    s.onerror = () => {
-      container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#fff;gap:16px;padding:32px;text-align:center">
-        <div style="font-size:40px">📡</div>
-        <p>Não foi possível carregar a sala.<br>Verifique sua conexão.</p>
-        <a href="https://meet.jit.si/${room}" target="_blank" rel="noopener noreferrer"
-           style="background:#3b6ef5;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">
-          Abrir em nova aba
-        </a>
-      </div>`;
-    };
-    document.head.appendChild(s);
-  }
-}
-
-function closeClassroom() {
-  if (_jitsiAPI) { try { _jitsiAPI.dispose(); } catch(e){} _jitsiAPI = null; }
-  document.getElementById('jitsi-container').innerHTML = '';
-  document.getElementById('modal-classroom').classList.add('hidden');
-}
-
-function copyRoomLink() {
-  if (!_jitsiRoom) return;
-  const url = 'https://meet.jit.si/' + encodeURIComponent(_jitsiRoom);
-  navigator.clipboard.writeText(url).then(() => {
-    showToast('✅ Link copiado!');
-    const btn = document.getElementById('copy-room-btn');
-    if (btn) { btn.textContent = '✅ Copiado!'; setTimeout(() => { btn.textContent = '🔗 Copiar link'; }, 2000); }
-  }).catch(() => prompt('Link da sala:', url));
-}
-
-// Helper: Jitsi button HTML (used in lesson items + day events)
-function jitsiBtnHTML(lesson, isTeacher) {
-  if (!lesson.jitsiRoom || lesson.status !== 'scheduled') return '';
-  const now      = new Date();
+function meetBtnHTML(lesson) {
+  if (!lesson.meetLink || lesson.status !== 'scheduled') return '';
+  const now     = new Date();
   const lessonDt = new Date(lesson.date + 'T' + lesson.time);
   const diffMin  = (lessonDt - now) / 60000;
   const isLive   = diffMin <= 30 && diffMin > -120;
-  const cls      = isLive ? 'btn-jitsi btn-jitsi-live' : 'btn-jitsi';
-  const sub      = (lesson.studentName || '') + (lesson.time ? ' • ' + lesson.time : '');
-  const titleEsc = (lesson.subject || lesson.topic || 'Aula').replace(/'/g, "\\'");
-  const subEsc   = sub.replace(/'/g, "\\'");
-  if (isTeacher) {
-    // Teacher always generates a fresh room when clicking — enters first = becomes moderator automatically
-    return `<button class="${cls}" onclick="startTeacherRoom(${lesson.$loki},'${titleEsc}','${subEsc}')">🎥 Iniciar Aula</button>`;
-  } else {
-    // Student fetches the room the teacher already opened
-    return `<button class="${cls}" onclick="joinStudentRoom(${lesson.$loki},'${titleEsc}','${subEsc}')">🎥 Entrar na Aula</button>`;
-  }
+  const style = isLive
+    ? 'background:#1a73e8;color:#fff;border-color:#1a73e8;font-weight:600'
+    : 'background:#e8f0fe;color:#1a73e8;border-color:#c5d4fb';
+  return `<a href="${lesson.meetLink}" target="_blank" rel="noopener noreferrer"
+    onclick="event.stopPropagation()"
+    style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;border:1.5px solid;font-size:13px;font-family:DM Sans,sans-serif;text-decoration:none;cursor:pointer;${style}">
+    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0"><path d="M29 24c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5z" fill="currentColor"/><path d="M39 12H9C6.8 12 5 13.8 5 16v24c0 2.2 1.8 4 4 4h30c2.2 0 4-1.8 4-4V16c0-2.2-1.8-4-4-4zm-4 26H13c-1.1 0-2-.9-2-2v-8h26v8c0 1.1-.9 2-2 2z" fill="currentColor" opacity=".3"/><path d="M43 16l-8 6v8l8 6V16z" fill="currentColor"/></svg>
+    ${isLive ? 'Entrar no Google Meet' : 'Google Meet'}
+  </a>`;
 }
 
 // ══════════════════════════════════════════════════════════════
