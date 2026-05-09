@@ -484,14 +484,19 @@ app.post('/api/lessons', auth, isTeach, (req, res) => {
   const s = Students.findOne({ matricula: studentMatricula });
   if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
   const jitsiRoom = 'BeBrave-' + s.name.replace(/\s+/g,'-') + '-' + date.replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
-  const lesson = Lessons.insert({ studentMatricula, studentName: s.name, teacherLogin: req.session.user.login, teacherName: req.session.user.name, date, time, topic, subject: subject || topic, duration: parseInt(duration) || 60, status: 'scheduled', meetLink: meetLink || '', jitsiRoom, createdAt: now() });
+  const safeLink = meetLink ? (meetLink.startsWith('http') ? meetLink : 'https://' + meetLink) : '';
+  const lesson = Lessons.insert({ studentMatricula, studentName: s.name, teacherLogin: req.session.user.login, teacherName: req.session.user.name, date, time, topic, subject: subject || topic, duration: parseInt(duration) || 60, status: 'scheduled', meetLink: safeLink, jitsiRoom, createdAt: now() });
   res.json(lesson);
 });
 
 app.put('/api/lessons/:id', auth, isTeach, (req, res) => {
   const l = Lessons.get(parseInt(req.params.id));
   if (!l) return res.status(404).json({ error: 'Aula não encontrada' });
-  ['status','meetLink','topic','subject','date','time','duration','feedback','homework'].forEach(k => { if (req.body[k] !== undefined) l[k] = req.body[k]; });
+  ['status','topic','subject','date','time','duration','feedback','homework'].forEach(k => { if (req.body[k] !== undefined) l[k] = req.body[k]; });
+  if (req.body.meetLink !== undefined) {
+    const ml = req.body.meetLink;
+    l.meetLink = ml ? (ml.startsWith('http') ? ml : 'https://' + ml) : '';
+  }
   Lessons.update(l);
   res.json(l);
 });
