@@ -1426,7 +1426,7 @@ function closeClassroom() {
 
 function copyRoomLink() {
   if (!_jitsiRoom) return;
-  const url = 'https://meet.jit.si/' + _jitsiRoom;
+  const url = 'https://meet.jit.si/' + encodeURIComponent(_jitsiRoom);
   navigator.clipboard.writeText(url).then(() => {
     showToast('✅ Link copiado!');
     const btn = document.getElementById('copy-room-btn');
@@ -1446,7 +1446,10 @@ function jitsiBtnHTML(lesson) {
   const sub      = (lesson.studentName || '') + (lesson.time ? ' • ' + lesson.time : '');
   const titleEsc = (lesson.subject || lesson.topic || 'Aula').replace(/'/g, "\\'");
   const subEsc   = sub.replace(/'/g, "\\'");
-  return `<button class="${cls}" onclick="openClassroom('${lesson.jitsiRoom}','${titleEsc}','${subEsc}')">${label}</button>`;
+  // Append today's date so the room resets daily — prevents lobby getting permanently stuck
+  const today       = now.toISOString().slice(0,10).replace(/-/g,'');
+  const effectiveRoom = lesson.jitsiRoom + '-' + today;
+  return `<button class="${cls}" onclick="openClassroom('${effectiveRoom}','${titleEsc}','${subEsc}')">${label}</button>`;
 }
 
 // ══════════════════════════════════════════════════════════════
