@@ -738,18 +738,64 @@
       <div class="field-group"><label>Nível atual *</label>
         <select id="as-level"><option value="A1">A1 — Iniciante</option><option value="A2">A2 — Básico</option><option value="B1">B1 — Intermediário</option><option value="B2" selected>B2 — Interm. Avançado</option><option value="C1">C1 — Avançado</option><option value="C2">C2 — Proficiente</option></select>
       </div>
-      <div class="field-group"><label>CPF</label><input id="as-cpf" type="text" placeholder="000.000.000-00" maxlength="14"></div>
+      <div class="field-group"><label>CPF *</label><input id="as-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)"></div>
     </div>
     <div class="field-row">
-      <div class="field-group"><label>E-mail</label><input id="as-email" type="email" placeholder="aluno@email.com"></div>
+      <div class="field-group"><label>E-mail *</label><input id="as-email" type="email" placeholder="aluno@email.com"></div>
       <div class="field-group"><label>WhatsApp</label><input id="as-whatsapp" type="text" placeholder="(21) 99999-9999"></div>
     </div>
     <div class="field-row">
-      <div class="field-group"><label>Dia de pagamento</label><input id="as-payday" type="number" min="1" max="31" placeholder="Ex: 10"></div>
-      <div class="field-group"><label>Valor da mensalidade (R$)</label><input id="as-price" type="number" placeholder="Ex: 350"></div>
+      <div class="field-group"><label>Dia de vencimento *</label><input id="as-payday" type="number" min="1" max="31" placeholder="Ex: 10"></div>
+      <div class="field-group"><label>Valor da mensalidade (R$) *</label><input id="as-price" type="number" placeholder="Ex: 350"></div>
     </div>
     <p class="modal-info">Será gerada uma <strong>matrícula de 6 dígitos</strong> automaticamente. A senha padrão será <strong>1234</strong>.</p>
     <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-add-student')">Cancelar</button><button class="btn-primary" onclick="teacherAddStudent()">Cadastrar</button></div>
+  </div>
+</div>
+
+<!-- Edit Student (teacher) -->
+<div id="modal-edit-student" class="modal-ov hidden" onclick="closeModalOv(event,'modal-edit-student')">
+  <div class="modal-card modal-wide">
+    <div class="mh"><h3>Editar Aluno</h3><button class="mc-close" onclick="closeModal('modal-edit-student')">✕</button></div>
+    <input type="hidden" id="es-matricula">
+    <div class="field-row">
+      <div class="field-group"><label>Nome completo *</label><input id="es-name" type="text" placeholder="Ex: Ana Lima"></div>
+      <div class="field-group"><label>Nome social</label><input id="es-socialname" type="text" placeholder="Nome pelo qual prefere ser chamado(a)"></div>
+    </div>
+    <div class="field-row">
+      <div class="field-group"><label>CPF *</label><input id="es-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)"></div>
+      <div class="field-group"><label>E-mail *</label><input id="es-email" type="email" placeholder="aluno@email.com"></div>
+    </div>
+    <div class="field-row">
+      <div class="field-group"><label>WhatsApp</label><input id="es-whatsapp" type="text" placeholder="(21) 99999-9999"></div>
+      <div class="field-group"><label>Idioma</label>
+        <select id="es-lang">
+          <option value="en">🇺🇸 Inglês</option><option value="es">🇪🇸 Espanhol</option>
+          <option value="fr">🇫🇷 Francês</option><option value="de">🇩🇪 Alemão</option>
+          <option value="it">🇮🇹 Italiano</option><option value="jp">🇯🇵 Japonês</option>
+          <option value="zh">🇨🇳 Mandarim</option><option value="ko">🇰🇷 Coreano</option>
+          <option value="ru">🇷🇺 Russo</option><option value="ar">🇸🇦 Árabe</option>
+          <option value="pt">🇧🇷 Português</option><option value="other">🌐 Outro</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group"><label>Nível</label>
+        <select id="es-level">
+          <option value="A1">A1 — Iniciante</option><option value="A2">A2 — Básico</option>
+          <option value="B1">B1 — Intermediário</option><option value="B2">B2 — Interm. Avançado</option>
+          <option value="C1">C1 — Avançado</option><option value="C2">C2 — Proficiente</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group"><label>Dia de vencimento *</label><input id="es-payday" type="number" min="1" max="31" placeholder="Ex: 10"></div>
+      <div class="field-group"><label>Valor da mensalidade (R$) *</label><input id="es-price" type="number" placeholder="Ex: 350"></div>
+    </div>
+    <div class="mf">
+      <button class="btn-secondary" onclick="closeModal('modal-edit-student')">Cancelar</button>
+      <button class="btn-primary" onclick="saveEditStudent()">Salvar Alterações</button>
+    </div>
   </div>
 </div>
 

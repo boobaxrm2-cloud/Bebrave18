@@ -405,8 +405,24 @@ app.post('/api/students', auth, isTeach, (req, res) => {
 app.put('/api/students/:matricula', auth, isAdminOrTeach, (req, res) => {
   const s = Students.findOne({ matricula: req.params.matricula });
   if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
-  if (req.body.level) s.level = req.body.level;
+  if (req.session.user.role === 'teacher' && s.teacherLogin !== req.session.user.login)
+    return res.status(403).json({ error: 'Sem permissão' });
+  const { level, name, socialname, cpf, email, whatsapp, payday, price, lang } = req.body;
+  if (level)      s.level      = level;
+  if (name)       { s.name = name.trim(); s.initials = initials(name.trim()); }
+  if (socialname !== undefined) s.socialname = socialname;
+  if (cpf       !== undefined) s.cpf        = cpf;
+  if (email     !== undefined) s.email      = email;
+  if (whatsapp  !== undefined) s.whatsapp   = whatsapp;
+  if (payday    !== undefined) s.payday     = payday;
+  if (price     !== undefined) s.price      = price;
+  if (lang      !== undefined) s.lang       = lang;
   Students.update(s);
+  // Also update name in Users collection
+  if (name) {
+    const u = Users.findOne({ login: s.matricula });
+    if (u) { u.name = name.trim(); Users.update(u); }
+  }
   res.json({ ok: true });
 });
 

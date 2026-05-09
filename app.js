@@ -397,7 +397,8 @@ function renderTeacherStudents(students, lessons) {
         </div>
         <div class="sdc-hd-actions">
           <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Redefinir senha" onclick="openResetPw('${s.matricula}','${escJs(s.name)}')">🔑</button>
-          <button class="btn-icon danger" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Excluir aluno" onclick="confirmDeleteStudent('${s.matricula}','${escJs(s.name)}')">🗑</button>
+          <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Editar aluno" onclick="openEditStudent('${s.matricula}')">✏️</button>
+          <button class="btn-icon danger" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Excluir aluno" onclick="confirmDeleteStudentTeacher('${s.matricula}','${escJs(s.name)}')">🗑</button>
         </div>
       </div>
       <div class="sdc-body">
@@ -491,7 +492,11 @@ async function teacherAddStudent() {
   const whatsapp   = document.getElementById('as-whatsapp').value.trim();
   const payday     = document.getElementById('as-payday').value.trim();
   const price      = document.getElementById('as-price').value.trim();
-  if (!name) return showToast('⚠️ Nome é obrigatório');
+  if (!name)    return showToast('⚠️ Nome é obrigatório');
+  if (!cpf)     return showToast('⚠️ CPF é obrigatório');
+  if (!email)   return showToast('⚠️ E-mail é obrigatório');
+  if (!payday)  return showToast('⚠️ Dia de vencimento é obrigatório');
+  if (!price)   return showToast('⚠️ Valor da mensalidade é obrigatório');
   try {
     const r = await api('POST','/api/students',{name,socialname,level,lang,cpf,email,whatsapp,payday,price});
     document.getElementById('cred-name').textContent  = r.name;
@@ -583,6 +588,49 @@ function confirmDeleteStudentTeacher(mat, name) {
     } catch(e) { showToast('❌ ' + e.message); }
   };
   openModal('modal-confirm');
+}
+
+async function openEditStudent(matricula) {
+  const students = await api('GET', '/api/students');
+  const s = students.find(x => x.matricula === matricula);
+  if (!s) return showToast('❌ Aluno não encontrado');
+  document.getElementById('es-matricula').value  = s.matricula;
+  document.getElementById('es-name').value       = s.name || '';
+  document.getElementById('es-socialname').value = s.socialname || '';
+  document.getElementById('es-cpf').value        = s.cpf || '';
+  document.getElementById('es-email').value      = s.email || '';
+  document.getElementById('es-whatsapp').value   = s.whatsapp || '';
+  document.getElementById('es-payday').value     = s.payday || '';
+  document.getElementById('es-price').value      = s.price || '';
+  const langEl  = document.getElementById('es-lang');
+  const levelEl = document.getElementById('es-level');
+  if (langEl)  langEl.value  = s.lang  || 'en';
+  if (levelEl) levelEl.value = s.level || 'A1';
+  openModal('modal-edit-student');
+}
+
+async function saveEditStudent() {
+  const matricula = document.getElementById('es-matricula').value;
+  const name      = document.getElementById('es-name').value.trim();
+  const socialname= document.getElementById('es-socialname').value.trim();
+  const cpf       = document.getElementById('es-cpf').value.trim();
+  const email     = document.getElementById('es-email').value.trim();
+  const whatsapp  = document.getElementById('es-whatsapp').value.trim();
+  const payday    = document.getElementById('es-payday').value.trim();
+  const price     = document.getElementById('es-price').value.trim();
+  const lang      = document.getElementById('es-lang').value;
+  const level     = document.getElementById('es-level').value;
+  if (!name)   return showToast('⚠️ Nome é obrigatório');
+  if (!cpf)    return showToast('⚠️ CPF é obrigatório');
+  if (!email)  return showToast('⚠️ E-mail é obrigatório');
+  if (!payday) return showToast('⚠️ Dia de vencimento é obrigatório');
+  if (!price)  return showToast('⚠️ Valor da mensalidade é obrigatório');
+  try {
+    await api('PUT', `/api/students/${matricula}`, {name,socialname,cpf,email,whatsapp,payday,price,lang,level});
+    closeModal('modal-edit-student');
+    showToast('✅ Aluno atualizado!');
+    refreshTeacherAll();
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 async function changeMonthT(dir) { calMonthT=addMonth(calMonthT,dir); const lessons=await api('GET','/api/lessons'); _calLessonsT=lessons; renderCal(calMonthT,'cal-t','cal-lbl-t',day=>showCalDayT(day),_calLessonsT,null); }
