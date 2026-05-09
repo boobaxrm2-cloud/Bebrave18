@@ -1319,6 +1319,12 @@ async function markAbsent(id) {
 // ══════════════════════════════════════════════════════════════
 //  GOOGLE MEET BUTTON
 // ══════════════════════════════════════════════════════════════
+function extractMeetLink(input) {
+  const text = input.value;
+  const match = text.match(/https:\/\/meet\.google\.com\/[a-z0-9]+-[a-z0-9]+-[a-z0-9]+/i);
+  if (match) input.value = match[0];
+}
+
 function meetBtnHTML(lesson) {
   if (!lesson.meetLink || lesson.status !== 'scheduled') return '';
   const now     = new Date();

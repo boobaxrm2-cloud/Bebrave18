@@ -858,7 +858,7 @@
     <div class="field-group"><label>Tópico / descrição adicional</label><input id="al-topic" type="text" placeholder="Detalhes, exercícios, objetivos..."></div>
     <div class="field-row">
       <div class="field-group"><label>Duração</label><select id="al-duration"><option value="60">1 hora</option><option value="90">1h30</option><option value="120">2 horas</option></select></div>
-      <div class="field-group"><label>Link Google Meet</label><input id="al-meet" type="url" placeholder="https://meet.google.com/xxx-xxxx-xxx"></div>
+      <div class="field-group"><label>Link Google Meet</label><input id="al-meet" type="text" placeholder="Cole o link ou o convite completo do Google Meet" oninput="extractMeetLink(this)"></div>
     </div>
     <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-add-lesson')">Cancelar</button><button class="btn-primary" onclick="teacherAddLesson()">Agendar</button></div>
   </div>
