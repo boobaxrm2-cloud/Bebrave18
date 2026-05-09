@@ -2541,19 +2541,17 @@ function fmtCpf(input) {
 
 async function submitTeacherRegistration() {
   const name     = document.getElementById('reg-name').value.trim();
-  const languages = Array.from(document.getElementById('reg-languages').selectedOptions).map(o => o.value);
   const email    = document.getElementById('reg-email').value.trim();
   const whatsapp = document.getElementById('reg-whatsapp').value.trim();
   const password = document.getElementById('reg-password').value;
 
   if (!name)               { showToast('⚠️ Informe o nome completo'); return; }
-  if (!languages.length)   { showToast('⚠️ Selecione ao menos um idioma'); return; }
   if (!email || !email.includes('@')) { showToast('⚠️ Informe um e-mail válido'); return; }
   if (!whatsapp)           { showToast('⚠️ Informe o WhatsApp'); return; }
   if (password.length < 4) { showToast('⚠️ A senha deve ter ao menos 4 caracteres'); return; }
 
   try {
-    const r = await api('POST', '/api/auth/register-teacher', { name, languages, email, whatsapp, password });
+    const r = await api('POST', '/api/auth/register-teacher', { name, email, whatsapp, password });
     document.getElementById('reg-success-login').textContent    = r.login;
     document.getElementById('reg-success-password').textContent = password;
     openModal('modal-registration-success');
@@ -2561,7 +2559,6 @@ async function submitTeacherRegistration() {
     document.getElementById('reg-email').value = '';
     document.getElementById('reg-whatsapp').value = '';
     document.getElementById('reg-password').value = '';
-    Array.from(document.getElementById('reg-languages').options).forEach(o => o.selected = false);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
