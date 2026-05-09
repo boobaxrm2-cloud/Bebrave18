@@ -1352,8 +1352,11 @@ function _mountJitsi(room) {
           enableWelcomePage:   false,
           disableDeepLinking:  true,
           prejoinPageEnabled:  false,
+          enableLobbyChat:     false,
+          disableProfile:      false,
           toolbarButtons: ['microphone','camera','desktop','fullscreen',
             'fodeviceselection','hangup','chat','raisehand','tileview'],
+          securityUi: { hideLobbyButton: true },
         },
         interfaceConfigOverwrite: {
           SHOW_JITSI_WATERMARK:      false,
