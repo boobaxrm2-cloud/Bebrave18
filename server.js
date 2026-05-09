@@ -496,15 +496,21 @@ app.put('/api/lessons/:id', auth, isTeach, (req, res) => {
   res.json(l);
 });
 
-app.post('/api/lessons/:id/reset-room', auth, isTeach, (req, res) => {
+// Teacher starts a fresh classroom session — generates a brand new room so teacher enters first and becomes moderator
+app.post('/api/lessons/:id/start-room', auth, isTeach, (req, res) => {
   const l = Lessons.get(parseInt(req.params.id));
   if (!l) return res.status(404).json({ error: 'Aula não encontrada' });
   if (l.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
-  const s = Students.findOne({ matricula: l.studentMatricula });
-  const baseName = s ? s.name.replace(/\s+/g,'-') : 'Aula';
-  l.jitsiRoom = 'BeBrave-' + baseName + '-' + l.date.replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+  l.activeRoom = 'BB-' + Math.random().toString(36).slice(2,10).toUpperCase();
   Lessons.update(l);
-  res.json({ jitsiRoom: l.jitsiRoom });
+  res.json({ room: l.activeRoom });
+});
+
+// Student fetches the active room the teacher already opened
+app.get('/api/lessons/:id/active-room', auth, (req, res) => {
+  const l = Lessons.get(parseInt(req.params.id));
+  if (!l) return res.status(404).json({ error: 'Aula não encontrada' });
+  res.json({ room: l.activeRoom || null });
 });
 
 app.delete('/api/lessons/:id', auth, isTeach, (req, res) => {

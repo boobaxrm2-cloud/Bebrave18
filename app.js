@@ -633,12 +633,18 @@ async function saveEditStudent() {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
-async function resetLessonRoom(lessonId) {
-  if (!confirm('Gerar uma sala nova para esta aula? Professor e aluno precisarão clicar em "Entrar na Aula" novamente.')) return;
+async function startTeacherRoom(lessonId, title, sub) {
   try {
-    await api('POST', `/api/lessons/${lessonId}/reset-room`);
-    showToast('✅ Nova sala gerada!');
-    refreshTeacherAll();
+    const r = await api('POST', `/api/lessons/${lessonId}/start-room`);
+    openClassroom(r.room, title, sub);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function joinStudentRoom(lessonId, title, sub) {
+  try {
+    const r = await api('GET', `/api/lessons/${lessonId}/active-room`);
+    if (!r.room) return showToast('⏳ O professor ainda não iniciou a aula. Tente novamente em instantes!');
+    openClassroom(r.room, title, sub);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
@@ -1451,20 +1457,16 @@ function jitsiBtnHTML(lesson, isTeacher) {
   const diffMin  = (lessonDt - now) / 60000;
   const isLive   = diffMin <= 30 && diffMin > -120;
   const cls      = isLive ? 'btn-jitsi btn-jitsi-live' : 'btn-jitsi';
-  const label    = isLive ? '🎥 Entrar na Aula' : '🎥 Abrir Sala';
   const sub      = (lesson.studentName || '') + (lesson.time ? ' • ' + lesson.time : '');
   const titleEsc = (lesson.subject || lesson.topic || 'Aula').replace(/'/g, "\\'");
   const subEsc   = sub.replace(/'/g, "\\'");
-  // Room uses the lesson's scheduled date — teacher and student always compute the same name
-  const lessonDate    = (lesson.date || '').replace(/-/g,'');
-  const effectiveRoom = lesson.jitsiRoom + (lessonDate ? '-' + lessonDate : '');
-  const resetBtn = isTeacher
-    ? `<button class="btn-sm" style="font-size:11px;padding:4px 8px;background:var(--g50);color:var(--g600);border:1px solid var(--g200)" title="Sala com problema? Gera uma sala nova" onclick="resetLessonRoom(${lesson.$loki})">⟳ Nova sala</button>`
-    : '';
-  return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-    <button class="${cls}" onclick="openClassroom('${effectiveRoom}','${titleEsc}','${subEsc}')">${label}</button>
-    ${resetBtn}
-  </div>`;
+  if (isTeacher) {
+    // Teacher always generates a fresh room when clicking — enters first = becomes moderator automatically
+    return `<button class="${cls}" onclick="startTeacherRoom(${lesson.$loki},'${titleEsc}','${subEsc}')">🎥 Iniciar Aula</button>`;
+  } else {
+    // Student fetches the room the teacher already opened
+    return `<button class="${cls}" onclick="joinStudentRoom(${lesson.$loki},'${titleEsc}','${subEsc}')">🎥 Entrar na Aula</button>`;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
