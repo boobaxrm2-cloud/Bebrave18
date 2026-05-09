@@ -82,6 +82,7 @@ async function loadAdmin() {
   loadAdminOverview();
   loadAdminTeachers();
   loadAdminStudents('');
+  refreshInboxBadges();
 }
 
 async function loadAdminOverview() {
@@ -313,6 +314,7 @@ async function loadTeacher() {
   } catch(e) {}
   await refreshTeacherAll();
   checkPendingContracts('teacher');
+  refreshInboxBadges();
 }
 
 async function refreshTeacherAll() {
@@ -591,6 +593,7 @@ async function loadStudent() {
   await refreshStudentAll();
   checkPendingContracts('student');
   checkPaymentAlert();
+  refreshInboxBadges();
 }
 
 async function refreshStudentAll() {
@@ -2100,6 +2103,168 @@ async function loadStudentPayments() {
   el.innerHTML = html || '<div class="card"><p class="empty">Nenhum registro de mensalidade ainda.</p></div>';
 }
 
+// ══════════════════════════════════════════════════════════════
+//  INBOX BADGES
+// ══════════════════════════════════════════════════════════════
+async function refreshInboxBadges() {
+  try {
+    const { count } = await api('GET', '/api/unread-count');
+    const badgeId = ME.role === 'admin' ? 'adm-inbox-badge' : ME.role === 'teacher' ? 't-inbox-badge' : 's-inbox-badge';
+    const badge = document.getElementById(badgeId);
+    if (!badge) return;
+    if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MESSAGES — TEACHER
+// ══════════════════════════════════════════════════════════════
+let _activeThreadLogin = null;
+let _activeThreadName  = null;
+
+async function loadTeacherMessages() {
+  _activeThreadLogin = null;
+  document.getElementById('t-messages-threads').style.display = '';
+  document.getElementById('t-messages-conversation').style.display = 'none';
+
+  const threads = await api('GET', '/api/messages/threads').catch(() => []);
+  const el = document.getElementById('t-messages-threads');
+  if (!threads.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Nenhuma mensagem recebida ainda. Seus alunos poderão te enviar mensagens pelo painel deles.</p></div>';
+    return;
+  }
+  el.innerHTML = threads.map(t => {
+    const last = t.last;
+    const preview = last ? (last.content.length > 60 ? last.content.slice(0, 60) + '...' : last.content) : '';
+    const unreadBadge = t.unread > 0
+      ? `<span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700">${t.unread}</span>`
+      : `<span style="font-size:12px;color:var(--g400)">✓ lido</span>`;
+    return `<div class="card" style="margin-bottom:10px;cursor:pointer;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseleave="this.style.boxShadow=''" onclick="openMessageThread('${t.studentLogin}','${escJs(t.studentName)}')">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0">${t.studentName.charAt(0)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:15px">${t.studentName}</div>
+          <div style="font-size:13px;color:var(--g500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          ${unreadBadge}
+          <span style="font-size:11px;color:var(--g400)">${last ? fmtTimeAgo(last.createdAt) : ''}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openMessageThread(login, name) {
+  _activeThreadLogin = login;
+  _activeThreadName  = name;
+  document.getElementById('t-messages-threads').style.display = 'none';
+  document.getElementById('t-messages-conversation').style.display = '';
+  document.getElementById('t-conv-title').textContent = name;
+  document.getElementById('t-msg-input').value = '';
+  await api('PUT', `/api/messages/read/${login}`).catch(() => {});
+  await renderConversation('t-conv-messages', login);
+  refreshInboxBadges();
+}
+
+function backToThreads() {
+  _activeThreadLogin = null;
+  document.getElementById('t-messages-threads').style.display = '';
+  document.getElementById('t-messages-conversation').style.display = 'none';
+  loadTeacherMessages();
+}
+
+async function sendTeacherMessage() {
+  const input = document.getElementById('t-msg-input');
+  const content = input.value.trim();
+  if (!content || !_activeThreadLogin) return;
+  try {
+    await api('POST', '/api/messages', { content, toLogin: _activeThreadLogin });
+    input.value = '';
+    await renderConversation('t-conv-messages', _activeThreadLogin);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MESSAGES — STUDENT
+// ══════════════════════════════════════════════════════════════
+let _studentTeacherLogin = null;
+
+async function loadStudentMessages() {
+  try {
+    const profile = await api('GET', '/api/profile');
+    _studentTeacherLogin = ME.teacherLogin || null;
+    if (!_studentTeacherLogin) {
+      const lessons = await api('GET', '/api/lessons').catch(() => []);
+      if (lessons.length) _studentTeacherLogin = lessons[0].teacherLogin;
+    }
+    const teacherName = document.getElementById('s-teacher-name')?.textContent || 'Professor';
+    document.getElementById('s-conv-title').textContent = `Conversa com ${teacherName}`;
+    await api('PUT', `/api/messages/read/${_studentTeacherLogin}`).catch(() => {});
+    await renderConversation('s-conv-messages', _studentTeacherLogin);
+    refreshInboxBadges();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function sendStudentMessage() {
+  const input = document.getElementById('s-msg-input');
+  const content = input.value.trim();
+  if (!content) return;
+  try {
+    await api('POST', '/api/messages', { content });
+    input.value = '';
+    await renderConversation('s-conv-messages', _studentTeacherLogin);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── Shared conversation renderer ───────────────────────────
+async function renderConversation(containerId, otherLogin) {
+  if (!otherLogin) return;
+  const msgs = await api('GET', `/api/messages/conversation/${otherLogin}`).catch(() => []);
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!msgs.length) {
+    el.innerHTML = '<p class="empty" style="text-align:center;padding:24px 0">Nenhuma mensagem ainda. Inicie a conversa!</p>';
+    return;
+  }
+  el.innerHTML = msgs.map(m => {
+    const isMine = m.fromLogin === ME.login;
+    return `<div style="display:flex;flex-direction:${isMine ? 'row-reverse' : 'row'};gap:8px;align-items:flex-end">
+      <div style="width:30px;height:30px;border-radius:50%;background:${isMine ? 'var(--navy)' : 'var(--g100)'};color:${isMine ? '#fff' : 'var(--g700)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${m.fromName.charAt(0)}</div>
+      <div style="max-width:70%">
+        <div style="background:${isMine ? 'var(--navy)' : 'var(--g50)'};color:${isMine ? '#fff' : 'var(--g800)'};padding:10px 14px;border-radius:${isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};font-size:14px;line-height:1.5">${escHtml(m.content)}</div>
+        <div style="font-size:11px;color:var(--g400);margin-top:3px;text-align:${isMine ? 'right' : 'left'}">${fmtTimeAgo(m.createdAt)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUGGESTIONS — TEACHER VIEW (with admin replies)
+// ══════════════════════════════════════════════════════════════
+async function loadTeacherSuggestions() {
+  await api('PUT', '/api/suggestions/mark-replies-read').catch(() => {});
+  const suggestions = await api('GET', '/api/admin/suggestions').catch(() => []);
+  const mine = suggestions.filter(s => s.teacherLogin === ME.login);
+  const el = document.getElementById('t-suggestions-list');
+  if (!el) return;
+  if (!mine.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="ch" style="margin-bottom:12px"><h3>Minhas Sugestões Enviadas</h3></div>` +
+    mine.map(s => `
+    <div class="card" style="margin-bottom:12px;border-left:3px solid ${s.adminReply ? 'var(--navy)' : 'var(--g200)'}">
+      <div style="font-size:12px;color:var(--g400);margin-bottom:6px">${fmtTimeAgo(s.createdAt)}</div>
+      <p style="margin:0 0 10px;font-size:14px;color:var(--g700);white-space:pre-wrap">${escHtml(s.content)}</p>
+      ${s.adminReply ? `
+        <div style="background:var(--g50);border-radius:var(--r-sm);padding:10px 14px;border-left:3px solid var(--navy)">
+          <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:4px">✉️ Resposta do Administrador · ${fmtTimeAgo(s.adminRepliedAt)}</div>
+          <p style="margin:0;font-size:13px;color:var(--g700);white-space:pre-wrap">${escHtml(s.adminReply)}</p>
+        </div>` : `<div style="font-size:12px;color:var(--g400);font-style:italic">⏳ Aguardando resposta do administrador...</div>`}
+    </div>`).join('');
+  refreshInboxBadges();
+}
+
 async function checkPaymentAlert() {
   try {
     const r = await api('GET', '/api/payments/student/alert');
@@ -2258,32 +2423,49 @@ async function submitSuggestion() {
     await api('POST', '/api/suggestions', { content });
     el.value = '';
     showToast('✅ Sugestão enviada com sucesso!');
+    loadTeacherSuggestions();
   } catch(e) { if (e.message !== 'TEACHER_BLOCKED') showToast('❌ ' + e.message); }
 }
 
 async function loadAdminSuggestions() {
   const suggestions = await api('GET', '/api/admin/suggestions').catch(() => []);
   const el = document.getElementById('adm-suggestions-list');
+  refreshInboxBadges();
   if (!suggestions.length) {
     el.innerHTML = '<div class="card"><p class="empty">Nenhuma sugestão recebida ainda.</p></div>';
-    // Clear badge
-    const nav = document.getElementById('adm-nav-suggestions');
-    if (nav) nav.querySelector('.notif-badge')?.remove();
     return;
   }
   el.innerHTML = suggestions.map(s => `
-    <div class="card" style="margin-bottom:14px;${s.read ? 'opacity:0.7' : 'border-left:3px solid var(--navy)'}">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+    <div class="card" style="margin-bottom:14px;${!s.read ? 'border-left:3px solid var(--navy)' : ''}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">${s.teacherName.charAt(0)}</div>
         <div>
           <div style="font-weight:600;font-size:14px">${s.teacherName}</div>
-          <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)}${s.read ? ' · Lida' : ' · <strong style="color:var(--navy)">Nova</strong>'}</div>
+          <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)} · ${s.read ? 'Lida' : '<strong style="color:var(--navy)">Nova</strong>'}</div>
         </div>
-        ${!s.read ? `<button class="btn-sm" style="margin-left:auto" onclick="markSuggestionRead(${s.$loki})">Marcar como lida</button>` : ''}
       </div>
-      <p style="margin:0;font-size:14px;color:var(--g700);line-height:1.6;white-space:pre-wrap">${escHtml(s.content)}</p>
-    </div>
-  `).join('');
+      <p style="margin:0 0 12px;font-size:14px;color:var(--g700);line-height:1.6;white-space:pre-wrap">${escHtml(s.content)}</p>
+      ${s.adminReply ? `
+        <div style="background:var(--g50);border-radius:var(--r-sm);padding:10px 14px;border-left:3px solid #22c55e;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:600;color:#16a34a;margin-bottom:4px">✅ Sua resposta · ${fmtTimeAgo(s.adminRepliedAt)}</div>
+          <p style="margin:0;font-size:13px;color:var(--g700);white-space:pre-wrap">${escHtml(s.adminReply)}</p>
+        </div>` : ''}
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <textarea id="reply-input-${s.$loki}" rows="2" placeholder="Responder a esta sugestão..." style="flex:1;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical"></textarea>
+        <button class="btn-sm" style="margin-top:2px" onclick="replyToSuggestion(${s.$loki})">${s.adminReply ? 'Atualizar' : 'Responder'}</button>
+      </div>
+    </div>`).join('');
+}
+
+async function replyToSuggestion(id) {
+  const input = document.getElementById(`reply-input-${id}`);
+  const reply = input?.value.trim();
+  if (!reply) { showToast('⚠️ Escreva uma resposta'); return; }
+  try {
+    await api('PUT', `/api/admin/suggestions/${id}/reply`, { reply });
+    showToast('✅ Resposta enviada!');
+    loadAdminSuggestions();
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 async function markSuggestionRead(id) {

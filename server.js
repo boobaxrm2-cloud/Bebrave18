@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -44,6 +44,7 @@ function dbReady() {
   ForumReplies     = db.getCollection('forumReplies')     || db.addCollection('forumReplies',     { indices: ['postId'] });
   Suggestions      = db.getCollection('suggestions')      || db.addCollection('suggestions',      { indices: ['teacherLogin'] });
   Payments         = db.getCollection('payments')         || db.addCollection('payments',         { indices: ['studentMatricula', 'teacherLogin', 'month'] });
+  Messages         = db.getCollection('messages')         || db.addCollection('messages',         { indices: ['fromLogin', 'toLogin', 'teacherLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -1150,6 +1151,97 @@ app.put('/api/students/:matricula/payment-plan', auth, isTeach, (req, res) => {
   if (payday !== undefined) s.payday = payday;
   Students.update(s);
   res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════
+//  MESSAGES (student ↔ teacher)
+// ════════════════════════════════════════════════════════════
+app.post('/api/messages', auth, (req, res) => {
+  const { content, toLogin } = req.body;
+  if (!content?.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
+  const u = req.session.user;
+  let toUser, teacherLogin;
+  if (u.role === 'student') {
+    const student = Students.findOne({ matricula: u.login });
+    if (!student) return res.status(404).json({ error: 'Dados não encontrados' });
+    toUser = Users.findOne({ login: student.teacherLogin });
+    teacherLogin = student.teacherLogin;
+  } else if (u.role === 'teacher') {
+    const student = Students.findOne({ matricula: toLogin, teacherLogin: u.login });
+    if (!student) return res.status(403).json({ error: 'Sem permissão' });
+    toUser = Users.findOne({ login: toLogin });
+    teacherLogin = u.login;
+  } else {
+    return res.status(403).json({ error: 'Sem permissão' });
+  }
+  if (!toUser) return res.status(404).json({ error: 'Destinatário não encontrado' });
+  Messages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, toLogin: toUser.login, toName: toUser.name, toRole: toUser.role, teacherLogin, content: content.trim(), createdAt: Date.now(), read: false });
+  res.json({ ok: true });
+});
+
+app.get('/api/messages/threads', auth, isTeach, (req, res) => {
+  const tLogin = req.session.user.login;
+  const all = Messages.find({ teacherLogin: tLogin });
+  const map = {};
+  all.forEach(m => {
+    const sLogin = m.fromRole === 'student' ? m.fromLogin : m.toLogin;
+    const sName  = m.fromRole === 'student' ? m.fromName  : m.toName;
+    if (!map[sLogin]) map[sLogin] = { studentLogin: sLogin, studentName: sName, unread: 0, last: null };
+    if (!m.read && m.toLogin === tLogin) map[sLogin].unread++;
+    if (!map[sLogin].last || m.createdAt > map[sLogin].last.createdAt) map[sLogin].last = m;
+  });
+  res.json(Object.values(map).sort((a, b) => (b.last?.createdAt || 0) - (a.last?.createdAt || 0)));
+});
+
+app.get('/api/messages/conversation/:login', auth, (req, res) => {
+  const u = req.session.user;
+  const other = req.params.login;
+  const msgs = Messages.find({}).filter(m =>
+    (m.fromLogin === u.login && m.toLogin === other) ||
+    (m.fromLogin === other   && m.toLogin === u.login)
+  ).sort((a, b) => a.createdAt - b.createdAt);
+  res.json(msgs);
+});
+
+app.put('/api/messages/read/:login', auth, (req, res) => {
+  const u = req.session.user;
+  Messages.find({ fromLogin: req.params.login, toLogin: u.login, read: false })
+    .forEach(m => { m.read = true; Messages.update(m); });
+  res.json({ ok: true });
+});
+
+// ── Suggestion reply (admin) ───────────────────────────────
+app.put('/api/admin/suggestions/:id/reply', auth, isAdmin, (req, res) => {
+  const s = Suggestions.get(parseInt(req.params.id));
+  if (!s) return res.status(404).json({ error: 'Sugestão não encontrada' });
+  const { reply } = req.body;
+  if (!reply?.trim()) return res.status(400).json({ error: 'Resposta obrigatória' });
+  s.adminReply = reply.trim(); s.adminRepliedAt = Date.now(); s.read = true; s.teacherRead = false;
+  Suggestions.update(s);
+  res.json({ ok: true });
+});
+
+app.put('/api/suggestions/mark-replies-read', auth, (req, res) => {
+  const u = req.session.user;
+  Suggestions.find({ teacherLogin: u.login }).forEach(s => {
+    if (s.adminReply && !s.teacherRead) { s.teacherRead = true; Suggestions.update(s); }
+  });
+  res.json({ ok: true });
+});
+
+// ── Unified unread count ───────────────────────────────────
+app.get('/api/unread-count', auth, (req, res) => {
+  const u = req.session.user;
+  let count = 0;
+  if (u.role === 'student') {
+    count = Messages.find({ toLogin: u.login, read: false }).length;
+  } else if (u.role === 'teacher') {
+    count  = Messages.find({ toLogin: u.login, read: false }).length;
+    count += Suggestions.find({ teacherLogin: u.login }).filter(s => s.adminReply && !s.teacherRead).length;
+  } else if (u.role === 'admin') {
+    count = Suggestions.find({ read: false }).length;
+  }
+  res.json({ count });
 });
 
 // SPA fallback - serve index.html for all non-API routes
