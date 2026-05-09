@@ -633,6 +633,15 @@ async function saveEditStudent() {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+async function resetLessonRoom(lessonId) {
+  if (!confirm('Gerar uma sala nova para esta aula? Professor e aluno precisarão clicar em "Entrar na Aula" novamente.')) return;
+  try {
+    await api('POST', `/api/lessons/${lessonId}/reset-room`);
+    showToast('✅ Nova sala gerada!');
+    refreshTeacherAll();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
 async function changeMonthT(dir) { calMonthT=addMonth(calMonthT,dir); const lessons=await api('GET','/api/lessons'); _calLessonsT=lessons; renderCal(calMonthT,'cal-t','cal-lbl-t',day=>showCalDayT(day),_calLessonsT,null); }
 
 function showTeacher(sec, el) {
@@ -851,7 +860,7 @@ function lessonItemHTML(l, isTeacher) {
     <div class="li-info">
       <div class="li-topic">📖 ${l.subject||l.topic}${l.topic&&l.topic!==l.subject?` <span style="font-weight:400;color:var(--g500);font-size:12px">— ${l.topic}</span>`:''}</div>
       <div class="li-meta">${DAYS_PT[d.getDay()]} • ${l.time} • ${l.duration}min${isTeacher?` • ${l.studentName}`:''}</div>
-      ${jitsiBtnHTML(l)}
+      ${jitsiBtnHTML(l, isTeacher)}
       ${l.meetLink?`<a class="meet-link" href="${l.meetLink}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔗 Meet externo</a>`:''}
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
@@ -868,7 +877,7 @@ function dayEventHTML(l, isTeacher) {
   return `<div class="dev ${statusClass}">
     <div class="dev-topic">📖 ${l.subject||l.topic}</div>
     <div class="dev-meta">⏰ ${l.time} • ${l.duration}min${isTeacher?` • 👤 ${l.studentName}`:''} • <span class="badge ${badgeClass}">${badgeLabel}</span></div>
-    ${jitsiBtnHTML(l)}
+    ${jitsiBtnHTML(l, isTeacher)}
     ${l.meetLink&&l.status==='scheduled'?`<a class="meet-link" href="${l.meetLink}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="margin-left:4px">🔗 Meet externo</a>`:''}
     ${l.feedback&&l.status!=='scheduled'?`<div style="font-size:12px;color:var(--g600);margin-top:6px;background:var(--g50);padding:6px 10px;border-radius:6px">📝 ${l.feedback}</div>`:''}
     ${l.homework?`<div style="font-size:12px;color:#065f46;margin-top:4px;background:var(--green-pale);padding:5px 10px;border-radius:6px">📚 Tarefa: ${l.homework}</div>`:''}
@@ -1435,7 +1444,7 @@ function copyRoomLink() {
 }
 
 // Helper: Jitsi button HTML (used in lesson items + day events)
-function jitsiBtnHTML(lesson) {
+function jitsiBtnHTML(lesson, isTeacher) {
   if (!lesson.jitsiRoom || lesson.status !== 'scheduled') return '';
   const now      = new Date();
   const lessonDt = new Date(lesson.date + 'T' + lesson.time);
@@ -1446,10 +1455,16 @@ function jitsiBtnHTML(lesson) {
   const sub      = (lesson.studentName || '') + (lesson.time ? ' • ' + lesson.time : '');
   const titleEsc = (lesson.subject || lesson.topic || 'Aula').replace(/'/g, "\\'");
   const subEsc   = sub.replace(/'/g, "\\'");
-  // Append today's date so the room resets daily — prevents lobby getting permanently stuck
-  const today       = now.toISOString().slice(0,10).replace(/-/g,'');
-  const effectiveRoom = lesson.jitsiRoom + '-' + today;
-  return `<button class="${cls}" onclick="openClassroom('${effectiveRoom}','${titleEsc}','${subEsc}')">${label}</button>`;
+  // Room uses the lesson's scheduled date — teacher and student always compute the same name
+  const lessonDate    = (lesson.date || '').replace(/-/g,'');
+  const effectiveRoom = lesson.jitsiRoom + (lessonDate ? '-' + lessonDate : '');
+  const resetBtn = isTeacher
+    ? `<button class="btn-sm" style="font-size:11px;padding:4px 8px;background:var(--g50);color:var(--g600);border:1px solid var(--g200)" title="Sala com problema? Gera uma sala nova" onclick="resetLessonRoom(${lesson.$loki})">⟳ Nova sala</button>`
+    : '';
+  return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+    <button class="${cls}" onclick="openClassroom('${effectiveRoom}','${titleEsc}','${subEsc}')">${label}</button>
+    ${resetBtn}
+  </div>`;
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -496,6 +496,17 @@ app.put('/api/lessons/:id', auth, isTeach, (req, res) => {
   res.json(l);
 });
 
+app.post('/api/lessons/:id/reset-room', auth, isTeach, (req, res) => {
+  const l = Lessons.get(parseInt(req.params.id));
+  if (!l) return res.status(404).json({ error: 'Aula não encontrada' });
+  if (l.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
+  const s = Students.findOne({ matricula: l.studentMatricula });
+  const baseName = s ? s.name.replace(/\s+/g,'-') : 'Aula';
+  l.jitsiRoom = 'BeBrave-' + baseName + '-' + l.date.replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+  Lessons.update(l);
+  res.json({ jitsiRoom: l.jitsiRoom });
+});
+
 app.delete('/api/lessons/:id', auth, isTeach, (req, res) => {
   const l = Lessons.get(parseInt(req.params.id));
   if (!l) return res.status(404).json({ error: 'Aula não encontrada' });
