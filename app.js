@@ -2270,7 +2270,7 @@ async function loadStudentMessages() {
     }
     await api('PUT', `/api/messages/read/${_studentTeacherLogin}`).catch(() => {});
     await renderConversation('s-conv-messages', _studentTeacherLogin);
-    refreshInboxBadges();
+    await refreshInboxBadges();
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
@@ -2313,21 +2313,29 @@ async function renderConversation(containerId, otherLogin) {
 // ══════════════════════════════════════════════════════════════
 async function loadTeacherSuggestions() {
   await api('PUT', '/api/suggestions/mark-replies-read').catch(() => {});
-  const suggestions = await api('GET', '/api/admin/suggestions').catch(() => []);
-  const mine = suggestions.filter(s => s.teacherLogin === ME.login);
+  const mine = await api('GET', '/api/teacher/suggestions').catch(() => []);
   const el = document.getElementById('t-suggestions-list');
   if (!el) return;
-  if (!mine.length) { el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="ch" style="margin-bottom:12px"><h3>Minhas Sugestões Enviadas</h3></div>` +
+  if (!mine.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Você ainda não enviou nenhuma sugestão.</p></div>';
+    refreshInboxBadges();
+    return;
+  }
+  el.innerHTML = `<div class="ch" style="margin-bottom:12px"><h3>Minhas Sugestões</h3></div>` +
     mine.map(s => `
-    <div class="card" style="margin-bottom:12px;border-left:3px solid ${s.adminReply ? 'var(--navy)' : 'var(--g200)'}">
-      <div style="font-size:12px;color:var(--g400);margin-bottom:6px">${fmtTimeAgo(s.createdAt)}</div>
-      <p style="margin:0 0 10px;font-size:14px;color:var(--g700);white-space:pre-wrap">${escHtml(s.content)}</p>
+    <div class="card" style="margin-bottom:12px;border-left:4px solid ${s.adminReply ? '#2A5FCC' : 'var(--g200)'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)}</span>
+        ${s.adminReply
+          ? `<span style="font-size:11px;font-weight:700;color:#2A5FCC;background:#eff6ff;padding:2px 10px;border-radius:99px">✉️ Respondida</span>`
+          : `<span style="font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 10px;border-radius:99px">⏳ Aguardando</span>`}
+      </div>
+      <p style="margin:0 0 12px;font-size:14px;color:var(--g700);white-space:pre-wrap;line-height:1.6">${escHtml(s.content)}</p>
       ${s.adminReply ? `
-        <div style="background:var(--g50);border-radius:var(--r-sm);padding:10px 14px;border-left:3px solid var(--navy)">
-          <div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:4px">✉️ Resposta do Administrador · ${fmtTimeAgo(s.adminRepliedAt)}</div>
-          <p style="margin:0;font-size:13px;color:var(--g700);white-space:pre-wrap">${escHtml(s.adminReply)}</p>
-        </div>` : `<div style="font-size:12px;color:var(--g400);font-style:italic">⏳ Aguardando resposta do administrador...</div>`}
+        <div style="background:#eff6ff;border-radius:var(--r-sm);padding:12px 16px;border-left:3px solid #2A5FCC">
+          <div style="font-size:11px;font-weight:700;color:#2A5FCC;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">✉️ Resposta do Administrador · ${fmtTimeAgo(s.adminRepliedAt)}</div>
+          <p style="margin:0;font-size:14px;color:var(--g800);white-space:pre-wrap;line-height:1.6">${escHtml(s.adminReply)}</p>
+        </div>` : ''}
     </div>`).join('');
   refreshInboxBadges();
 }
@@ -2494,31 +2502,51 @@ async function submitSuggestion() {
   } catch(e) { if (e.message !== 'TEACHER_BLOCKED') showToast('❌ ' + e.message); }
 }
 
-async function loadAdminSuggestions() {
+let _suggTab = 'pending';
+async function loadAdminSuggestions(tab) {
+  if (tab) _suggTab = tab;
   const suggestions = await api('GET', '/api/admin/suggestions').catch(() => []);
   const el = document.getElementById('adm-suggestions-list');
   refreshInboxBadges();
-  if (!suggestions.length) {
-    el.innerHTML = '<div class="card"><p class="empty">Nenhuma sugestão recebida ainda.</p></div>';
+
+  const pending  = suggestions.filter(s => !s.adminReply);
+  const historic = suggestions.filter(s =>  s.adminReply);
+  const list     = _suggTab === 'pending' ? pending : historic;
+
+  const tabs = `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn-sm" onclick="loadAdminSuggestions('pending')"
+        style="${_suggTab==='pending' ? 'background:var(--navy);color:#fff' : ''}">
+        Pendentes <span style="background:${pending.length?'#ef4444':'var(--g200)'};color:${pending.length?'#fff':'var(--g600)'};border-radius:99px;padding:0 7px;font-size:11px;font-weight:700">${pending.length}</span>
+      </button>
+      <button class="btn-sm" onclick="loadAdminSuggestions('history')"
+        style="${_suggTab==='history' ? 'background:var(--navy);color:#fff' : ''}">
+        Histórico <span style="background:var(--g200);color:var(--g600);border-radius:99px;padding:0 7px;font-size:11px;font-weight:700">${historic.length}</span>
+      </button>
+    </div>`;
+
+  if (!list.length) {
+    el.innerHTML = tabs + `<div class="card"><p class="empty">${_suggTab === 'pending' ? 'Nenhuma sugestão pendente.' : 'Nenhum histórico ainda.'}</p></div>`;
     return;
   }
-  el.innerHTML = suggestions.map(s => `
-    <div class="card" style="margin-bottom:14px;${!s.read ? 'border-left:3px solid var(--navy)' : ''}">
+
+  el.innerHTML = tabs + list.map(s => `
+    <div class="card" style="margin-bottom:14px;${!s.read && !s.adminReply ? 'border-left:4px solid var(--navy)' : s.adminReply ? 'border-left:4px solid #22c55e' : ''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">${s.teacherName.charAt(0)}</div>
-        <div>
-          <div style="font-weight:600;font-size:14px">${s.teacherName}</div>
-          <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)} · ${s.read ? 'Lida' : '<strong style="color:var(--navy)">Nova</strong>'}</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(s.teacherName||'?').charAt(0)}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)}</div>
+          <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)} · ${s.adminReply ? '<span style="color:#16a34a;font-weight:600">✅ Respondida</span>' : s.read ? 'Lida' : '<strong style="color:var(--navy)">Nova</strong>'}</div>
         </div>
       </div>
       <p style="margin:0 0 12px;font-size:14px;color:var(--g700);line-height:1.6;white-space:pre-wrap">${escHtml(s.content)}</p>
       ${s.adminReply ? `
-        <div style="background:var(--g50);border-radius:var(--r-sm);padding:10px 14px;border-left:3px solid #22c55e;margin-bottom:10px">
-          <div style="font-size:11px;font-weight:600;color:#16a34a;margin-bottom:4px">✅ Sua resposta · ${fmtTimeAgo(s.adminRepliedAt)}</div>
-          <p style="margin:0;font-size:13px;color:var(--g700);white-space:pre-wrap">${escHtml(s.adminReply)}</p>
+        <div style="background:#f0fdf4;border-radius:var(--r-sm);padding:12px 16px;border-left:3px solid #22c55e;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">✅ Sua resposta · ${fmtTimeAgo(s.adminRepliedAt)}</div>
+          <p style="margin:0;font-size:14px;color:var(--g700);white-space:pre-wrap;line-height:1.6">${escHtml(s.adminReply)}</p>
         </div>` : ''}
-      <div style="display:flex;gap:8px;align-items:flex-start">
-        <textarea id="reply-input-${s.$loki}" rows="2" placeholder="Responder a esta sugestão..." style="flex:1;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical"></textarea>
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px">
+        <textarea id="reply-input-${s.$loki}" rows="2" placeholder="${s.adminReply ? 'Atualizar resposta...' : 'Escrever resposta...'}" style="flex:1;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical"></textarea>
         <button class="btn-sm" style="margin-top:2px" onclick="replyToSuggestion(${s.$loki})">${s.adminReply ? 'Atualizar' : 'Responder'}</button>
       </div>
     </div>`).join('');

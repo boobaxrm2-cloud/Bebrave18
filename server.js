@@ -1326,6 +1326,13 @@ app.put('/api/admin/suggestions/:id/reply', auth, isAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Teacher: get own suggestions (with admin replies)
+app.get('/api/teacher/suggestions', auth, isTeach, (req, res) => {
+  const mine = Suggestions.find({ teacherLogin: req.session.user.login })
+    .sort((a, b) => b.createdAt - a.createdAt);
+  res.json(mine);
+});
+
 app.put('/api/suggestions/mark-replies-read', auth, (req, res) => {
   const u = req.session.user;
   Suggestions.find({ teacherLogin: u.login }).forEach(s => {
