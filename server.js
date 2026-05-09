@@ -187,6 +187,10 @@ app.post('/api/auth/login', (req, res) => {
     const t = Teachers.findOne({ login: user.login });
     return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false });
   }
+  if (user.role === 'student') {
+    const s = Students.findOne({ matricula: user.login });
+    return res.json({ role: user.role, name: user.name, login: user.login, teacherLogin: s?.teacherLogin || '', teacherName: s?.teacherName || '' });
+  }
   res.json({ role: user.role, name: user.name, login: user.login });
 });
 
@@ -197,7 +201,7 @@ app.get('/api/auth/me', (req, res) => {
   const u = req.session.user;
   if (u.role === 'student') {
     const s = Students.findOne({ matricula: u.login });
-    return res.json({ ...u, level: s?.level || 'A1', teacherName: s?.teacherName || '' });
+    return res.json({ ...u, level: s?.level || 'A1', teacherLogin: s?.teacherLogin || '', teacherName: s?.teacherName || '' });
   }
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
@@ -1333,16 +1337,20 @@ app.put('/api/suggestions/mark-replies-read', auth, (req, res) => {
 // ── Unified unread count ───────────────────────────────────
 app.get('/api/unread-count', auth, (req, res) => {
   const u = req.session.user;
-  let count = 0;
   if (u.role === 'student') {
-    count = Messages.find({ toLogin: u.login, read: false }).length;
-  } else if (u.role === 'teacher') {
-    count  = Messages.find({ toLogin: u.login, read: false }).length;
-    count += Suggestions.find({ teacherLogin: u.login }).filter(s => s.adminReply && !s.teacherRead).length;
-  } else if (u.role === 'admin') {
-    count = Suggestions.find({ read: false }).length;
+    const count = Messages.find({ toLogin: u.login, read: false }).length;
+    return res.json({ count, msgCount: count, suggCount: 0 });
   }
-  res.json({ count });
+  if (u.role === 'teacher') {
+    const msgCount  = Messages.find({ toLogin: u.login, read: false }).length;
+    const suggCount = Suggestions.find({ teacherLogin: u.login }).filter(s => s.adminReply && !s.teacherRead).length;
+    return res.json({ count: msgCount + suggCount, msgCount, suggCount });
+  }
+  if (u.role === 'admin') {
+    const count = Suggestions.find({ read: false }).length;
+    return res.json({ count, msgCount: 0, suggCount: count });
+  }
+  res.json({ count: 0, msgCount: 0, suggCount: 0 });
 });
 
 // SPA fallback - serve index.html for all non-API routes

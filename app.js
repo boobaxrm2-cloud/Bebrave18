@@ -2160,8 +2160,16 @@ async function loadStudentPayments() {
 // ══════════════════════════════════════════════════════════════
 async function refreshInboxBadges() {
   try {
-    const { count } = await api('GET', '/api/unread-count');
-    const badgeId = ME.role === 'admin' ? 'adm-inbox-badge' : ME.role === 'teacher' ? 't-inbox-badge' : 's-inbox-badge';
+    const { count, msgCount, suggCount } = await api('GET', '/api/unread-count');
+    // For teachers: separate badge for messages vs suggestions
+    if (ME.role === 'teacher') {
+      const mb = document.getElementById('t-inbox-badge');
+      if (mb) { mb.textContent = msgCount; mb.style.display = msgCount > 0 ? '' : 'none'; }
+      const sb = document.getElementById('t-sugg-badge');
+      if (sb) { sb.textContent = suggCount; sb.style.display = suggCount > 0 ? '' : 'none'; }
+      return;
+    }
+    const badgeId = ME.role === 'admin' ? 'adm-inbox-badge' : 's-inbox-badge';
     const badge = document.getElementById(badgeId);
     if (!badge) return;
     if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'inline-block'; }
@@ -2245,14 +2253,21 @@ let _studentTeacherLogin = null;
 
 async function loadStudentMessages() {
   try {
-    const profile = await api('GET', '/api/profile');
+    // ME.teacherLogin is set at login/me — use it directly
     _studentTeacherLogin = ME.teacherLogin || null;
+    // Fallback: try to get teacherLogin from the teacher name badge in the dashboard
     if (!_studentTeacherLogin) {
       const lessons = await api('GET', '/api/lessons').catch(() => []);
       if (lessons.length) _studentTeacherLogin = lessons[0].teacherLogin;
     }
-    const teacherName = document.getElementById('s-teacher-name')?.textContent || 'Professor';
-    document.getElementById('s-conv-title').textContent = `Conversa com ${teacherName}`;
+    const teacherName = ME.teacherName || document.getElementById('s-teacher-name')?.textContent?.trim() || 'Professor';
+    const titleEl = document.getElementById('s-conv-title');
+    if (titleEl) titleEl.textContent = `Conversa com ${teacherName}`;
+
+    if (!_studentTeacherLogin) {
+      document.getElementById('s-conv-messages').innerHTML = '<p class="empty" style="text-align:center;padding:24px 0">Nenhum professor vinculado ainda. Aguarde seu professor cadastrá-lo.</p>';
+      return;
+    }
     await api('PUT', `/api/messages/read/${_studentTeacherLogin}`).catch(() => {});
     await renderConversation('s-conv-messages', _studentTeacherLogin);
     refreshInboxBadges();
