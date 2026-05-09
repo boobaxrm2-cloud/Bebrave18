@@ -113,7 +113,10 @@
         </div>
 
         <button class="lv2-btn" onclick="doLogin()">Entrar</button>
-        <p class="lv2-footer">Não tem acesso? Entre em contato com seu professor.</p>
+        <div style="margin-top:18px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:18px">
+          <p style="font-size:13px;color:#94a3b8;margin:0 0 10px">É professor e quer usar a plataforma?</p>
+          <button onclick="showPage('page-register')" style="background:transparent;border:1.5px solid rgba(255,255,255,0.2);color:#cbd5e1;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:all .2s" onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='transparent'">Cadastrar-se como Professor</button>
+        </div>
       </div>
 
     </div>
@@ -121,6 +124,40 @@
 </div>
 
 
+
+<!-- ═══════════════════ REGISTER PAGE (teacher) ══════════════════════ -->
+<div id="page-register" class="page">
+  <div class="login-v2">
+    <div class="lv2-bg" aria-hidden="true"></div>
+    <div class="lv2-card" style="max-width:520px">
+      <div class="lv2-logo-wrap">
+        <svg viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg" class="lv2-logo-svg">
+          <rect x="0" y="0" width="48" height="3" fill="#2A5FCC" opacity="0.9"/><rect x="0" y="0" width="3" height="48" fill="#2A5FCC" opacity="0.9"/>
+          <rect x="632" y="0" width="48" height="3" fill="#E8381E" opacity="0.9"/><rect x="677" y="0" width="3" height="48" fill="#E8381E" opacity="0.9"/>
+          <rect x="0" y="217" width="48" height="3" fill="#E8381E" opacity="0.9"/><rect x="0" y="172" width="3" height="48" fill="#E8381E" opacity="0.9"/>
+          <rect x="632" y="217" width="48" height="3" fill="#2A5FCC" opacity="0.9"/><rect x="677" y="172" width="3" height="48" fill="#2A5FCC" opacity="0.9"/>
+          <text x="340" y="128" font-family="'Helvetica Neue',Arial,sans-serif" font-size="100" font-weight="800" text-anchor="middle" letter-spacing="-4"><tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan></text>
+          <rect x="155" y="140" width="183" height="3" fill="#2A5FCC" rx="1.5"/><rect x="342" y="140" width="187" height="3" fill="#E8381E" rx="1.5"/>
+          <text x="340" y="185" font-family="'Helvetica Neue',Arial,sans-serif" font-size="14" font-weight="500" fill="#94a3b8" text-anchor="middle" letter-spacing="5">LANGUAGE TUTORING PLATFORM</text>
+        </svg>
+      </div>
+      <div class="lv2-divider"><span class="lv2-divider-line lv2-dl-blue"></span><span class="lv2-divider-dot"></span><span class="lv2-divider-line lv2-dl-red"></span></div>
+      <div class="lv2-form">
+        <h2 class="lv2-title">Cadastro de Professor</h2>
+        <p class="lv2-sub">Preencha seus dados para criar sua conta</p>
+        <div id="reg-err" class="alert-err hidden"></div>
+        <div class="lv2-field"><label class="lv2-label">Nome completo *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><input id="reg-name" type="text" class="lv2-input" placeholder="Seu nome completo"></div></div>
+        <div class="lv2-field"><label class="lv2-label">CPF *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg><input id="reg-cpf" type="text" class="lv2-input" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)"></div></div>
+        <div class="lv2-field"><label class="lv2-label">Idiomas que leciona *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><input id="reg-languages" type="text" class="lv2-input" placeholder="Ex: Inglês, Espanhol, Francês"></div></div>
+        <div class="lv2-field"><label class="lv2-label">E-mail *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg><input id="reg-email" type="email" class="lv2-input" placeholder="seu@email.com"></div></div>
+        <div class="lv2-field"><label class="lv2-label">WhatsApp</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
+        <div class="lv2-field"><label class="lv2-label">Senha de acesso *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input id="reg-password" type="password" class="lv2-input" placeholder="Mínimo 4 caracteres"><button type="button" class="lv2-eye" onclick="togglePw('reg-password',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <button class="lv2-btn" onclick="submitTeacherRegistration()">Criar Conta</button>
+        <p style="text-align:center;margin-top:14px"><button onclick="showPage('page-login')" style="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">← Voltar ao login</button></p>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════════════ ADMIN PAGE ══════════════════════════════ -->
 <div id="page-admin" class="page">
@@ -205,10 +242,10 @@
       <section id="adm-contracts" class="cs">
         <div class="sh">
           <div><h2>Contratos</h2><p class="sub">Gerencie todos os contratos da plataforma</p></div>
-          <button class="btn-primary" onclick="openTeacherContractModal()">+ Contrato de Professor</button>
+          <button class="btn-primary" onclick="openTeacherContractModal()">+ Termo de Uso</button>
         </div>
         <div style="display:flex;gap:12px;margin-bottom:16px">
-          <button class="btn-sm" id="adm-ctr-tab-teacher" onclick="showAdmContractTab('teacher')" style="background:var(--navy);color:#fff">Contratos de Professores</button>
+          <button class="btn-sm" id="adm-ctr-tab-teacher" onclick="showAdmContractTab('teacher')" style="background:var(--navy);color:#fff">Termos de Uso</button>
           <button class="btn-sm" id="adm-ctr-tab-student" onclick="showAdmContractTab('student')">Contratos de Alunos</button>
         </div>
         <div id="adm-teacher-contracts-list"></div>
@@ -343,7 +380,7 @@
         <div class="sh"><div><h2>Contratos</h2><p class="sub">Contratos dos alunos e seu contrato com a BeBrave</p></div><button class="btn-primary" onclick="openContractModal()">+ Contrato de Aluno</button></div>
         <div style="display:flex;gap:12px;margin-bottom:16px">
           <button class="btn-sm" id="t-ctr-tab-students" onclick="showTeacherContractTab('students')" style="background:var(--navy);color:#fff">Contratos de Alunos</button>
-          <button class="btn-sm" id="t-ctr-tab-bebrave" onclick="showTeacherContractTab('bebrave')">Meu Contrato BeBrave</button>
+          <button class="btn-sm" id="t-ctr-tab-bebrave" onclick="showTeacherContractTab('bebrave')">Meu Termo de Uso</button>
         </div>
         <div id="t-contracts-list"></div>
         <div id="t-bebrave-contracts-list" class="hidden"></div>
@@ -576,6 +613,62 @@
 </div>
 
 <!-- ═══════════════════════ MODAIS ════════════════════════════════ -->
+
+<!-- ═══════ Modal: Cadastro de Professor — Sucesso ═══════ -->
+<div id="modal-registration-success" class="modal-ov hidden">
+  <div class="modal-card" style="max-width:420px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">🎉</div>
+    <h3 style="margin-bottom:8px">Cadastro realizado!</h3>
+    <p style="color:var(--g600);font-size:14px;margin-bottom:20px">Guarde seus dados de acesso com segurança.</p>
+    <div style="background:var(--g50);border-radius:var(--r-sm);padding:16px;margin-bottom:20px;text-align:left">
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--g500);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Login</div>
+        <div style="font-size:24px;font-weight:700;color:var(--navy);font-family:monospace;letter-spacing:.12em" id="reg-success-login"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--g500);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Senha</div>
+        <div style="font-size:24px;font-weight:700;color:var(--navy);font-family:monospace;letter-spacing:.12em" id="reg-success-password"></div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--g400);margin-bottom:20px">Use estes dados para entrar na plataforma BeBrave.</p>
+    <button class="btn-primary" style="width:100%" onclick="closeModal('modal-registration-success');showPage('page-login')">Ir para Login</button>
+  </div>
+</div>
+
+<!-- ═══════ Modal: Termo de Uso (primeiro login — não dispensável) ═══════ -->
+<div id="modal-terms-of-use" class="modal-ov hidden">
+  <div class="modal-card" style="max-width:600px;width:95vw">
+    <div class="mh"><h3>📋 Termo de Uso — BeBrave</h3></div>
+    <div style="max-height:38vh;overflow-y:auto;background:var(--g50);border-radius:var(--r-sm);padding:16px;font-size:13px;color:var(--g700);line-height:1.7;margin-bottom:16px;border:1px solid var(--g200)">
+      <p><strong>TERMO DE USO DA PLATAFORMA BEBRAVE</strong></p><br>
+      <p>Ao utilizar a plataforma BeBrave, o professor concorda com os termos e condições descritos neste documento.</p><br>
+      <p><strong>1. PERÍODO DE TESTE GRATUITO</strong></p>
+      <p>O acesso à plataforma BeBrave é concedido de forma <strong>gratuita durante o período de teste</strong>. Este período tem duração determinada e será comunicado ao professor no momento do cadastro ou por e-mail.</p><br>
+      <p><strong>2. ENCERRAMENTO DO PERÍODO DE TESTE</strong></p>
+      <p>Após o término do período de testes, o acesso do professor à plataforma será <strong>automaticamente bloqueado</strong>. O professor será notificado com antecedência sobre o encerramento do período gratuito.</p><br>
+      <p><strong>3. CONTINUIDADE DO SERVIÇO</strong></p>
+      <p>Ao término do período de teste, o professor terá a oportunidade de optar por <strong>continuar utilizando a plataforma</strong> mediante aceitação dos novos termos de uso e condições comerciais vigentes à época, firmando novo acordo com a BeBrave.</p><br>
+      <p><strong>4. DADOS E PRIVACIDADE</strong></p>
+      <p>Os dados cadastrados na plataforma — incluindo informações de alunos e aulas — são de responsabilidade do professor e serão utilizados exclusivamente para o funcionamento dos serviços da BeBrave, em conformidade com a legislação aplicável.</p><br>
+      <p><strong>5. RESPONSABILIDADES DO PROFESSOR</strong></p>
+      <p>O professor se compromete a utilizar a plataforma de forma ética e legal, respeitando os dados dos alunos e as políticas da BeBrave. O uso inadequado poderá resultar no bloqueio imediato do acesso.</p><br>
+      <p><strong>6. ALTERAÇÕES NOS TERMOS</strong></p>
+      <p>A BeBrave reserva-se o direito de alterar os presentes termos a qualquer momento, mediante comunicação prévia ao professor. A continuidade do uso da plataforma implica aceitação das novas condições.</p>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;color:var(--g600);margin-bottom:8px;display:block;font-weight:600">Assine abaixo (mouse ou dedo)</label>
+      <div style="border:1.5px solid var(--g200);border-radius:var(--r-sm);background:#fafafa;position:relative">
+        <canvas id="canvas-terms-sig" width="540" height="100" style="display:block;touch-action:none;cursor:crosshair;width:100%;max-width:100%"></canvas>
+        <button onclick="clearSig('canvas-terms-sig')" style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--g400);cursor:pointer;font-size:12px">Limpar</button>
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--g700);cursor:pointer;margin-bottom:20px">
+      <input type="checkbox" id="terms-agree-check" style="width:18px;height:18px;accent-color:var(--navy)">
+      Li e concordo com os termos de uso
+    </label>
+    <button class="btn-primary" style="width:100%;font-size:16px;padding:14px" onclick="submitTermsAcceptance()">Aceitar e Continuar</button>
+  </div>
+</div>
 
 <!-- Add Teacher (admin) -->
 <div id="modal-add-teacher" class="modal-ov hidden" onclick="closeModalOv(event,'modal-add-teacher')">
@@ -816,7 +909,7 @@
 <!-- ═══════ Modal: Contrato de Professor (admin) ═══════ -->
 <div id="modal-teacher-contract" class="modal-ov hidden" onclick="closeModalOv(event,'modal-teacher-contract')">
   <div class="modal-card" style="max-width:560px;width:95vw">
-    <div class="mh"><h3>📋 Contrato de Uso — Professor</h3><button class="mc-close" onclick="closeModal('modal-teacher-contract')">✕</button></div>
+    <div class="mh"><h3>📋 Termo de Uso — Professor</h3><button class="mc-close" onclick="closeModal('modal-teacher-contract')">✕</button></div>
     <div class="field-group"><label>Professor *</label><select id="tctr-teacher"></select></div>
     <div class="field-group">
       <label>Plano *</label>
@@ -840,10 +933,10 @@
   </div>
 </div>
 
-<!-- ═══════ Modal: Assinar Contrato BeBrave (professor) ═══════ -->
+<!-- ═══════ Modal: Assinar Termo de Uso (professor — legado) ═══════ -->
 <div id="modal-teacher-self-sign" class="modal-ov hidden" onclick="closeModalOv(event,'modal-teacher-self-sign')">
   <div class="modal-card" style="max-width:500px;width:95vw">
-    <div class="mh"><h3>✍️ Assinar Contrato BeBrave</h3><button class="mc-close" onclick="closeModal('modal-teacher-self-sign')">✕</button></div>
+    <div class="mh"><h3>✍️ Assinar Termo de Uso</h3><button class="mc-close" onclick="closeModal('modal-teacher-self-sign')">✕</button></div>
     <input type="hidden" id="sign-tctr-id">
     <input type="hidden" id="sign-tctr-ctr-id">
     <p style="color:var(--g600);font-size:14px;margin-bottom:12px">Leia o contrato antes de assinar.</p>

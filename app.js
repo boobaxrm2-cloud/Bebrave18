@@ -110,18 +110,39 @@ async function loadAdminTeachers() {
   const teachers = await api('GET','/api/admin/teachers');
   const el = document.getElementById('adm-teachers-list');
   if (!teachers.length) { el.innerHTML = '<p class="empty">Nenhum professor cadastrado ainda.</p>'; return; }
-  el.innerHTML = `<table class="list-table"><thead><tr><th>Professor</th><th>Login</th><th>Alunos</th><th>Cadastrado em</th><th>Ações</th></tr></thead><tbody>
-    ${teachers.map(t=>`<tr>
-      <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'}">${t.initials}</div><div><div>${t.name}</div>${t.blocked?'<span style="font-size:11px;color:#ef4444;font-weight:600">● Bloqueado</span>':''}</div></div></td>
-      <td><span class="mat-badge" style="background:var(--navy2)">${t.login}</span></td>
-      <td>${t.studentCount} aluno${t.studentCount!==1?'s':''}</td>
-      <td>${fmtDate(t.createdAt)}</td>
-      <td><div class="lt-actions">
-        <button class="btn-icon" title="${t.blocked?'Desbloquear':'Bloquear'} professor" onclick="toggleBlockTeacher('${t.login}',${!!t.blocked})" style="${t.blocked?'color:#22c55e':'color:#ef4444'}">${t.blocked?'🔓':'🔒'}</button>
-        <button class="btn-icon" title="Redefinir senha" onclick="openResetPw('${t.login}','${t.name}')">🔑</button>
-        <button class="btn-icon danger" title="Excluir" onclick="confirmDelete('teacher','${t.login}','${escJs(t.name)}')">🗑</button>
-      </div></td>
-    </tr>`).join('')}
+  el.innerHTML = `<table class="list-table"><thead><tr>
+    <th>Professor</th><th>Login</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Cadastrado em</th><th>Ações</th>
+  </tr></thead><tbody>
+    ${teachers.map(t=>{
+      const termsHtml = t.termsAccepted
+        ? `<span style="color:#22c55e;font-size:12px;font-weight:600">✅ Aceito</span>`
+        : `<span style="color:#f59e0b;font-size:12px;font-weight:600">⏳ Pendente</span>`;
+      const pwId = `pw-${t.login.replace(/\W/g,'_')}`;
+      const pwHtml = t.plainPassword
+        ? `<div style="display:flex;align-items:center;gap:6px">
+            <span id="${pwId}" style="font-family:monospace;font-size:13px;filter:blur(4px);transition:filter .2s">${escHtml(t.plainPassword)}</span>
+            <button class="btn-icon" title="Mostrar/ocultar senha" onclick="(function(){const s=document.getElementById('${pwId}');s.style.filter=s.style.filter?'':'blur(4px)'})()" style="font-size:14px">👁</button>
+           </div>`
+        : `<span style="color:var(--g400);font-size:12px">—</span>`;
+      const langsList = Array.isArray(t.languages) ? t.languages : (t.languages ? [t.languages] : []);
+      const langsHtml = langsList.length
+        ? `<span style="font-size:13px;color:var(--g700)">${langsList.join(', ')}</span>`
+        : '<span style="color:var(--g400);font-size:12px">—</span>';
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'}">${t.initials}</div><div><div>${t.name}</div>${t.blocked?'<span style="font-size:11px;color:#ef4444;font-weight:600">● Bloqueado</span>':''}</div></div></td>
+        <td><span class="mat-badge" style="background:var(--navy2)">${t.login}</span></td>
+        <td>${langsHtml}</td>
+        <td>${pwHtml}</td>
+        <td>${termsHtml}</td>
+        <td>${t.studentCount} aluno${t.studentCount!==1?'s':''}</td>
+        <td>${fmtDate(t.createdAt)}</td>
+        <td><div class="lt-actions">
+          <button class="btn-icon" title="${t.blocked?'Desbloquear':'Bloquear'} professor" onclick="toggleBlockTeacher('${t.login}',${!!t.blocked})" style="${t.blocked?'color:#22c55e':'color:#ef4444'}">${t.blocked?'🔓':'🔒'}</button>
+          <button class="btn-icon" title="Redefinir senha" onclick="openResetPw('${t.login}','${t.name}')">🔑</button>
+          <button class="btn-icon danger" title="Excluir" onclick="confirmDelete('teacher','${t.login}','${escJs(t.name)}')">🗑</button>
+        </div></td>
+      </tr>`;
+    }).join('')}
   </tbody></table>`;
 }
 
@@ -315,6 +336,7 @@ async function loadTeacher() {
   await refreshTeacherAll();
   checkPendingContracts('teacher');
   refreshInboxBadges();
+  checkTermsAccepted();
 }
 
 async function refreshTeacherAll() {
@@ -2472,5 +2494,72 @@ async function markSuggestionRead(id) {
   try {
     await api('PUT', `/api/admin/suggestions/${id}/read`);
     loadAdminSuggestions();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TEACHER SELF-REGISTRATION
+// ══════════════════════════════════════════════════════════════
+
+function fmtCpf(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 9)      v = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/^(\d{3})(\d{3})(\d{0,3})/,        '$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/^(\d{3})(\d{0,3})/,               '$1.$2');
+  input.value = v;
+}
+
+async function submitTeacherRegistration() {
+  const name      = document.getElementById('reg-name').value.trim();
+  const cpf       = document.getElementById('reg-cpf').value.trim();
+  const languagesRaw = document.getElementById('reg-languages').value.trim();
+  const languages = languagesRaw ? languagesRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  const email     = document.getElementById('reg-email').value.trim();
+  const whatsapp  = document.getElementById('reg-whatsapp').value.trim();
+  const password  = document.getElementById('reg-password').value;
+
+  if (!name)          { showToast('⚠️ Informe o nome completo'); return; }
+  if (cpf.replace(/\D/g,'').length < 11) { showToast('⚠️ CPF inválido'); return; }
+  if (!languagesRaw)  { showToast('⚠️ Informe ao menos um idioma'); return; }
+  if (!email || !email.includes('@')) { showToast('⚠️ Informe um e-mail válido'); return; }
+  if (!whatsapp)      { showToast('⚠️ Informe o WhatsApp'); return; }
+  if (password.length < 4) { showToast('⚠️ A senha deve ter ao menos 4 caracteres'); return; }
+
+  try {
+    const r = await api('POST', '/api/auth/register-teacher', { name, cpf, languages, email, whatsapp, password });
+    document.getElementById('reg-success-login').textContent    = r.login;
+    document.getElementById('reg-success-password').textContent = password;
+    openModal('modal-registration-success');
+    // Clear form
+    ['reg-name','reg-cpf','reg-languages','reg-email','reg-whatsapp','reg-password'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TERMO DE USO — PRIMEIRO LOGIN
+// ══════════════════════════════════════════════════════════════
+
+function checkTermsAccepted() {
+  if (ME && ME.termsAccepted === false) {
+    openModal('modal-terms-of-use');
+    // Init signature pad once modal is visible
+    setTimeout(() => initSigPad('canvas-terms-sig'), 50);
+  }
+}
+
+async function submitTermsAcceptance() {
+  const checked = document.getElementById('terms-agree-check')?.checked;
+  if (!checked) { showToast('⚠️ Marque que leu e concorda com os termos'); return; }
+
+  const signature = getSigDataURL('canvas-terms-sig');
+  if (!signature) { showToast('⚠️ Assine o termo antes de continuar'); return; }
+
+  try {
+    await api('POST', '/api/teacher/accept-terms', { signature });
+    ME.termsAccepted = true;
+    closeModal('modal-terms-of-use');
+    showToast('✅ Termo de uso aceito!');
   } catch(e) { showToast('❌ ' + e.message); }
 }

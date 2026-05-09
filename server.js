@@ -151,10 +151,29 @@ const isAdminOrTeach = (req, res, next) => {
 // ════════════════════════════════════════════════════════════
 //  AUTH
 // ════════════════════════════════════════════════════════════
+// ── Teacher self-registration (public) ────────────────────────
+app.post('/api/auth/register-teacher', (req, res) => {
+  const { name, cpf, languages, email, whatsapp, password } = req.body;
+  if (!name || !cpf || !email || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
+  if (password.length < 4) return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres' });
+  const cpfDigits = cpf.replace(/\D/g, '');
+  if (cpfDigits.length < 11) return res.status(400).json({ error: 'CPF inválido — informe os 11 dígitos' });
+  let login = cpfDigits.slice(0, 5);
+  if (Users.findOne({ login })) {
+    login = cpfDigits.slice(0, 6);
+    if (Users.findOne({ login })) return res.status(409).json({ error: 'Login já existente. Entre em contato com o administrador.' });
+  }
+  const ini = initials(name);
+  const { color, bg } = pickColor(Teachers.count());
+  Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
+  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: cpf.trim(), whatsapp: whatsapp || '', languages: languages || '', initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true });
+  res.json({ ok: true, login, name: name.trim() });
+});
+
 app.post('/api/auth/login', (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) return res.status(400).json({ error: 'Preencha todos os campos' });
-  const user = Users.findOne({ login: login.trim().toUpperCase() });
+  const user = Users.findOne({ login: login.trim().toUpperCase() }) || Users.findOne({ login: login.trim() });
   if (!user || !bcrypt.compareSync(password, user.password))
     return res.status(401).json({ error: 'Login ou senha incorretos' });
   if (user.inactive) return res.status(403).json({ error: 'Acesso inativo. Entre em contato com seu professor.' });
@@ -166,6 +185,10 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
   req.session.user = { id: user.$loki, login: user.login, role: user.role, name: user.name };
+  if (user.role === 'teacher') {
+    const t = Teachers.findOne({ login: user.login });
+    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false });
+  }
   res.json({ role: user.role, name: user.name, login: user.login });
 });
 
@@ -178,7 +201,21 @@ app.get('/api/auth/me', (req, res) => {
     const s = Students.findOne({ matricula: u.login });
     return res.json({ ...u, level: s?.level || 'A1', teacherName: s?.teacherName || '' });
   }
+  if (u.role === 'teacher') {
+    const t = Teachers.findOne({ login: u.login });
+    return res.json({ ...u, termsAccepted: t?.termsAccepted || false });
+  }
   res.json(u);
+});
+
+app.post('/api/teacher/accept-terms', auth, isTeach, (req, res) => {
+  const { signature } = req.body;
+  if (!signature) return res.status(400).json({ error: 'Assinatura obrigatória' });
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  t.termsAccepted = true; t.termsAcceptedAt = Date.now(); t.termsSignature = signature;
+  Teachers.update(t);
+  res.json({ ok: true });
 });
 
 app.post('/api/auth/change-password', auth, (req, res) => {
@@ -195,7 +232,7 @@ app.post('/api/auth/change-password', auth, (req, res) => {
 //  ADMIN — TEACHERS
 // ════════════════════════════════════════════════════════════
 app.get('/api/admin/teachers', auth, isAdmin, (req, res) => {
-  const teachers = Teachers.find().map(t => ({ ...t, studentCount: Students.find({ teacherLogin: t.login }).length }));
+  const teachers = Teachers.find().map(t => ({ ...t, studentCount: Students.find({ teacherLogin: t.login }).length, plainPassword: t.plainPassword || '', languages: t.languages || '', termsAccepted: t.termsAccepted || false, termsAcceptedAt: t.termsAcceptedAt || null }));
   res.json(teachers);
 });
 
