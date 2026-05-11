@@ -422,6 +422,7 @@ function renderTeacherStudents(students, lessons) {
           </select>
           <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
           <button class="btn-danger" style="font-size:13px;padding:8px 16px" onclick="confirmDeleteStudentTeacher('${s.matricula}','${escJs(s.name)}')">🗑 Excluir Aluno</button>
+          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openReportModal('${s.matricula}','${escJs(s.name)}')">📄 Relatório</button>
         </div>
       </div>
     </div>`;
@@ -2001,6 +2002,244 @@ async function savePaymentPlan() {
     showToast('✅ Mensalidade configurada!');
     loadTeacherPayments();
   } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── Student Progress Report ──────────────────────────────────────────────────
+
+let _reportMatricula = '';
+let _reportStudentName = '';
+
+function openReportModal(matricula, name) {
+  _reportMatricula = matricula;
+  _reportStudentName = name;
+  document.getElementById('report-student-name').textContent = name;
+  const now = new Date();
+  document.getElementById('report-month').value = now.getMonth() + 1;
+  document.getElementById('report-year').value  = now.getFullYear();
+  document.getElementById('report-preview').style.display = 'none';
+  openModal('modal-report');
+}
+
+async function generateStudentReport() {
+  const month = parseInt(document.getElementById('report-month').value);
+  const year  = parseInt(document.getElementById('report-year').value);
+  if (!year || year < 2020) { showToast('⚠️ Ano inválido'); return; }
+
+  const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const monthLabel = MONTHS_PT[month - 1];
+  const pad = n => String(n).padStart(2, '0');
+  const prefix = `${year}-${pad(month)}`;
+
+  let allLessons = [], allNotes = [], students = [];
+  try {
+    [allLessons, allNotes, students] = await Promise.all([
+      api('GET', '/api/lessons'),
+      api('GET', '/api/notes'),
+      api('GET', '/api/students'),
+    ]);
+  } catch(e) { showToast('❌ Erro ao buscar dados: ' + e.message); return; }
+
+  const student = students.find(s => s.matricula === _reportMatricula) || {};
+  const lessons = allLessons.filter(l => l.studentMatricula === _reportMatricula && (l.date||'').startsWith(prefix));
+  const notes   = allNotes.filter(n => n.studentMatricula === _reportMatricula);
+
+  const done     = lessons.filter(l => l.status === 'done').length;
+  const absent   = lessons.filter(l => l.status === 'absent').length;
+  const sched    = lessons.filter(l => l.status === 'scheduled').length;
+  const total    = lessons.length;
+
+  if (!window.jspdf) { showToast('❌ jsPDF não carregado. Recarregue a página.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const PW = 210, PH = 297;
+  const ML = 18, MR = 18, MT = 0;
+  const CW = PW - ML - MR;
+
+  // ── Header band ──────────────────────────────────────────────────────────
+  doc.setFillColor(26, 42, 80);
+  doc.rect(0, 0, PW, 38, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
+  doc.text('BeBrave', ML, 18);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(180, 200, 230);
+  doc.text('Language Tutoring Platform', ML, 25);
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Relatório de Progresso — ${monthLabel} ${year}`, PW - MR, 18, { align: 'right' });
+
+  // ── Student info ─────────────────────────────────────────────────────────
+  let y = 50;
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(26, 42, 80);
+  doc.text(_reportStudentName, ML, y);
+
+  y += 7;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 110, 130);
+  const infoLine = [
+    student.level ? `Nível: ${student.level}` : '',
+    student.email ? `E-mail: ${student.email}` : '',
+    student.lang  ? `Idioma: ${student.lang}`  : '',
+  ].filter(Boolean).join('   •   ');
+  if (infoLine) doc.text(infoLine, ML, y);
+
+  // divider
+  y += 6;
+  doc.setDrawColor(220, 225, 235);
+  doc.setLineWidth(0.4);
+  doc.line(ML, y, PW - MR, y);
+
+  // ── Stats row ────────────────────────────────────────────────────────────
+  y += 10;
+  const statBoxW = CW / 4 - 3;
+  const stats = [
+    { val: done,   label: 'Aulas realizadas', color: [16, 185, 129]  },
+    { val: absent, label: 'Faltas',            color: [239, 68, 68]   },
+    { val: sched,  label: 'Agendadas',         color: [59, 130, 246]  },
+    { val: total,  label: 'Total no mês',      color: [26, 42, 80]    },
+  ];
+  stats.forEach((st, i) => {
+    const bx = ML + i * (statBoxW + 4);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(bx, y, statBoxW, 22, 3, 3, 'F');
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...st.color);
+    doc.text(String(st.val), bx + statBoxW / 2, y + 11, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 110, 130);
+    doc.text(st.label, bx + statBoxW / 2, y + 18, { align: 'center' });
+  });
+
+  y += 30;
+
+  // ── Lessons table ─────────────────────────────────────────────────────────
+  if (lessons.length > 0) {
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 42, 80);
+    doc.text('Aulas do Período', ML, y);
+    y += 6;
+
+    // table header
+    const cols = [
+      { label: 'Data',     w: 24 },
+      { label: 'Horário',  w: 20 },
+      { label: 'Tópico',   w: 58 },
+      { label: 'Status',   w: 24 },
+      { label: 'Feedback', w: CW - 24 - 20 - 58 - 24 },
+    ];
+    doc.setFillColor(26, 42, 80);
+    doc.rect(ML, y, CW, 7, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    let cx = ML + 2;
+    cols.forEach(c => { doc.text(c.label, cx, y + 5); cx += c.w; });
+
+    y += 7;
+    const statusLabel = { done: 'Realizada', absent: 'Falta', scheduled: 'Agendada', cancelled: 'Cancelada' };
+    const statusColor = { done: [16,185,129], absent: [239,68,68], scheduled: [59,130,246], cancelled: [156,163,175] };
+
+    const sortedLessons = [...lessons].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    sortedLessons.forEach((l, idx) => {
+      const rowH = 7;
+      if (y + rowH > PH - 20) {
+        doc.addPage();
+        y = MT + 20;
+      }
+      doc.setFillColor(idx % 2 === 0 ? 248 : 255, idx % 2 === 0 ? 250 : 255, idx % 2 === 0 ? 252 : 255);
+      doc.rect(ML, y, CW, rowH, 'F');
+
+      const dateParts = (l.date||'').split('-');
+      const dateStr = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}` : (l.date||'');
+      const rowVals = [
+        dateStr,
+        l.time || '',
+        l.topic || l.subject || '',
+        statusLabel[l.status] || l.status || '',
+        l.feedback || '',
+      ];
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 70, 90);
+      cx = ML + 2;
+      cols.forEach((c, ci) => {
+        if (ci === 3) {
+          const sc = statusColor[l.status] || [100,110,130];
+          doc.setTextColor(...sc);
+        } else {
+          doc.setTextColor(60, 70, 90);
+        }
+        const txt = doc.splitTextToSize(rowVals[ci], c.w - 3);
+        doc.text(txt[0] || '', cx, y + 5);
+        cx += c.w;
+      });
+      doc.setDrawColor(230, 235, 240);
+      doc.setLineWidth(0.2);
+      doc.line(ML, y + rowH, ML + CW, y + rowH);
+      y += rowH;
+    });
+  } else {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(150, 160, 175);
+    doc.text('Nenhuma aula registrada neste período.', ML, y + 6);
+    y += 14;
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  if (notes.length > 0) {
+    y += 10;
+    if (y + 30 > PH - 20) { doc.addPage(); y = MT + 20; }
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 42, 80);
+    doc.text('Anotações do Professor', ML, y);
+    y += 6;
+
+    notes.slice(0, 6).forEach(n => {
+      const lines = doc.splitTextToSize('• ' + (n.text || ''), CW);
+      const blockH = lines.length * 5 + 4;
+      if (y + blockH > PH - 20) { doc.addPage(); y = MT + 20; }
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 70, 90);
+      doc.text(lines, ML, y + 4);
+      y += blockH;
+    });
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(0, PH - 12, PW, 12, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150, 160, 175);
+    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · BeBrave Language Tutoring`, ML, PH - 5);
+    doc.text(`${p} / ${totalPages}`, PW - MR, PH - 5, { align: 'right' });
+  }
+
+  const filename = `Relatorio_${_reportStudentName.replace(/\s+/g,'_')}_${monthLabel}_${year}.pdf`;
+  doc.save(filename);
+  closeModal('modal-report');
+  showToast('✅ PDF gerado com sucesso!');
 }
 
 async function loadStudentPayments() {
