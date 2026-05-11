@@ -1207,8 +1207,10 @@ app.get('/api/payments/student/alert', auth, (req, res) => {
   ensurePaymentForStudent(student, currentMonth);
   const p = Payments.findOne({ studentMatricula: u.login, month: currentMonth });
   if (!p || p.status === 'paid') return res.json({ alert: false });
-  const daysUntilDue = Math.ceil((p.dueDate - Date.now()) / 86400000);
-  res.json({ alert: p.status === 'overdue' || daysUntilDue <= 2, status: p.status, daysUntilDue, amount: p.amount, dueDate: p.dueDate });
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dueStr   = new Date(p.dueDate).toISOString().slice(0, 10);
+  const daysUntilDue = Math.round((new Date(dueStr) - new Date(todayStr)) / 86400000);
+  res.json({ alert: p.status === 'overdue' || daysUntilDue <= 4, status: p.status, daysUntilDue, amount: p.amount, dueDate: p.dueDate });
 });
 
 app.put('/api/students/:matricula/payment-plan', auth, isTeach, (req, res) => {

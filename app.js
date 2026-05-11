@@ -2451,6 +2451,10 @@ async function loadStudentPayments() {
         <div><div style="font-size:12px;color:var(--g400);margin-bottom:4px">Status</div><span style="background:${st.bg};color:${st.color};padding:5px 16px;border-radius:20px;font-weight:600;font-size:14px">${st.label}</span></div>
         ${current.paidAt ? `<div><div style="font-size:12px;color:var(--g400);margin-bottom:4px">Pago em</div><div style="font-size:16px;font-weight:600">${new Date(current.paidAt).toLocaleDateString('pt-BR')}</div></div>` : ''}
       </div>
+      ${current.status !== 'paid' ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100);display:flex;align-items:center;gap:12px">
+        <span style="font-size:13px;color:var(--g500)">Dúvidas sobre o pagamento?</span>
+        <button class="btn-sm" style="background:var(--blue);color:white;border-color:var(--blue)" onclick="showStudent('s-messages',document.getElementById('s-nav-messages'));loadStudentMessages()">💬 Contacte seu professor</button>
+      </div>` : ''}
     </div>`;
   }
 
