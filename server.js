@@ -379,11 +379,20 @@ app.delete('/api/admin/students/:matricula', auth, isAdmin, (req, res) => {
 //  STUDENTS
 // ════════════════════════════════════════════════════════════
 app.get('/api/students', auth, isAdminOrTeach, (req, res) => {
-  const filter = req.session.user.role === 'admin' ? {} : { teacherLogin: req.session.user.login };
+  const u = req.session.user;
+  const filter = u.role === 'admin' ? {} : { teacherLogin: u.login, active: { '$ne': false } };
   res.json(Students.find(filter).map(s => ({
     ...s,
     lessonsDone:      Lessons.find({ studentMatricula: s.matricula, status: 'done' }).length,
     lessonsScheduled: Lessons.find({ studentMatricula: s.matricula, status: 'scheduled' }).length,
+  })));
+});
+
+app.get('/api/students/inactive', auth, isTeach, (req, res) => {
+  const inactive = Students.find({ teacherLogin: req.session.user.login, active: false });
+  res.json(inactive.map(s => ({
+    ...s,
+    lessonsDone: Lessons.find({ studentMatricula: s.matricula, status: 'done' }).length,
   })));
 });
 
@@ -446,22 +455,23 @@ app.delete('/api/students/:matricula', auth, isAdminOrTeach, (req, res) => {
 // ════════════════════════════════════════════════════════════
 
 // ── STUDENT INACTIVATE / REACTIVATE ─────────────────────────────────────────
-app.put('/api/students/:matricula/inactivate', auth, isAdminOrTeach, (req, res) => {
+app.put('/api/students/:matricula/inactivate', auth, isTeach, (req, res) => {
   const s = Students.findOne({ matricula: req.params.matricula });
   if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
-  if (req.session.user.role === 'teacher' && s.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
+  if (s.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
   s.active = false;
+  s.inactivatedAt = now();
   Students.update(s);
   const u = Users.findOne({ login: req.params.matricula });
   if (u) { u.inactive = true; Users.update(u); }
   res.json({ ok: true });
 });
 
-app.put('/api/students/:matricula/reactivate-teacher', auth, isAdminOrTeach, (req, res) => {
+app.put('/api/students/:matricula/reactivate-teacher', auth, isAdmin, (req, res) => {
   const s = Students.findOne({ matricula: req.params.matricula });
   if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
-  if (req.session.user.role === 'teacher' && s.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
   s.active = true;
+  s.inactivatedAt = null;
   Students.update(s);
   const u = Users.findOne({ login: req.params.matricula });
   if (u) { u.inactive = false; Users.update(u); }

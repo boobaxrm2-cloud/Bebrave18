@@ -172,13 +172,13 @@ async function loadAdminStudents(teacherFilter) {
       <input type="checkbox" ${_adminShowDeleted?'checked':''} onchange="_adminShowDeleted=this.checked;loadAdminStudents()" style="accent-color:var(--red)">
       Mostrar alunos excluídos
     </label>
-    <span style="font-size:13px;color:var(--g400)">${students.length} aluno${students.length!==1?'s':''} ativos${deleted.length?' • '+deleted.length+' excluído'+(deleted.length!==1?'s':''):''}</span>
+    <span style="font-size:13px;color:var(--g400)">${students.filter(s=>s.active!==false).length} ativos${students.filter(s=>s.active===false).length?' • '+students.filter(s=>s.active===false).length+' inativo'+(students.filter(s=>s.active===false).length!==1?'s':''):''}${deleted.length?' • '+deleted.length+' excluído'+(deleted.length!==1?'s':''):''}</span>
   </div>`;
 
-  // Filter active students
-  let filtered = _adminStudentFilter
-    ? students.filter(s=>s.teacherLogin===_adminStudentFilter)
-    : students;
+  // Separate active vs inactive
+  const allFiltered = _adminStudentFilter ? students.filter(s=>s.teacherLogin===_adminStudentFilter) : students;
+  let filtered  = allFiltered.filter(s => s.active !== false);
+  const inactiveStudents = allFiltered.filter(s => s.active === false);
 
   const activeRows = filtered.map(s=>`<tr>
     <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${s.bg||'#e8eeff'};color:${s.color||'#3b6ef5'}">${s.initials}</div>${s.name}</div></td>
@@ -191,6 +191,17 @@ async function loadAdminStudents(teacherFilter) {
       <button class="btn-icon" title="Redefinir senha" onclick="openResetPw('${s.matricula}','${escJs(s.name)}')">🔑</button>
       <button class="btn-icon danger" title="Excluir" onclick="confirmDelete('student','${s.matricula}','${escJs(s.name)}')">🗑</button>
     </div></td>
+  </tr>`).join('');
+
+  // Inactive students rows
+  const inactiveRows = inactiveStudents.map(s=>`<tr style="background:#fff7ed;opacity:.9">
+    <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:#fed7aa;color:#c2410c">${s.initials||'?'}</div>${s.name} <span class="badge" style="background:#fed7aa;color:#c2410c;font-size:10px;margin-left:4px">Inativo</span></div></td>
+    <td><span class="mat-badge" style="background:#f97316">${s.matricula}</span></td>
+    <td>${s.level||'—'}</td>
+    <td>${s.teacherName||'—'}</td>
+    <td>${s.lessonCount||0}</td>
+    <td>${s.inactivatedAt ? fmtDate(s.inactivatedAt) : '—'}</td>
+    <td><button class="btn-sm" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7" onclick="reactivateInactiveStudent('${s.matricula}','${escJs(s.name)}')">♻️ Reativar</button></td>
   </tr>`).join('');
 
   // Deleted students rows
@@ -210,13 +221,13 @@ async function loadAdminStudents(teacherFilter) {
     </tr>`).join('');
   }
 
-  if (!filtered.length && !deletedRows) {
+  if (!filtered.length && !inactiveRows && !deletedRows) {
     el.innerHTML = filterBar + '<p class="empty">Nenhum aluno encontrado.</p>';
     return;
   }
 
   el.innerHTML = filterBar + `<table class="list-table"><thead><tr><th>Aluno</th><th>Matrícula</th><th>Nível</th><th>Professor</th><th>Aulas</th><th>Data</th><th>Ações</th></tr></thead><tbody>
-    ${activeRows}${deletedRows}
+    ${activeRows}${inactiveRows}${deletedRows}
   </tbody></table>`;
 }
 
@@ -224,6 +235,15 @@ async function reactivateStudent(matricula, name) {
   if (!confirm('Reativar o aluno ' + name + '? Ele voltará a ter acesso ao sistema com a matrícula e senha originais.')) return;
   try {
     await api('POST', '/api/admin/students/reactivate', { matricula });
+    showToast('✅ Aluno ' + name + ' reativado!');
+    loadAdminStudents();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function reactivateInactiveStudent(matricula, name) {
+  if (!confirm('Reativar o aluno ' + name + '? Ele voltará a ter acesso ao sistema normalmente.')) return;
+  try {
+    await api('PUT', `/api/students/${matricula}/reactivate-teacher`);
     showToast('✅ Aluno ' + name + ' reativado!');
     loadAdminStudents();
   } catch(e) { showToast('❌ ' + e.message); }
@@ -344,14 +364,16 @@ async function loadTeacher() {
 }
 
 async function refreshTeacherAll() {
-  const [students, lessons, files, plans] = await Promise.all([
+  const [students, lessons, files, plans, inactive] = await Promise.all([
     api('GET','/api/students'),
     api('GET','/api/lessons'),
     api('GET','/api/files'),
     api('GET','/api/study-plans').catch(() => []),
+    api('GET','/api/students/inactive').catch(() => []),
   ]);
   renderTeacherOverview(students, lessons);
   renderTeacherStudents(students, lessons, plans);
+  renderInactiveStudents(inactive);
   renderTeacherCalendar(lessons);
   renderTeacherFiles(files, students);
   populateStudentSelects(students);
@@ -414,7 +436,7 @@ function renderTeacherStudents(students, lessons, plans = []) {
         <div class="sdc-hd-actions">
           <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Redefinir senha" onclick="openResetPw('${s.matricula}','${escJs(s.name)}')">🔑</button>
           <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Editar aluno" onclick="openEditStudent('${s.matricula}')">✏️</button>
-          <button class="btn-icon danger" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Excluir aluno" onclick="confirmDeleteStudentTeacher('${s.matricula}','${escJs(s.name)}')">🗑</button>
+          <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Inativar aluno" onclick="confirmInactivateStudent('${s.matricula}','${escJs(s.name)}')">🚫</button>
         </div>
       </div>
       <div class="sdc-body">
@@ -438,7 +460,7 @@ function renderTeacherStudents(students, lessons, plans = []) {
             ${['A1','A2','B1','B2','C1','C2'].map(l=>`<option value="${l}"${l===s.level?' selected':''}>${l}</option>`).join('')}
           </select>
           <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
-          <button class="btn-danger" style="font-size:13px;padding:8px 16px" onclick="confirmDeleteStudentTeacher('${s.matricula}','${escJs(s.name)}')">🗑 Excluir Aluno</button>
+          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:#fff7ed;color:#c2410c;border:1.5px solid #fed7aa" onclick="confirmInactivateStudent('${s.matricula}','${escJs(s.name)}')">🚫 Inativar Aluno</button>
           <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openReportModal('${s.matricula}','${escJs(s.name)}')">📄 Relatório</button>
           <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openStudyPlan('${s.matricula}','${escJs(s.name)}')">📋 Plano</button>
         </div>
@@ -595,18 +617,85 @@ async function uploadTeacherFile(ev) {
 function openLessonFor(mat) { pendingLessonStudent = mat; openModal('modal-add-lesson'); setTimeout(()=>{ const el=document.getElementById('al-student'); if(el) el.value=mat; },50); }
 function openNoteFor(mat)  { document.getElementById('an-mat').value=mat; document.getElementById('an-text').value=''; openModal('modal-add-note'); }
 function confirmDeleteStudent(mat,name) { confirmDelete('student',mat,name); }
-function confirmDeleteStudentTeacher(mat, name) {
-  document.getElementById('confirm-msg').innerHTML = `Tem certeza que deseja excluir o aluno <strong>${name}</strong>?<br><br>Todas as aulas, notas, arquivos e certificados serão removidos permanentemente.`;
-  pendingDelete = { type: 'student', id: mat };
+function confirmInactivateStudent(mat, name) {
+  document.getElementById('confirm-msg').innerHTML = `Deseja inativar o aluno <strong>${name}</strong>?<br><br>O aluno perderá acesso ao sistema. Para reativá-lo, entre em contato com o administrador.`;
   document.getElementById('confirm-btn').onclick = async () => {
     try {
-      await api('DELETE', `/api/students/${mat}`);
+      await api('PUT', `/api/students/${mat}/inactivate`);
       closeModal('modal-confirm');
-      showToast('✅ Aluno excluído!');
+      showToast('✅ Aluno inativado.');
       refreshTeacherAll();
     } catch(e) { showToast('❌ ' + e.message); }
   };
   openModal('modal-confirm');
+}
+
+function showStudentsTab(tab) {
+  const activeList   = document.getElementById('t-student-detail-list');
+  const inactiveList = document.getElementById('t-student-inactive-list');
+  const btnActive    = document.getElementById('tab-btn-active');
+  const btnInactive  = document.getElementById('tab-btn-inactive');
+  if (tab === 'active') {
+    activeList.style.display   = '';
+    inactiveList.style.display = 'none';
+    btnActive.style.color        = 'var(--blue)';
+    btnActive.style.borderBottomColor  = 'var(--blue)';
+    btnActive.style.fontWeight   = '600';
+    btnInactive.style.color      = 'var(--g400)';
+    btnInactive.style.borderBottomColor = 'transparent';
+    btnInactive.style.fontWeight = '500';
+  } else {
+    activeList.style.display   = 'none';
+    inactiveList.style.display = '';
+    btnInactive.style.color      = 'var(--blue)';
+    btnInactive.style.borderBottomColor  = 'var(--blue)';
+    btnInactive.style.fontWeight = '600';
+    btnActive.style.color        = 'var(--g400)';
+    btnActive.style.borderBottomColor   = 'transparent';
+    btnActive.style.fontWeight   = '500';
+  }
+}
+
+function renderInactiveStudents(students) {
+  const el = document.getElementById('t-student-inactive-list');
+  if (!el) return;
+  if (!students || !students.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:32px 24px">
+      <p style="font-size:32px;margin-bottom:8px">✅</p>
+      <p style="font-size:15px;font-weight:600;color:var(--navy);margin-bottom:4px">Nenhum aluno inativo</p>
+      <p style="font-size:13px;color:var(--g400)">Todos os seus alunos estão ativos.</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="card" style="margin-bottom:16px;background:#fff7ed;border-left:4px solid #f97316">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px">ℹ️</span>
+      <p style="font-size:13px;color:#92400e;margin:0">Para reativar um aluno, entre em contato com o <strong>administrador</strong> do sistema.</p>
+    </div>
+  </div>` + students.map(s => {
+    const inactivatedStr = s.inactivatedAt ? new Date(s.inactivatedAt).toLocaleDateString('pt-BR') : '—';
+    return `<div class="sdc" style="opacity:.85;border-left:4px solid #f97316">
+      <div class="sdc-hd" style="background:linear-gradient(135deg,#9a3412,#c2410c)">
+        <div style="display:flex;align-items:center;gap:12px;flex:1">
+          <div class="sdc-av" style="background:rgba(255,255,255,.15);color:white">${s.initials||s.name.charAt(0)}</div>
+          <div>
+            <div class="sdc-name">${s.name}</div>
+            <div class="sdc-sub">Matrícula ${s.matricula} · Nível ${s.level}</div>
+          </div>
+        </div>
+        <span style="background:rgba(255,255,255,.15);color:white;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">🚫 Inativo</span>
+      </div>
+      <div class="sdc-body">
+        <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:12px">
+          <div><span style="font-size:11px;color:var(--g400);display:block">Aulas realizadas</span><span style="font-size:20px;font-weight:700;color:var(--navy)">${s.lessonsDone||0}</span></div>
+          <div><span style="font-size:11px;color:var(--g400);display:block">Nível</span><span style="font-size:20px;font-weight:700;color:var(--navy)">${s.level}</span></div>
+          <div><span style="font-size:11px;color:var(--g400);display:block">Inativado em</span><span style="font-size:14px;font-weight:600;color:#c2410c">${inactivatedStr}</span></div>
+        </div>
+        ${s.email ? `<p style="font-size:13px;color:var(--g500);margin-bottom:4px">📧 ${s.email}</p>` : ''}
+        <p style="font-size:12px;color:var(--g400);margin-top:8px">Para reativar este aluno, entre em contato com o administrador.</p>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 async function openEditStudent(matricula) {
@@ -1274,13 +1363,6 @@ async function inactivateStudent(mat, name) {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
-async function reactivateStudentTeacher(mat) {
-  try {
-    await api('PUT', `/api/students/${mat}/reactivate-teacher`);
-    showToast('✅ Aluno reativado! Acesso restaurado.');
-    refreshTeacherAll();
-  } catch(e) { showToast('❌ ' + e.message); }
-}
 
 // ── Open Meet in new tab (guaranteed) ────────────────────────
 function openMeet(url) {

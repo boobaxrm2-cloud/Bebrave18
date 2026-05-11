@@ -327,7 +327,12 @@
       <!-- Alunos -->
       <section id="t-students" class="cs">
         <div class="sh"><div><h2>Meus Alunos</h2><p class="sub">Gerencie o progresso de cada aluno</p></div><button class="btn-primary" onclick="openModal('modal-add-student')">+ Cadastrar Aluno</button></div>
+        <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--g100)">
+          <button id="tab-btn-active" onclick="showStudentsTab('active')" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--blue);border-bottom:2px solid var(--blue);margin-bottom:-2px">Ativos</button>
+          <button id="tab-btn-inactive" onclick="showStudentsTab('inactive')" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:var(--g400);border-bottom:2px solid transparent;margin-bottom:-2px">Inativos</button>
+        </div>
         <div id="t-student-detail-list"></div>
+        <div id="t-student-inactive-list" style="display:none"></div>
       </section>
 
       <!-- Agenda -->
