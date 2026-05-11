@@ -2675,7 +2675,7 @@ async function checkPaymentAlert() {
     if (banner) banner.innerHTML = `
       <div style="background:${isOverdue ? '#fee2e2' : '#fef3c7'};color:${isOverdue ? '#991b1b' : '#92400e'};padding:14px 18px;border-radius:var(--r-sm);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <span style="font-weight:600;font-size:14px">${msg}</span>
-        <button class="btn-sm" onclick="showStudent('s-payments',document.querySelector('#student-sidebar .nav-item:nth-child(7)'))">Ver detalhes</button>
+        <button class="btn-sm" onclick="showStudent('s-payments',document.getElementById('s-nav-payments'));loadStudentPayments()">Ver detalhes</button>
       </div>`;
   } catch(e) {}
 }
