@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -45,6 +45,7 @@ function dbReady() {
   Suggestions      = db.getCollection('suggestions')      || db.addCollection('suggestions',      { indices: ['teacherLogin'] });
   Payments         = db.getCollection('payments')         || db.addCollection('payments',         { indices: ['studentMatricula', 'teacherLogin', 'month'] });
   Messages         = db.getCollection('messages')         || db.addCollection('messages',         { indices: ['fromLogin', 'toLogin', 'teacherLogin'] });
+  StudyPlans       = db.getCollection('studyPlans')       || db.addCollection('studyPlans',       { indices: ['studentMatricula', 'teacherLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -1320,6 +1321,58 @@ app.get('/api/unread-count', auth, (req, res) => {
     return res.json({ count, msgCount: 0, suggCount: count });
   }
   res.json({ count: 0, msgCount: 0, suggCount: 0 });
+});
+
+// ── Study Plans ──────────────────────────────────────────────
+app.get('/api/study-plans', auth, isTeach, (req, res) => {
+  res.json(StudyPlans.find({ teacherLogin: req.session.user.login }));
+});
+
+app.get('/api/study-plan/:matricula', auth, (req, res) => {
+  const u = req.session.user;
+  const { matricula } = req.params;
+  if (u.role === 'teacher') {
+    if (!Students.findOne({ matricula, teacherLogin: u.login })) return res.status(403).json({ error: 'Acesso negado' });
+  } else if (u.role === 'student') {
+    if (u.login !== matricula) return res.status(403).json({ error: 'Acesso negado' });
+  } else if (u.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+  res.json(StudyPlans.findOne({ studentMatricula: matricula }) || null);
+});
+
+app.put('/api/study-plan/:matricula', auth, isTeach, (req, res) => {
+  const u = req.session.user;
+  const { matricula } = req.params;
+  if (!Students.findOne({ matricula, teacherLogin: u.login })) return res.status(403).json({ error: 'Acesso negado' });
+  const { title, goalLevel, startDate, endDate, milestones } = req.body;
+  let plan = StudyPlans.findOne({ studentMatricula: matricula });
+  if (plan) {
+    if (title      !== undefined) plan.title      = title;
+    if (goalLevel  !== undefined) plan.goalLevel  = goalLevel;
+    if (startDate  !== undefined) plan.startDate  = startDate;
+    if (endDate    !== undefined) plan.endDate    = endDate;
+    if (milestones !== undefined) plan.milestones = milestones;
+    plan.updatedAt = now();
+    StudyPlans.update(plan);
+  } else {
+    plan = StudyPlans.insert({
+      studentMatricula: matricula, teacherLogin: u.login,
+      title: title || '', goalLevel: goalLevel || '',
+      startDate: startDate || '', endDate: endDate || '',
+      milestones: milestones || [], createdAt: now(), updatedAt: now(),
+    });
+  }
+  res.json(plan);
+});
+
+app.delete('/api/study-plan/:matricula', auth, isTeach, (req, res) => {
+  const u = req.session.user;
+  const { matricula } = req.params;
+  if (!Students.findOne({ matricula, teacherLogin: u.login })) return res.status(403).json({ error: 'Acesso negado' });
+  const plan = StudyPlans.findOne({ studentMatricula: matricula });
+  if (plan) StudyPlans.remove(plan);
+  res.json({ ok: true });
 });
 
 // SPA fallback - serve index.html for all non-API routes

@@ -344,13 +344,14 @@ async function loadTeacher() {
 }
 
 async function refreshTeacherAll() {
-  const [students, lessons, files] = await Promise.all([
+  const [students, lessons, files, plans] = await Promise.all([
     api('GET','/api/students'),
     api('GET','/api/lessons'),
-    api('GET','/api/files')
+    api('GET','/api/files'),
+    api('GET','/api/study-plans').catch(() => []),
   ]);
   renderTeacherOverview(students, lessons);
-  renderTeacherStudents(students, lessons);
+  renderTeacherStudents(students, lessons, plans);
   renderTeacherCalendar(lessons);
   renderTeacherFiles(files, students);
   populateStudentSelects(students);
@@ -381,13 +382,28 @@ function renderTeacherOverview(students, lessons) {
     : '<p class="empty">Nenhuma aula agendada.</p>';
 }
 
-function renderTeacherStudents(students, lessons) {
+function renderTeacherStudents(students, lessons, plans = []) {
   const el = document.getElementById('t-student-detail-list');
   if (!students.length) { el.innerHTML = '<div class="card"><p class="empty">Nenhum aluno cadastrado ainda.</p></div>'; return; }
   el.innerHTML = students.map(s=>{
     const done = lessons.filter(l=>l.studentMatricula===s.matricula&&l.status==='done').length;
     const sched = lessons.filter(l=>l.studentMatricula===s.matricula&&l.status==='scheduled').length;
     const absences = lessons.filter(l=>l.studentMatricula===s.matricula&&l.status==='absent').length;
+    const plan = plans.find(p=>p.studentMatricula===s.matricula);
+    const planBar = plan && plan.milestones && plan.milestones.length > 0 ? (()=>{
+      const total = plan.milestones.length;
+      const doneM = plan.milestones.filter(m=>m.done).length;
+      const pct = Math.round(doneM / total * 100);
+      return `<div style="margin-top:10px;padding:8px 12px;background:var(--g50);border-radius:var(--r-sm)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:var(--g500);font-weight:500">📋 ${plan.title||'Plano de estudos'}</span>
+          <span style="font-size:11px;color:var(--navy);font-weight:600">${doneM}/${total} marcos · ${pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--g200);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--blue);border-radius:3px;transition:width .3s"></div>
+        </div>
+      </div>`;
+    })() : '';
     return `<div class="sdc">
       <div class="sdc-hd">
         <div class="sdc-hd-av">${s.initials}</div>
@@ -408,6 +424,7 @@ function renderTeacherStudents(students, lessons) {
           <div class="sdc-mini"><div class="sdc-mini-val">${s.level}</div><div class="sdc-mini-lbl">Nível atual</div></div>
           <div class="sdc-mini"><div class="sdc-mini-val">${absences}</div><div class="sdc-mini-lbl">Faltas</div></div>
         </div>
+        ${planBar}
         ${(s.email||s.whatsapp||s.cpf||s.payday)?`<div class="student-info-grid">
           ${s.email?`<div class="si-field"><div class="si-label">E-mail</div><div class="si-value">${s.email}</div></div>`:''}
           ${s.whatsapp?`<div class="si-field"><div class="si-label">WhatsApp</div><div class="si-value">${s.whatsapp}</div></div>`:''}
@@ -423,6 +440,7 @@ function renderTeacherStudents(students, lessons) {
           <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
           <button class="btn-danger" style="font-size:13px;padding:8px 16px" onclick="confirmDeleteStudentTeacher('${s.matricula}','${escJs(s.name)}')">🗑 Excluir Aluno</button>
           <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openReportModal('${s.matricula}','${escJs(s.name)}')">📄 Relatório</button>
+          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openStudyPlan('${s.matricula}','${escJs(s.name)}')">📋 Plano</button>
         </div>
       </div>
     </div>`;
@@ -2240,6 +2258,167 @@ async function generateStudentReport() {
   doc.save(filename);
   closeModal('modal-report');
   showToast('✅ PDF gerado com sucesso!');
+}
+
+// ── Study Plan ───────────────────────────────────────────────────────────────
+
+let _spMillestoneCounter = 0;
+
+async function openStudyPlan(matricula, name) {
+  document.getElementById('sp-matricula').value = matricula;
+  document.getElementById('sp-student-name').textContent = name;
+  document.getElementById('sp-title').value = '';
+  document.getElementById('sp-goal-level').value = '';
+  document.getElementById('sp-start').value = '';
+  document.getElementById('sp-end').value = '';
+  document.getElementById('sp-milestones').innerHTML = '';
+  _spMillestoneCounter = 0;
+
+  try {
+    const plan = await api('GET', `/api/study-plan/${matricula}`);
+    if (plan) {
+      document.getElementById('sp-title').value      = plan.title      || '';
+      document.getElementById('sp-goal-level').value = plan.goalLevel  || '';
+      document.getElementById('sp-start').value      = plan.startDate  || '';
+      document.getElementById('sp-end').value        = plan.endDate    || '';
+      (plan.milestones || []).forEach(m => _addMilestoneRowData(m));
+    }
+  } catch(e) {}
+
+  _updateNoMilestonesMsg();
+  openModal('modal-study-plan');
+}
+
+function _addMilestoneRowData(m) {
+  _spMillestoneCounter++;
+  const id = m.id || ('ms-' + _spMillestoneCounter);
+  const row = document.createElement('div');
+  row.dataset.id = id;
+  row.style.cssText = 'display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:8px 10px;background:var(--g50);border-radius:var(--r-sm)';
+  row.innerHTML = `
+    <input type="checkbox" ${m.done ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue)" onchange="_updateMilestoneDone(this)">
+    <input type="text" value="${escHtml(m.title||'')}" placeholder="Descreva o marco..." style="padding:6px 10px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-size:13px;font-family:'DM Sans',sans-serif;width:100%;box-sizing:border-box">
+    <input type="date" value="${m.targetDate||''}" style="padding:6px 8px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-size:13px;font-family:'DM Sans',sans-serif">
+    <button onclick="removeMilestoneRow(this)" style="background:none;border:none;cursor:pointer;color:var(--g400);font-size:16px;line-height:1;padding:4px">✕</button>`;
+  document.getElementById('sp-milestones').appendChild(row);
+}
+
+function addMilestoneRow() {
+  _addMilestoneRowData({ id: 'ms-' + (++_spMillestoneCounter), title: '', targetDate: '', done: false });
+  _updateNoMilestonesMsg();
+}
+
+function removeMilestoneRow(btn) {
+  btn.closest('[data-id]').remove();
+  _updateNoMilestonesMsg();
+}
+
+function _updateMilestoneDone(cb) {
+  const row = cb.closest('[data-id]');
+  const titleInput = row.querySelector('input[type="text"]');
+  titleInput.style.textDecoration = cb.checked ? 'line-through' : '';
+  titleInput.style.color = cb.checked ? 'var(--g400)' : '';
+}
+
+function _updateNoMilestonesMsg() {
+  const rows = document.getElementById('sp-milestones').children.length;
+  document.getElementById('sp-no-milestones').style.display = rows > 0 ? 'none' : '';
+}
+
+function _collectMilestones() {
+  return [...document.getElementById('sp-milestones').children].map(row => ({
+    id: row.dataset.id,
+    title:      row.querySelector('input[type="text"]').value.trim(),
+    targetDate: row.querySelector('input[type="date"]').value,
+    done:       row.querySelector('input[type="checkbox"]').checked,
+  }));
+}
+
+async function saveStudyPlan() {
+  const matricula = document.getElementById('sp-matricula').value;
+  const title     = document.getElementById('sp-title').value.trim();
+  const goalLevel = document.getElementById('sp-goal-level').value;
+  const startDate = document.getElementById('sp-start').value;
+  const endDate   = document.getElementById('sp-end').value;
+  if (!title) { showToast('⚠️ Informe o título do plano'); return; }
+  const milestones = _collectMilestones().filter(m => m.title);
+  try {
+    await api('PUT', `/api/study-plan/${matricula}`, { title, goalLevel, startDate, endDate, milestones });
+    closeModal('modal-study-plan');
+    showToast('✅ Plano salvo!');
+    refreshTeacherAll();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function deleteStudyPlan() {
+  const matricula = document.getElementById('sp-matricula').value;
+  if (!confirm('Excluir o plano de estudos deste aluno?')) return;
+  try {
+    await api('DELETE', `/api/study-plan/${matricula}`);
+    closeModal('modal-study-plan');
+    showToast('✅ Plano excluído');
+    refreshTeacherAll();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function loadStudentPlan() {
+  const el = document.getElementById('s-plan-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const plan = await api('GET', `/api/study-plan/${ME.login}`);
+    if (!plan) {
+      el.innerHTML = '<div class="card"><p class="empty" style="text-align:center;padding:32px 0">Nenhum plano definido pelo seu professor ainda.</p></div>';
+      return;
+    }
+    const milestones = plan.milestones || [];
+    const total = milestones.length;
+    const doneM = milestones.filter(m => m.done).length;
+    const pct   = total > 0 ? Math.round(doneM / total * 100) : 0;
+    const today = new Date().toISOString().split('T')[0];
+
+    const milestoneHTML = milestones.length > 0
+      ? milestones.map(m => {
+          const overdue = !m.done && m.targetDate && m.targetDate < today;
+          const icon = m.done ? '✅' : (overdue ? '🔴' : '⏳');
+          const dateStr = m.targetDate ? new Date(m.targetDate + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }) : '';
+          return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--g100)">
+            <span style="font-size:18px;flex-shrink:0">${icon}</span>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:500;color:var(--navy);${m.done?'text-decoration:line-through;color:var(--g400)':''}">${escHtml(m.title)}</div>
+              ${dateStr ? `<div style="font-size:12px;color:var(--g400);margin-top:2px">${dateStr}</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')
+      : '<p style="color:var(--g400);font-size:13px">Nenhum marco definido ainda.</p>';
+
+    const durationStr = (plan.startDate && plan.endDate)
+      ? `${new Date(plan.startDate+'T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'numeric'})} → ${new Date(plan.endDate+'T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'numeric'})}`
+      : '';
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="ch">
+          <div>
+            <h3>${escHtml(plan.title)}</h3>
+            ${durationStr ? `<p class="sub">${durationStr}</p>` : ''}
+          </div>
+          ${plan.goalLevel ? `<span style="background:var(--blue);color:white;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">Objetivo: ${plan.goalLevel}</span>` : ''}
+        </div>
+        ${total > 0 ? `
+        <div style="margin:16px 0">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--g500)">Progresso geral</span>
+            <span style="font-size:13px;font-weight:700;color:var(--navy)">${doneM}/${total} marcos · ${pct}%</span>
+          </div>
+          <div style="height:10px;background:var(--g200);border-radius:5px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--blue),#10b981);border-radius:5px;transition:width .5s"></div>
+          </div>
+        </div>` : ''}
+        <div style="margin-top:8px">${milestoneHTML}</div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><p class="empty">Erro ao carregar plano: ${e.message}</p></div>`;
+  }
 }
 
 async function loadStudentPayments() {

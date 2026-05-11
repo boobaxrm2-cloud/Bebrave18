@@ -474,6 +474,7 @@
         <a class="nav-item" onclick="showStudent('s-calendar',this)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Agenda</a>
         <a class="nav-item" onclick="showStudent('s-files',this)"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Materiais</a>
         <a class="nav-item" onclick="showStudent('s-progress',this)"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Progresso</a>
+        <a class="nav-item" onclick="showStudent('s-study-plan',this);loadStudentPlan()"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="12" y2="16"/></svg>Plano</a>
         <a class="nav-item" onclick="showStudent('s-certs',this)"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>Certificados</a>
         <a class="nav-item" onclick="showStudent('s-contracts',this)"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Contratos</a>
         <a class="nav-item" id="s-nav-messages" onclick="showStudent('s-messages',this);loadStudentMessages()"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>Mensagens<span id="s-inbox-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
@@ -563,6 +564,12 @@
         </div>
       </section>
 
+
+      <!-- Plano de estudos (student) -->
+      <section id="s-study-plan" class="cs">
+        <div class="sh"><div><h2>Meu Plano de Estudos</h2><p class="sub">Objetivos e marcos definidos pelo seu professor</p></div></div>
+        <div id="s-plan-content"></div>
+      </section>
 
       <!-- Certificados (student) -->
       <section id="s-certs" class="cs">
@@ -1169,6 +1176,55 @@
     <div class="mf">
       <button class="btn-secondary" onclick="closeModal('modal-crop-photo')">Cancelar</button>
       <button class="btn-primary" onclick="applyCrop()">✅ Usar esta foto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Plano de Estudos (teacher) -->
+<div id="modal-study-plan" class="modal-ov hidden" onclick="closeModalOv(event,'modal-study-plan')">
+  <div class="modal-card" style="max-width:560px;width:95vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="mh"><h3>📋 Plano de Estudos</h3><button class="mc-close" onclick="closeModal('modal-study-plan')">✕</button></div>
+    <div style="overflow-y:auto;flex:1;padding-bottom:4px">
+      <p id="sp-student-name" style="font-size:15px;font-weight:600;color:var(--navy);margin-bottom:16px"></p>
+      <input type="hidden" id="sp-matricula">
+      <div style="display:grid;gap:12px;margin-bottom:20px">
+        <div>
+          <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Título do plano</label>
+          <input type="text" id="sp-title" placeholder="Ex: Inglês B2 em 6 meses" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Nível objetivo</label>
+            <select id="sp-goal-level" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px">
+              <option value="">—</option>
+              <option value="A1">A1</option><option value="A2">A2</option>
+              <option value="B1">B1</option><option value="B2">B2</option>
+              <option value="C1">C1</option><option value="C2">C2</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Início</label>
+            <input type="date" id="sp-start" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Conclusão prevista</label>
+            <input type="date" id="sp-end" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <label style="font-size:13px;font-weight:600;color:var(--navy)">Marcos de progresso</label>
+          <button class="btn-sm" style="font-size:12px;padding:6px 12px" onclick="addMilestoneRow()">+ Adicionar marco</button>
+        </div>
+        <div id="sp-milestones" style="display:flex;flex-direction:column;gap:8px"></div>
+        <p id="sp-no-milestones" style="font-size:13px;color:var(--g400);text-align:center;padding:12px 0">Nenhum marco adicionado. Clique em "+ Adicionar marco".</p>
+      </div>
+    </div>
+    <div class="mf" style="margin-top:16px">
+      <button class="btn-sm" style="color:#ef4444;border-color:#ef4444;background:transparent" onclick="deleteStudyPlan()">🗑 Excluir plano</button>
+      <button class="btn-secondary" onclick="closeModal('modal-study-plan')">Cancelar</button>
+      <button class="btn-primary" onclick="saveStudyPlan()">💾 Salvar plano</button>
     </div>
   </div>
 </div>
