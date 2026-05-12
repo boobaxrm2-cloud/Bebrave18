@@ -58,6 +58,12 @@ function dbReady() {
 const now   = () => new Date().toISOString();
 const today = () => new Date().toISOString().split('T')[0];
 
+// Brazil is UTC-3. Railway runs UTC, so we shift timestamps before extracting calendar day.
+const BR_OFFSET_MS = -3 * 60 * 60 * 1000;
+const todayBR  = ()   => new Date(Date.now() + BR_OFFSET_MS).toISOString().slice(0, 10);
+const dateBR   = (ts) => new Date(Number(ts) + BR_OFFSET_MS).toISOString().slice(0, 10);
+const isOverdueBR = (dueTs) => dateBR(dueTs) < todayBR();
+
 function genMatricula() {
   let m;
   do { m = String(Math.floor(100000 + Math.random() * 900000)); }
@@ -1143,18 +1149,18 @@ app.put('/api/admin/suggestions/:id/read', auth, isAdmin, (req, res) => {
 function ensurePaymentForStudent(student, month) {
   if (!student.price || !student.payday) return;
   const [y, m] = month.split('-').map(Number);
-  const today = Date.now();
   const existing = Payments.findOne({ studentMatricula: student.matricula, month });
   if (!existing) {
-    const dueDate = new Date(y, m - 1, parseInt(student.payday) || 1).setHours(23, 59, 59, 0);
+    // Store dueDate as UTC noon on the due day — timezone-neutral anchor point
+    const dueDate = Date.UTC(y, m - 1, parseInt(student.payday) || 1, 12, 0, 0);
     Payments.insert({
       studentMatricula: student.matricula, studentName: student.name,
       teacherLogin: student.teacherLogin, month,
       amount: parseFloat(student.price) || 0,
       dueDate, paidAt: null,
-      status: dueDate < today ? 'overdue' : 'pending',
+      status: isOverdueBR(dueDate) ? 'overdue' : 'pending',
     });
-  } else if (existing.status === 'pending' && existing.dueDate < today) {
+  } else if (existing.status === 'pending' && isOverdueBR(existing.dueDate)) {
     existing.status = 'overdue';
     Payments.update(existing);
   }
@@ -1191,7 +1197,7 @@ app.put('/api/payments/:id/mark-unpaid', auth, isTeach, (req, res) => {
   const p = Payments.get(parseInt(req.params.id));
   if (!p) return res.status(404).json({ error: 'Pagamento não encontrado' });
   if (p.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
-  p.status = p.dueDate < Date.now() ? 'overdue' : 'pending'; p.paidAt = null;
+  p.status = isOverdueBR(p.dueDate) ? 'overdue' : 'pending'; p.paidAt = null;
   Payments.update(p);
   res.json({ ok: true });
 });
@@ -1217,8 +1223,8 @@ app.get('/api/payments/student/alert', auth, (req, res) => {
   ensurePaymentForStudent(student, currentMonth);
   const p = Payments.findOne({ studentMatricula: u.login, month: currentMonth });
   if (!p || p.status === 'paid') return res.json({ alert: false });
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const dueStr   = new Date(p.dueDate).toISOString().slice(0, 10);
+  const todayStr = todayBR();
+  const dueStr   = dateBR(p.dueDate);
   const daysUntilDue = Math.round((new Date(dueStr) - new Date(todayStr)) / 86400000);
   res.json({ alert: p.status === 'overdue' || daysUntilDue <= 4, status: p.status, daysUntilDue, amount: p.amount, dueDate: p.dueDate });
 });
