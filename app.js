@@ -1739,7 +1739,8 @@ async function loadTeacherContracts() {
         ${c.status === 'complete'
           ? `<span class="badge b-done badge-complete">✅ Assinado</span>
              <a href="/api/contracts/${c.contractId}/download" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none">⬇ Baixar PDF</a>`
-          : `<span class="badge b-sched" style="background:#fef3c7;color:#92400e">⏳ Aguardando aluno</span>`
+          : `<span class="badge b-sched" style="background:#fef3c7;color:#92400e;margin-bottom:6px">⏳ Aguardando assinatura do aluno</span>
+             <a href="/api/contracts/${c.contractId}/view" target="_blank" class="btn-secondary" style="font-size:13px;padding:8px 16px;text-decoration:none">👁 Visualizar</a>`
         }
       </div>
     </div>`).join('');
@@ -2480,12 +2481,15 @@ async function submitCompleteNetworkReg() {
       teacher_signature: teacherSig,
     });
     closeModal('modal-complete-network-reg');
-    toast('✅ Aluno vinculado e contrato gerado! O aluno irá assinar em Contratos.');
+    toast('✅ Contrato gerado! Aguardando assinatura do aluno.');
     loadStudents();
     loadTeacherRequests();
-    const contractNav = document.querySelector('[onclick*="t-contracts"]');
-    showTeacher('t-contracts', contractNav);
-    loadTeacherContracts();
+    // Navigate to Contratos tab and reload
+    const contractNav = [...document.querySelectorAll('#teacher-sidebar .nav-item')]
+      .find(el => el.textContent.trim().startsWith('Contratos'));
+    showTeacher('t-contracts', contractNav || null);
+    showTeacherContractTab('students');
+    await loadTeacherContracts();
   } catch(e) { showErr('❌ ' + e.message); }
 }
 
