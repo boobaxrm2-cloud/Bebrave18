@@ -2435,8 +2435,12 @@ function openCompleteNetworkReg(studentLogin, studentName, requestId) {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   const err = document.getElementById('cnr-err'); if (err) { err.style.display='none'; err.textContent=''; }
-  initSigPad('sig-cnr-teacher');
+  // Open modal first so the canvas is visible, then init sig pad
   openModal('modal-complete-network-reg');
+  // Reset sig pad state so it reinitializes cleanly each time
+  delete _sigState['sig-cnr-teacher'];
+  clearSig('sig-cnr-teacher');
+  setTimeout(() => initSigPad('sig-cnr-teacher'), 50);
 }
 
 async function submitCompleteNetworkReg() {
