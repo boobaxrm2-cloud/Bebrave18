@@ -1261,8 +1261,12 @@ app.post('/api/messages', auth, (req, res) => {
       teacherLogin = student.teacherLogin;
     }
   } else if (u.role === 'teacher') {
-    const student = Students.findOne({ matricula: toLogin, teacherLogin: u.login });
-    if (!student) return res.status(403).json({ error: 'Sem permissão' });
+    const student = Students.findOne({ matricula: toLogin });
+    if (!student) return res.status(404).json({ error: 'Aluno não encontrado' });
+    // Allow reply if formally linked OR if there's an existing message thread (Network contact)
+    const isLinked = student.teacherLogin === u.login;
+    const hasThread = Messages.find({ teacherLogin: u.login }).some(m => m.fromLogin === toLogin || m.toLogin === toLogin);
+    if (!isLinked && !hasThread) return res.status(403).json({ error: 'Sem permissão' });
     toUser = Users.findOne({ login: toLogin });
     teacherLogin = u.login;
   } else {
@@ -1271,6 +1275,21 @@ app.post('/api/messages', auth, (req, res) => {
   if (!toUser) return res.status(404).json({ error: 'Destinatário não encontrado' });
   Messages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, toLogin: toUser.login, toName: toUser.name, toRole: toUser.role, teacherLogin, content: content.trim(), createdAt: Date.now(), read: false });
   res.json({ ok: true });
+});
+
+app.get('/api/messages/student-threads', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos' });
+  const all = Messages.find({}).filter(m => m.fromLogin === u.login || m.toLogin === u.login);
+  const map = {};
+  all.forEach(m => {
+    const tLogin = m.fromRole === 'teacher' ? m.fromLogin : m.toLogin;
+    const tName  = m.fromRole === 'teacher' ? m.fromName  : m.toName;
+    if (!map[tLogin]) map[tLogin] = { teacherLogin: tLogin, teacherName: tName, unread: 0, last: null };
+    if (!m.read && m.toLogin === u.login) map[tLogin].unread++;
+    if (!map[tLogin].last || m.createdAt > map[tLogin].last.createdAt) map[tLogin].last = m;
+  });
+  res.json(Object.values(map).sort((a, b) => (b.last?.createdAt || 0) - (a.last?.createdAt || 0)));
 });
 
 app.get('/api/messages/threads', auth, isTeach, (req, res) => {

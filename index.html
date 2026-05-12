@@ -616,15 +616,8 @@
 
       <!-- Mensagens (student) -->
       <section id="s-messages" class="cs">
-        <div class="sh"><div><h2>Mensagens</h2><p class="sub">Conversa com seu professor</p></div></div>
-        <div class="card">
-          <div class="ch"><h3 id="s-conv-title">Carregando...</h3></div>
-          <div id="s-conv-messages" style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:8px 0"></div>
-          <div style="display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--g100)">
-            <input id="s-msg-input" type="text" placeholder="Escrever mensagem..." style="flex:1;padding:10px 14px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px" onkeydown="if(event.key==='Enter')sendStudentMessage()">
-            <button class="btn-primary" onclick="sendStudentMessage()">Enviar</button>
-          </div>
-        </div>
+        <div class="sh"><div><h2>Mensagens</h2><p class="sub">Conversas com professores</p></div></div>
+        <div id="s-msg-area"></div>
       </section>
 
       <!-- Financeiro (student) -->

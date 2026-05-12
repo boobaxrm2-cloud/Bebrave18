@@ -2320,30 +2320,27 @@ async function viewTeacherProfile(login) {
           <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem — combine data, horário e valor antes de solicitar aulas..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
           <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendNetworkMessage('${escHtml(t.login)}')">✉️ Enviar mensagem</button>
         </div>
-        <div id="network-request-area" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)"></div>
       </div>`;
-    // Load request status for the request button area
-    try {
-      const reqStatus = await api('GET', '/api/network/my-request');
-      renderNetworkRequestButton(t.login, t.name, reqStatus);
-    } catch(e) { /* not a student, hide area */ }
   } catch(e) { el.innerHTML = `<p class="empty">Erro ao carregar perfil: ${e.message}</p>`; }
 }
 
 function renderNetworkRequestButton(teacherLogin, teacherName, reqStatus) {
-  const area = document.getElementById('network-request-area');
+  const area = document.getElementById('s-conv-request-area');
   if (!area) return;
   if (reqStatus.status === 'pending') {
     if (reqStatus.teacherLogin === teacherLogin) {
       area.innerHTML = `
         <p style="font-size:13px;font-weight:600;color:#92400e;background:#fef3c7;padding:12px;border-radius:var(--r-sm);margin-bottom:10px;text-align:center">⏳ Solicitação enviada — aguardando resposta do professor</p>
-        <button class="btn-secondary" style="width:100%" onclick="cancelNetworkRequest()">Cancelar solicitação</button>`;
+        <button class="btn-secondary" style="width:100%" onclick="cancelNetworkRequest()">❌ Cancelar solicitação</button>`;
     } else {
       area.innerHTML = `<p style="font-size:13px;color:var(--g400);text-align:center">Você já tem uma solicitação pendente com outro professor.</p>`;
     }
   } else {
     area.innerHTML = `
-      <button class="btn-primary" style="width:100%;background:#16a34a;border-color:#16a34a" onmouseenter="this.style.background='#15803d'" onmouseleave="this.style.background='#16a34a'" onclick="requestTeacher('${teacherLogin}','${escHtml(teacherName)}')">🎓 Solicitar aulas com este professor</button>`;
+      <div style="display:flex;gap:10px">
+        <button class="btn-primary" style="flex:1;background:#16a34a;border-color:#16a34a" onmouseenter="this.style.background='#15803d'" onmouseleave="this.style.background='#16a34a'" onclick="requestTeacher('${teacherLogin}','${escHtml(teacherName)}')">🎓 Quero ter aulas com este professor</button>
+        <button class="btn-secondary" style="flex:1;color:#dc2626;border-color:#dc2626" onclick="declineNetworkTeacher('${teacherLogin}')">❌ Não tenho interesse</button>
+      </div>`;
   }
 }
 
@@ -2359,11 +2356,18 @@ async function requestTeacher(teacherLogin, teacherName) {
 async function cancelNetworkRequest() {
   try {
     await api('DELETE', '/api/network/request');
-    const area = document.getElementById('network-request-area');
-    if (area) area.innerHTML = `<button class="btn-primary" style="width:100%;background:#16a34a" onclick="toast('Reabra o perfil do professor para solicitar novamente.')">🎓 Solicitar aulas com este professor</button>`;
     toast('Solicitação cancelada.');
     renderNetworkPage();
+    if (_studentActiveConv) {
+      const reqStatus = await api('GET', '/api/network/my-request');
+      renderNetworkRequestButton(_studentActiveConv, '', reqStatus);
+    }
   } catch(e) { toast('Erro: ' + e.message); }
+}
+
+function declineNetworkTeacher(teacherLogin) {
+  const area = document.getElementById('s-conv-request-area');
+  if (area) area.innerHTML = `<p style="font-size:13px;color:var(--g400);text-align:center;padding:8px 0">Tudo bem! Você pode continuar conversando ou encontrar outro professor em <strong>Network</strong>.</p>`;
 }
 
 async function sendNetworkMessage(teacherLogin) {
@@ -3048,39 +3052,75 @@ async function sendTeacherMessage() {
 // ══════════════════════════════════════════════════════════════
 //  MESSAGES — STUDENT
 // ══════════════════════════════════════════════════════════════
-let _studentTeacherLogin = null;
+let _studentActiveConv = null; // teacherLogin currently open
 
 async function loadStudentMessages() {
+  const el = document.getElementById('s-msg-area');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
   try {
-    // ME.teacherLogin is set at login/me — use it directly
-    _studentTeacherLogin = ME.teacherLogin || null;
-    // Fallback: try to get teacherLogin from the teacher name badge in the dashboard
-    if (!_studentTeacherLogin) {
-      const lessons = await api('GET', '/api/lessons').catch(() => []);
-      if (lessons.length) _studentTeacherLogin = lessons[0].teacherLogin;
-    }
-    const teacherName = ME.teacherName || document.getElementById('s-teacher-name')?.textContent?.trim() || 'Professor';
-    const titleEl = document.getElementById('s-conv-title');
-    if (titleEl) titleEl.textContent = `Conversa com ${teacherName}`;
+    const threads = await api('GET', '/api/messages/student-threads');
+    await refreshInboxBadges();
 
-    if (!_studentTeacherLogin) {
-      document.getElementById('s-conv-messages').innerHTML = '<p class="empty" style="text-align:center;padding:24px 0">Nenhum professor vinculado ainda. Aguarde seu professor cadastrá-lo.</p>';
+    if (!threads.length) {
+      el.innerHTML = `<div class="card"><p class="empty" style="text-align:center;padding:32px 0">
+        Nenhuma mensagem ainda.<br><span style="font-size:13px;color:var(--g400)">Encontre um professor em <strong>Network</strong> e inicie uma conversa.</span>
+      </p></div>`;
       return;
     }
-    await api('PUT', `/api/messages/read/${_studentTeacherLogin}`).catch(() => {});
-    await renderConversation('s-conv-messages', _studentTeacherLogin);
-    await refreshInboxBadges();
-  } catch(e) { showToast('❌ ' + e.message); }
+
+    // Thread list
+    const threadItems = threads.map(t => `
+      <div class="card" style="margin-bottom:10px;display:flex;align-items:center;gap:14px;cursor:pointer;padding:14px 16px" onclick="openStudentConv('${t.teacherLogin}','${escHtml(t.teacherName)}')">
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0">${t.teacherName.charAt(0)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600;color:var(--navy)">${escHtml(t.teacherName)}</div>
+          <div style="font-size:12px;color:var(--g400);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(t.last?.content || '')}</div>
+        </div>
+        ${t.unread > 0 ? `<span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700">${t.unread}</span>` : ''}
+      </div>`).join('');
+    el.innerHTML = threadItems;
+  } catch(e) { el.innerHTML = `<div class="card"><p class="empty">Erro: ${e.message}</p></div>`; }
+}
+
+async function openStudentConv(teacherLogin, teacherName) {
+  _studentActiveConv = teacherLogin;
+  const el = document.getElementById('s-msg-area');
+  el.innerHTML = `
+    <div class="card" style="display:flex;flex-direction:column;gap:0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <button class="btn-secondary" style="padding:6px 12px;font-size:13px" onclick="loadStudentMessages()">← Voltar</button>
+        <h3 style="font-size:16px;font-weight:700;color:var(--navy);margin:0">${escHtml(teacherName)}</h3>
+      </div>
+      <div id="s-conv-messages" style="max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:8px 0"></div>
+      <div style="display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--g100)">
+        <input id="s-msg-input" type="text" placeholder="Escrever mensagem..." style="flex:1;padding:10px 14px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px" onkeydown="if(event.key==='Enter')sendStudentMessage()">
+        <button class="btn-primary" onclick="sendStudentMessage()">Enviar</button>
+      </div>
+      <div id="s-conv-request-area" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)"></div>
+    </div>`;
+  await api('PUT', `/api/messages/read/${teacherLogin}`).catch(() => {});
+  await renderConversation('s-conv-messages', teacherLogin);
+  // Show solicitar/cancel buttons only if this teacher is not the formal teacher
+  if (ME.teacherLogin !== teacherLogin) {
+    try {
+      const reqStatus = await api('GET', '/api/network/my-request');
+      renderNetworkRequestButton(teacherLogin, teacherName, reqStatus);
+    } catch(e) {}
+  }
+  await refreshInboxBadges();
 }
 
 async function sendStudentMessage() {
   const input = document.getElementById('s-msg-input');
   const content = input.value.trim();
-  if (!content) return;
+  if (!content || !_studentActiveConv) return;
   try {
-    await api('POST', '/api/messages', { content });
+    const body = ME.teacherLogin === _studentActiveConv
+      ? { content }
+      : { content, toLogin: _studentActiveConv };
+    await api('POST', '/api/messages', body);
     input.value = '';
-    await renderConversation('s-conv-messages', _studentTeacherLogin);
+    await renderConversation('s-conv-messages', _studentActiveConv);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
