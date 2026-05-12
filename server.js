@@ -1393,6 +1393,85 @@ app.delete('/api/study-plan/:matricula', auth, isTeach, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Network ──────────────────────────────────────────────────────────────────
+app.get('/api/network/teachers', (req, res) => {
+  const teachers = Teachers.find({ networkVisible: true });
+  res.json(teachers.map(t => {
+    const u = Users.findOne({ login: t.login });
+    return {
+      login: t.login, name: t.name, photo: u?.photo || null,
+      bio: t.networkBio || '', languages: t.networkLanguages || [],
+      rate: t.networkRate || null, rateNegotiable: t.networkRateNegotiable || false,
+      publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '',
+      studentCount: Students.find({ teacherLogin: t.login, active: { '$ne': false } }).length,
+    };
+  }));
+});
+
+app.get('/api/network/teachers/:login', (req, res) => {
+  const t = Teachers.findOne({ login: req.params.login, networkVisible: true });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  const u = Users.findOne({ login: t.login });
+  res.json({
+    login: t.login, name: t.name, photo: u?.photo || null,
+    bio: t.networkBio || '', languages: t.networkLanguages || [],
+    rate: t.networkRate || null, rateNegotiable: t.networkRateNegotiable || false,
+    publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '',
+  });
+});
+
+app.put('/api/teacher/network-profile', auth, isTeach, (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  const fields = ['networkVisible','networkBio','networkLanguages','networkRate','networkRateNegotiable','networkEmail','networkWhatsapp'];
+  fields.forEach(f => { if (req.body[f] !== undefined) t[f] = req.body[f]; });
+  Teachers.update(t);
+  res.json({ ok: true });
+});
+
+app.get('/api/teacher/network-profile', auth, isTeach, (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (!t) return res.status(404).json({ error: 'não encontrado' });
+  res.json({
+    networkVisible: t.networkVisible || false,
+    networkBio: t.networkBio || '',
+    networkLanguages: t.networkLanguages || [],
+    networkRate: t.networkRate || null,
+    networkRateNegotiable: t.networkRateNegotiable || false,
+    networkEmail: t.networkEmail || '',
+    networkWhatsapp: t.networkWhatsapp || '',
+  });
+});
+
+// ── Student self-registration ──────────────────────────────────────────────
+app.post('/api/register/student', (req, res) => {
+  const { name, cpf, dob, languages, email, whatsapp, password } = req.body;
+  if (!name?.trim())      return res.status(400).json({ error: 'Nome é obrigatório' });
+  if (!cpf?.trim())       return res.status(400).json({ error: 'CPF é obrigatório' });
+  if (!dob?.trim())       return res.status(400).json({ error: 'Data de nascimento é obrigatória' });
+  if (!languages?.length) return res.status(400).json({ error: 'Selecione ao menos um idioma' });
+  if (!email?.trim())     return res.status(400).json({ error: 'E-mail é obrigatório' });
+  if (!whatsapp?.trim())  return res.status(400).json({ error: 'WhatsApp é obrigatório' });
+  if (!password || password.length < 4) return res.status(400).json({ error: 'Senha mínimo 4 caracteres' });
+  const cpfDigits = cpf.replace(/\D/g, '');
+  if (cpfDigits.length !== 11) return res.status(400).json({ error: 'CPF deve ter 11 dígitos' });
+  let login = cpfDigits.slice(0, 4);
+  let attempt = 4;
+  while (Users.findOne({ login }) && attempt < cpfDigits.length) login = cpfDigits.slice(0, ++attempt);
+  if (Users.findOne({ login })) login = genMatricula();
+  const ini = initials(name);
+  const { color, bg } = pickColor(Students.count());
+  Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'student', name: name.trim(), createdAt: now() });
+  Students.insert({
+    matricula: login, name: name.trim(), socialname: '', initials: ini, level: 'A1', color, bg,
+    teacherLogin: null, teacherName: null,
+    cpf: cpf.trim(), dob: dob.trim(), email: email.trim(), whatsapp: whatsapp.trim(),
+    languages: Array.isArray(languages) ? languages : [languages],
+    selfRegistered: true, createdAt: now(), active: true,
+  });
+  res.json({ ok: true, login, name: name.trim() });
+});
+
 // SPA fallback - serve index.html for all non-API routes
 app.use((req, res) => {
   const indexPath = path.join(__dirname, 'index.html');

@@ -115,7 +115,11 @@
         <button class="lv2-btn" onclick="doLogin()">Entrar</button>
         <div style="margin-top:18px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:18px">
           <p style="font-size:13px;color:#94a3b8;margin:0 0 10px">É professor e quer usar a plataforma?</p>
-          <button onclick="showPage('page-register')" style="background:#E8381E;border:none;color:#fff;border-radius:10px;padding:13px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:background .2s;letter-spacing:.02em" onmouseenter="this.style.background='#C82D16'" onmouseleave="this.style.background='#E8381E'">Cadastre-se</button>
+          <button onclick="showPage('page-register')" style="background:#E8381E;border:none;color:#fff;border-radius:10px;padding:13px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:background .2s;letter-spacing:.02em" onmouseenter="this.style.background='#C82D16'" onmouseleave="this.style.background='#E8381E'">Cadastre-se como professor</button>
+        </div>
+        <div style="margin-top:14px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:18px">
+          <p style="font-size:13px;color:#94a3b8;margin:0 0 10px">É aluno? <strong style="color:#e2e8f0">Cadastre-se para achar seu professor</strong></p>
+          <button onclick="openStudentRegister()" style="background:transparent;border:2px solid rgba(255,255,255,0.25);color:#e2e8f0;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%;transition:all .2s;letter-spacing:.02em" onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='transparent'">🎓 Criar conta de aluno</button>
         </div>
       </div>
 
@@ -304,6 +308,7 @@
         <a class="nav-item" id="t-nav-messages" onclick="showTeacher('t-messages',this);loadTeacherMessages()"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>Mensagens<span id="t-inbox-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
         <a class="nav-item" onclick="showTeacher('t-payments',this);loadTeacherPayments()"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Financeiro</a>
         <a class="nav-item" onclick="showTeacher('t-forum',this);loadTeacherForum()"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Fórum</a>
+        <a class="nav-item" onclick="showTeacher('t-network',this);loadTeacherNetworkProfile()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Network</a>
         <a class="nav-item" onclick="showTeacher('t-suggestions',this);loadTeacherSuggestions()"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Sugestões<span id="t-sugg-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
       </nav>
       <button class="btn-logout" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sair</button>
@@ -422,6 +427,12 @@
       </section>
 
       <!-- Fórum (teacher) -->
+      <!-- Network (teacher) -->
+      <section id="t-network" class="cs">
+        <div class="sh"><div><h2>Meu Perfil na Network</h2><p class="sub">Seja encontrado por novos alunos na plataforma</p></div></div>
+        <div id="t-network-content"></div>
+      </section>
+
       <section id="t-forum" class="cs">
         <div class="sh"><div><h2>Fórum dos Alunos</h2><p class="sub">Interaja com seus alunos em grupo</p></div></div>
         <div class="card" style="margin-bottom:16px">
@@ -492,6 +503,7 @@
         <a class="nav-item" id="s-nav-messages" onclick="showStudent('s-messages',this);loadStudentMessages()"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>Mensagens<span id="s-inbox-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
         <a id="s-nav-payments" class="nav-item" onclick="showStudent('s-payments',this);loadStudentPayments()"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Financeiro</a>
         <a class="nav-item" onclick="showStudent('s-forum',this);loadStudentForum()"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Fórum</a>
+        <a class="nav-item" onclick="showStudent('s-network',this);loadStudentNetwork()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Network</a>
       </nav>
       <button class="btn-logout" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sair</button>
     </aside>
@@ -615,6 +627,12 @@
       </section>
 
       <!-- Fórum (student) -->
+      <!-- Network (student) -->
+      <section id="s-network" class="cs">
+        <div class="sh"><div><h2>Network de Professores</h2><p class="sub">Encontre o professor ideal para você</p></div></div>
+        <div id="s-network-content"></div>
+      </section>
+
       <section id="s-forum" class="cs">
         <div class="sh"><div><h2>Fórum</h2><p class="sub">Interaja com outros alunos e com seu professor</p></div></div>
         <div class="card" style="margin-bottom:16px">
@@ -1278,6 +1296,72 @@
       <button class="btn-secondary" onclick="closeModal('modal-report')">Cancelar</button>
       <button class="btn-primary" onclick="generateStudentReport()">⬇️ Baixar PDF</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Cadastro de Aluno (self-register) -->
+<div id="modal-student-register" class="modal-ov hidden" onclick="closeModalOv(event,'modal-student-register')">
+  <div class="modal-card" style="max-width:520px;width:95vw;max-height:92vh;display:flex;flex-direction:column">
+    <div class="mh"><h3>🎓 Criar conta de aluno</h3><button class="mc-close" onclick="closeModal('modal-student-register')">✕</button></div>
+    <div style="overflow-y:auto;flex:1;padding-bottom:4px;display:flex;flex-direction:column;gap:12px">
+      <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">Nome completo *</label>
+        <input type="text" id="sr-name" placeholder="Seu nome completo" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">CPF *</label>
+          <input type="text" id="sr-cpf" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+        <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">Data de nascimento *</label>
+          <input type="date" id="sr-dob" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+      </div>
+      <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:8px">Idiomas que deseja aprender *</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px" id="sr-langs-wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="en" style="accent-color:var(--blue)"> 🇺🇸 Inglês</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="es" style="accent-color:var(--blue)"> 🇪🇸 Espanhol</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="fr" style="accent-color:var(--blue)"> 🇫🇷 Francês</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="de" style="accent-color:var(--blue)"> 🇩🇪 Alemão</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="it" style="accent-color:var(--blue)"> 🇮🇹 Italiano</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="jp" style="accent-color:var(--blue)"> 🇯🇵 Japonês</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="zh" style="accent-color:var(--blue)"> 🇨🇳 Mandarim</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="ko" style="accent-color:var(--blue)"> 🇰🇷 Coreano</label>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">E-mail *</label>
+          <input type="email" id="sr-email" placeholder="seu@email.com" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+        <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">WhatsApp *</label>
+          <input type="text" id="sr-whatsapp" placeholder="(21) 99999-9999" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+      </div>
+      <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">Senha de acesso * <span style="color:var(--g400)">(mín. 4 caracteres)</span></label>
+        <input type="password" id="sr-password" placeholder="Crie uma senha" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+      <p id="sr-err" style="display:none;color:#ef4444;font-size:13px;font-weight:500"></p>
+    </div>
+    <div class="mf" style="margin-top:16px">
+      <button class="btn-secondary" onclick="closeModal('modal-student-register')">Cancelar</button>
+      <button class="btn-primary" onclick="submitStudentRegister()">🎓 Criar minha conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cadastro concluído (login info) -->
+<div id="modal-register-success" class="modal-ov hidden">
+  <div class="modal-card" style="max-width:400px;width:95vw;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">🎉</div>
+    <h3 style="font-size:20px;color:var(--navy);margin-bottom:8px">Conta criada com sucesso!</h3>
+    <p style="font-size:14px;color:var(--g500);margin-bottom:20px">Anote suas informações de acesso:</p>
+    <div style="background:var(--g50);border-radius:var(--r-sm);padding:20px;margin-bottom:20px">
+      <p style="font-size:12px;color:var(--g400);margin-bottom:6px">Seu login</p>
+      <p id="reg-success-login" style="font-size:32px;font-weight:800;color:var(--blue);letter-spacing:4px;font-family:monospace;margin-bottom:12px"></p>
+      <p style="font-size:12px;color:var(--g400)">Use a <strong>senha que você cadastrou</strong> para entrar</p>
+    </div>
+    <p style="font-size:12px;color:var(--g400);margin-bottom:20px">Depois de entrar, acesse a <strong>Network</strong> para encontrar seu professor.</p>
+    <button class="btn-primary" style="width:100%" onclick="closeModal('modal-register-success');closeModal('modal-student-register')">Ir para o login</button>
+  </div>
+</div>
+
+<!-- Modal: Perfil do professor (visualização pelo aluno) -->
+<div id="modal-teacher-profile-view" class="modal-ov hidden" onclick="closeModalOv(event,'modal-teacher-profile-view')">
+  <div class="modal-card" style="max-width:480px;width:95vw">
+    <div class="mh"><h3>Perfil do Professor</h3><button class="mc-close" onclick="closeModal('modal-teacher-profile-view')">✕</button></div>
+    <div id="teacher-profile-view-content"></div>
   </div>
 </div>
 

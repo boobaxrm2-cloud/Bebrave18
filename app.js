@@ -2106,6 +2106,207 @@ async function savePaymentPlan() {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+// ── Network ───────────────────────────────────────────────────────────────────
+
+const LANG_LABELS = { en:'🇺🇸 Inglês', es:'🇪🇸 Espanhol', fr:'🇫🇷 Francês', de:'🇩🇪 Alemão', it:'🇮🇹 Italiano', jp:'🇯🇵 Japonês', zh:'🇨🇳 Mandarim', ko:'🇰🇷 Coreano', ru:'🇷🇺 Russo', ar:'🇸🇦 Árabe', pt:'🇧🇷 Português' };
+
+// ── Teacher: edit own network profile ────────────────────────────────────────
+async function loadTeacherNetworkProfile() {
+  const el = document.getElementById('t-network-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  let p = {};
+  try { p = await api('GET', '/api/teacher/network-profile'); } catch(e) {}
+
+  const langCheckboxes = Object.entries(LANG_LABELS).map(([code, label]) =>
+    `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px;${(p.networkLanguages||[]).includes(code)?'background:var(--blue);color:white;border-color:var(--blue)':''}">
+      <input type="checkbox" value="${code}" ${(p.networkLanguages||[]).includes(code)?'checked':''} style="accent-color:#fff" onchange="updateNetworkLangStyle(this)"> ${label}</label>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="ch" style="flex-wrap:wrap;gap:12px">
+        <div>
+          <h3>Visibilidade na Network</h3>
+          <p class="sub">Quando ativo, novos alunos podem encontrar e visualizar seu perfil</p>
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <span style="font-size:13px;color:var(--g500)">Aparecer na Network</span>
+          <div style="position:relative;width:44px;height:24px">
+            <input type="checkbox" id="np-visible" ${p.networkVisible?'checked':''} style="opacity:0;width:0;height:0;position:absolute" onchange="document.getElementById('np-toggle-track').style.background=this.checked?'var(--blue)':'var(--g200)';document.getElementById('np-toggle-thumb').style.left=this.checked?'22px':'2px'">
+            <div id="np-toggle-track" style="position:absolute;inset:0;border-radius:12px;background:${p.networkVisible?'var(--blue)':'var(--g200)'};transition:.2s"></div>
+            <div id="np-toggle-thumb" style="position:absolute;top:2px;left:${p.networkVisible?'22':'2'}px;width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.2s"></div>
+          </div>
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><h3>Informações do perfil</h3></div>
+      <div style="display:grid;gap:14px">
+        <div>
+          <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Sobre mim / Experiência</label>
+          <textarea id="np-bio" rows="4" placeholder="Conte um pouco sobre você, sua experiência como professor, sua metodologia..." style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;resize:vertical;box-sizing:border-box">${escHtml(p.networkBio||'')}</textarea>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:8px">Idiomas que leciono</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px" id="np-langs-wrap">${langCheckboxes}</div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Valor da hora/aula</label>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="position:relative">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--g400);font-size:14px">R$</span>
+              <input type="number" id="np-rate" min="0" placeholder="0,00" value="${p.networkRate||''}" ${p.networkRateNegotiable?'disabled':''} style="padding:10px 12px 10px 34px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;width:120px">
+            </div>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+              <input type="checkbox" id="np-negotiable" ${p.networkRateNegotiable?'checked':''} style="accent-color:var(--blue)" onchange="document.getElementById('np-rate').disabled=this.checked">
+              Vamos Combinar
+            </label>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">E-mail de contato público</label>
+            <input type="email" id="np-email" value="${escHtml(p.networkEmail||'')}" placeholder="seu@email.com" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">WhatsApp público</label>
+            <input type="text" id="np-whatsapp" value="${escHtml(p.networkWhatsapp||'')}" placeholder="(21) 99999-9999" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+      <div class="mf" style="margin-top:20px;justify-content:flex-end">
+        <button class="btn-primary" onclick="saveTeacherNetworkProfile()">💾 Salvar perfil</button>
+      </div>
+    </div>`;
+}
+
+function updateNetworkLangStyle(cb) {
+  const label = cb.closest('label');
+  if (cb.checked) { label.style.background='var(--blue)'; label.style.color='white'; label.style.borderColor='var(--blue)'; }
+  else { label.style.background=''; label.style.color=''; label.style.borderColor='var(--g200)'; }
+}
+
+async function saveTeacherNetworkProfile() {
+  const networkLanguages = [...document.querySelectorAll('#np-langs-wrap input:checked')].map(c => c.value);
+  const networkRate = document.getElementById('np-negotiable').checked ? null : (parseFloat(document.getElementById('np-rate').value) || null);
+  await api('PUT', '/api/teacher/network-profile', {
+    networkVisible:       document.getElementById('np-visible').checked,
+    networkBio:           document.getElementById('np-bio').value.trim(),
+    networkLanguages,
+    networkRate,
+    networkRateNegotiable: document.getElementById('np-negotiable').checked,
+    networkEmail:         document.getElementById('np-email').value.trim(),
+    networkWhatsapp:      document.getElementById('np-whatsapp').value.trim(),
+  }).then(() => showToast('✅ Perfil salvo!')).catch(e => showToast('❌ ' + e.message));
+}
+
+// ── Student: browse teacher network ──────────────────────────────────────────
+async function loadStudentNetwork() {
+  const el = document.getElementById('s-network-content');
+  el.innerHTML = '<p class="empty">Carregando professores...</p>';
+  try {
+    const teachers = await api('GET', '/api/network/teachers');
+    if (!teachers.length) {
+      el.innerHTML = '<div class="card"><p class="empty" style="text-align:center;padding:32px 0">Nenhum professor disponível na Network no momento.</p></div>';
+      return;
+    }
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">` +
+      teachers.map(t => {
+        const photoHTML = t.photo
+          ? `<img src="${t.photo}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">`
+          : `<div style="width:72px;height:72px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">${t.name.charAt(0).toUpperCase()}</div>`;
+        const langs = (t.languages||[]).map(l => `<span style="font-size:11px;background:#e8eeff;color:var(--blue);padding:2px 8px;border-radius:20px">${LANG_LABELS[l]||l}</span>`).join('');
+        const rateStr = t.rateNegotiable ? '<span style="font-size:12px;background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:20px">💬 Vamos Combinar</span>'
+          : (t.rate ? `<span style="font-size:12px;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/h</span>` : '');
+        const bioExcerpt = t.bio ? (t.bio.length > 90 ? t.bio.slice(0, 90) + '...' : t.bio) : '';
+        return `<div style="background:white;border-radius:var(--r-md);box-shadow:0 1px 8px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column">
+          <div style="background:linear-gradient(135deg,var(--navy),#2a5fcc);padding:20px;display:flex;gap:14px;align-items:center">
+            ${photoHTML}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:white;margin-bottom:4px">${escHtml(t.name)}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px">${langs||'<span style="font-size:11px;color:rgba(255,255,255,.6)">Idiomas não informados</span>'}</div>
+            </div>
+          </div>
+          <div style="padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:8px">
+            ${rateStr}
+            ${bioExcerpt ? `<p style="font-size:13px;color:var(--g500);line-height:1.5;flex:1">${escHtml(bioExcerpt)}</p>` : '<p style="font-size:13px;color:var(--g300);flex:1">Sem descrição.</p>'}
+            <button class="btn-primary" style="width:100%;margin-top:8px" onclick="viewTeacherProfile('${t.login}')">👁 Visualizar perfil</button>
+          </div>
+        </div>`;
+      }).join('') + '</div>';
+  } catch(e) { el.innerHTML = `<div class="card"><p class="empty">Erro ao carregar: ${e.message}</p></div>`; }
+}
+
+async function viewTeacherProfile(login) {
+  const el = document.getElementById('teacher-profile-view-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  openModal('modal-teacher-profile-view');
+  try {
+    const t = await api('GET', `/api/network/teachers/${login}`);
+    const photoHTML = t.photo
+      ? `<img src="${t.photo}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:4px solid var(--blue);display:block;margin:0 auto 12px">`
+      : `<div style="width:96px;height:96px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;margin:0 auto 12px">${t.name.charAt(0).toUpperCase()}</div>`;
+    const langs = (t.languages||[]).map(l => `<span class="lang-badge-en" style="font-size:12px">${LANG_LABELS[l]||l}</span>`).join(' ');
+    const rateStr = t.rateNegotiable ? '<span style="background:#d1fae5;color:#065f46;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">💬 Vamos Combinar</span>'
+      : (t.rate ? `<span style="background:#fef3c7;color:#92400e;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/hora</span>` : '');
+    el.innerHTML = `
+      <div style="text-align:center;margin-bottom:20px">
+        ${photoHTML}
+        <h3 style="font-size:20px;color:var(--navy);margin-bottom:6px">${escHtml(t.name)}</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px">${langs}</div>
+        ${rateStr}
+      </div>
+      ${t.bio ? `<div style="background:var(--g50);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:16px">
+        <p style="font-size:13px;color:var(--g600);line-height:1.7;margin:0">${escHtml(t.bio)}</p>
+      </div>` : ''}
+      <div style="border-top:1px solid var(--g100);padding-top:16px">
+        <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Contato</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${t.publicEmail ? `<a href="mailto:${t.publicEmail}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--g50);border-radius:var(--r-sm);text-decoration:none;color:var(--navy)"><span style="font-size:18px">📧</span><span style="font-size:14px">${escHtml(t.publicEmail)}</span></a>` : ''}
+          ${t.publicWhatsapp ? `<a href="https://wa.me/55${t.publicWhatsapp.replace(/\D/g,'')}" target="_blank" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#d1fae5;border-radius:var(--r-sm);text-decoration:none;color:#065f46"><span style="font-size:18px">💬</span><span style="font-size:14px">${escHtml(t.publicWhatsapp)}</span></a>` : ''}
+          ${!t.publicEmail && !t.publicWhatsapp ? '<p style="font-size:13px;color:var(--g400);text-align:center">Nenhuma informação de contato disponível.</p>' : ''}
+        </div>
+      </div>`;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro ao carregar perfil: ${e.message}</p>`; }
+}
+
+// ── Student self-registration ─────────────────────────────────────────────────
+function openStudentRegister() {
+  ['sr-name','sr-cpf','sr-email','sr-whatsapp','sr-password'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const dob = document.getElementById('sr-dob'); if(dob) dob.value = '';
+  document.querySelectorAll('#sr-langs-wrap input[type=checkbox]').forEach(cb => cb.checked = false);
+  const err = document.getElementById('sr-err'); if(err) { err.style.display='none'; err.textContent=''; }
+  openModal('modal-student-register');
+}
+
+async function submitStudentRegister() {
+  const name     = document.getElementById('sr-name').value.trim();
+  const cpf      = document.getElementById('sr-cpf').value.trim();
+  const dob      = document.getElementById('sr-dob').value.trim();
+  const email    = document.getElementById('sr-email').value.trim();
+  const whatsapp = document.getElementById('sr-whatsapp').value.trim();
+  const password = document.getElementById('sr-password').value;
+  const languages = [...document.querySelectorAll('#sr-langs-wrap input:checked')].map(c => c.value);
+  const err = document.getElementById('sr-err');
+
+  const showErr = msg => { err.textContent = msg; err.style.display = 'block'; };
+  err.style.display = 'none';
+
+  if (!name)          return showErr('⚠️ Nome é obrigatório');
+  if (!cpf)           return showErr('⚠️ CPF é obrigatório');
+  if (!dob)           return showErr('⚠️ Data de nascimento é obrigatória');
+  if (!languages.length) return showErr('⚠️ Selecione ao menos um idioma');
+  if (!email)         return showErr('⚠️ E-mail é obrigatório');
+  if (!whatsapp)      return showErr('⚠️ WhatsApp é obrigatório');
+  if (!password || password.length < 4) return showErr('⚠️ Senha mínimo 4 caracteres');
+
+  try {
+    const r = await api('POST', '/api/register/student', { name, cpf, dob, languages, email, whatsapp, password });
+    document.getElementById('reg-success-login').textContent = r.login;
+    openModal('modal-register-success');
+  } catch(e) { showErr('❌ ' + e.message); }
+}
+
 // ── Student Progress Report ──────────────────────────────────────────────────
 
 let _reportMatricula = '';
