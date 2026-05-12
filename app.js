@@ -3669,8 +3669,6 @@ const NOTIF_ICONS = {
   contract_signed:  '✅',
 };
 
-let _notifOpen = false;
-
 async function loadNotifications() {
   try {
     const notifs = await api('GET', '/api/notifications');
@@ -3681,62 +3679,34 @@ async function loadNotifications() {
       el.textContent = unread > 99 ? '99+' : unread;
       el.style.display = unread > 0 ? 'inline-block' : 'none';
     });
-    if (_notifOpen) _renderNotifDropdown(notifs);
   } catch(e) {}
 }
 
-function _renderNotifDropdown(notifs) {
-  const content = document.getElementById('notif-dropdown-content');
-  if (!content) return;
-  const header = `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g100);position:sticky;top:0;background:white;z-index:1">
-      <strong style="font-size:14px">Notificações</strong>
-      <button class="btn-sm" onclick="markAllNotifsRead()">Marcar todas como lidas</button>
-    </div>`;
+async function loadNotificationsPage() {
+  const listId = ME?.role === 'teacher' ? 't-notif-list' : 's-notif-list';
+  const el = document.getElementById(listId);
+  if (!el) return;
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  const notifs = await api('GET', '/api/notifications').catch(() => []);
+  api('PUT', '/api/notifications/read-all').catch(() => {});
+  ['t-notif-badge', 's-notif-badge'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.style.display = 'none';
+  });
   if (!notifs.length) {
-    content.innerHTML = header + '<div style="padding:32px;text-align:center;color:var(--g400);font-size:14px">Nenhuma notificação ainda</div>';
+    el.innerHTML = '<div class="card"><p class="empty">Nenhuma notificação ainda.</p></div>';
     return;
   }
-  content.innerHTML = header + notifs.map(n => `
-    <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid var(--g50);background:${n.read ? 'white' : '#f0f4ff'}">
-      <div style="font-size:20px;flex-shrink:0;margin-top:1px">${NOTIF_ICONS[n.type] || '🔔'}</div>
+  el.innerHTML = notifs.map(n => `
+    <div class="card" style="margin-bottom:10px;display:flex;gap:16px;align-items:flex-start;${!n.read ? 'border-left:4px solid var(--blue);background:#f8faff' : ''}">
+      <div style="font-size:26px;flex-shrink:0;line-height:1;margin-top:2px">${NOTIF_ICONS[n.type] || '🔔'}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:${n.read ? '500' : '700'};font-size:13px;line-height:1.4">${escHtml(n.title)}</div>
-        <div style="font-size:12px;color:var(--g500);margin-top:2px">${escHtml(n.body)}</div>
-        <div style="font-size:11px;color:var(--g300);margin-top:4px">${fmtTimeAgo(n.createdAt)}</div>
+        <div style="font-weight:${n.read ? '500' : '700'};font-size:14px;line-height:1.4;margin-bottom:3px">${escHtml(n.title)}</div>
+        <div style="font-size:13px;color:var(--g500);line-height:1.5">${escHtml(n.body)}</div>
+        <div style="font-size:12px;color:var(--g300);margin-top:6px">${fmtTimeAgo(n.createdAt)}</div>
       </div>
-      ${!n.read ? '<div style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:5px"></div>' : ''}
+      ${!n.read ? '<div style="width:9px;height:9px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px"></div>' : ''}
     </div>`).join('');
-}
-
-function toggleNotifications(triggerEl) {
-  const dropdown = document.getElementById('notif-dropdown');
-  const backdrop = document.getElementById('notif-backdrop');
-  _notifOpen = !_notifOpen;
-  if (_notifOpen) {
-    const rect = triggerEl.getBoundingClientRect();
-    const left = Math.min(rect.left, window.innerWidth - 370);
-    dropdown.style.top  = (rect.bottom + 6) + 'px';
-    dropdown.style.left = left + 'px';
-    dropdown.style.display = 'block';
-    backdrop.style.display = 'block';
-    api('GET', '/api/notifications').then(notifs => {
-      _renderNotifDropdown(notifs);
-      const unread = notifs.filter(n => !n.read).length;
-      ['t-notif-badge', 's-notif-badge'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) { el.textContent = unread > 99 ? '99+' : unread; el.style.display = unread > 0 ? 'inline-block' : 'none'; }
-      });
-    }).catch(() => {});
-  } else {
-    closeNotifications();
-  }
-}
-
-function closeNotifications() {
-  _notifOpen = false;
-  document.getElementById('notif-dropdown').style.display = 'none';
-  document.getElementById('notif-backdrop').style.display = 'none';
 }
 
 async function markAllNotifsRead() {
@@ -3745,8 +3715,7 @@ async function markAllNotifsRead() {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  const notifs = await api('GET', '/api/notifications').catch(() => []);
-  _renderNotifDropdown(notifs);
+  loadNotificationsPage();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3771,7 +3740,7 @@ async function loadStudentRating() {
       ${existing ? `Sua avaliação atual para <strong>${escHtml(teacherName)}</strong>:` : `Avalie <strong>${escHtml(teacherName)}</strong>:`}
     </p>
     <div style="display:flex;gap:6px;margin-bottom:14px">
-      ${[1,2,3,4,5].map(s => `<span id="star-${s}" onclick="setRating(${s})" style="font-size:30px;cursor:pointer;transition:transform .1s;line-height:1" onmouseenter="hoverRating(${s})" onmouseleave="unhoverRating()">${s <= _selectedRating ? '⭐' : '☆'}</span>`).join('')}
+      ${[1,2,3,4,5].map(s => `<span id="star-${s}" onclick="setRating(${s})" style="font-size:32px;cursor:pointer;line-height:1;padding:6px 8px;margin:-6px -4px;display:inline-block" onmouseenter="hoverRating(${s})" onmouseleave="unhoverRating()">${s <= _selectedRating ? '⭐' : '☆'}</span>`).join('')}
     </div>
     <textarea id="rating-comment" rows="2" placeholder="Comentário opcional..." style="width:100%;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;box-sizing:border-box;resize:vertical">${escHtml(existing?.comment || '')}</textarea>
     <button class="btn-primary" style="margin-top:10px" onclick="submitRating()">
