@@ -2431,62 +2431,58 @@ function openCompleteNetworkReg(studentLogin, studentName, requestId) {
   document.getElementById('cnr-student-login').value = studentLogin;
   document.getElementById('cnr-request-id').value = requestId || '';
   document.getElementById('cnr-student-name').textContent = '👤 ' + studentName;
-  document.getElementById('cnr-price').value = '';
-  document.getElementById('cnr-payday').value = '';
+  ['cnr-price','cnr-payday','cnr-course','cnr-months','cnr-hours','cnr-teacher-cpf'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
   const err = document.getElementById('cnr-err'); if (err) { err.style.display='none'; err.textContent=''; }
+  initSigPad('sig-cnr-teacher');
   openModal('modal-complete-network-reg');
 }
 
 async function submitCompleteNetworkReg() {
-  const studentLogin = document.getElementById('cnr-student-login').value;
-  const requestId    = document.getElementById('cnr-request-id').value;
-  const price  = document.getElementById('cnr-price').value.trim();
-  const payday = document.getElementById('cnr-payday').value.trim();
+  const studentLogin  = document.getElementById('cnr-student-login').value;
+  const requestId     = document.getElementById('cnr-request-id').value;
+  const price         = document.getElementById('cnr-price').value.trim();
+  const payday        = document.getElementById('cnr-payday').value.trim();
+  const course        = document.getElementById('cnr-course').value.trim();
+  const months        = document.getElementById('cnr-months').value.trim();
+  const hours         = document.getElementById('cnr-hours').value.trim();
+  const teacherCpf    = document.getElementById('cnr-teacher-cpf').value.trim();
+  const teacherSig    = getSigDataURL('sig-cnr-teacher');
   const err = document.getElementById('cnr-err');
   const showErr = msg => { err.textContent = msg; err.style.display = 'block'; };
   err.style.display = 'none';
-  if (!price || parseFloat(price) <= 0) return showErr('⚠️ Informe o valor da mensalidade');
-  if (!payday || parseInt(payday) < 1 || parseInt(payday) > 28) return showErr('⚠️ Dia de vencimento deve ser entre 1 e 28');
+
+  if (!course)                                return showErr('⚠️ Informe o idioma/curso');
+  if (!months)                                return showErr('⚠️ Informe a duração em meses');
+  if (!hours)                                 return showErr('⚠️ Informe as horas por semana');
+  if (!price || parseFloat(price) <= 0)       return showErr('⚠️ Informe o valor da mensalidade');
+  if (!payday || parseInt(payday)<1 || parseInt(payday)>28) return showErr('⚠️ Dia de vencimento deve ser entre 1 e 28');
+  if (!teacherCpf)                            return showErr('⚠️ Informe seu CPF');
+  if (!teacherSig || teacherSig.length < 200) return showErr('⚠️ Assine o contrato no campo acima');
+
   try {
-    // Accept the request first (if it came from Solicitações tab)
+    // 1. Accept the network request
     if (requestId) await api('PUT', `/api/network/request/${requestId}/accept`);
+    // 2. Link student + set payment info
     await api('POST', '/api/network/complete-registration', { studentLogin, price, payday });
+    // 3. Generate contract
+    await api('POST', '/api/contracts', {
+      studentMatricula: studentLogin,
+      course, months, hours_per_week: hours,
+      price, payday,
+      start_date: new Date().toLocaleDateString('pt-BR'),
+      teacher_cpf: teacherCpf,
+      teacher_signature: teacherSig,
+    });
     closeModal('modal-complete-network-reg');
+    toast('✅ Aluno vinculado e contrato gerado! O aluno irá assinar em Contratos.');
     loadStudents();
     loadTeacherRequests();
-    // Navigate to Contratos and open contract modal pre-filled
     const contractNav = document.querySelector('[onclick*="t-contracts"]');
     showTeacher('t-contracts', contractNav);
-    await loadTeacherContracts();
-    await openContractModalForNetworkStudent(studentLogin, price, payday);
+    loadTeacherContracts();
   } catch(e) { showErr('❌ ' + e.message); }
-}
-
-async function openContractModalForNetworkStudent(matricula, price, payday) {
-  // Load students into the modal
-  _contractStudents = await api('GET', '/api/students');
-  const sel = document.getElementById('ctr-student');
-  sel.innerHTML = '<option value="">Selecione o aluno...</option>' +
-    _contractStudents.map(s => `<option value="${s.matricula}" data-lang="${s.lang||''}" data-price="${s.price||''}" data-payday="${s.payday||''}">${s.name}</option>`).join('');
-  sel.onchange = () => {
-    const opt = sel.selectedOptions[0];
-    if (!opt) return;
-    if (opt.dataset.lang)   document.getElementById('ctr-course').value  = opt.dataset.lang;
-    if (opt.dataset.price)  document.getElementById('ctr-price').value   = opt.dataset.price;
-    if (opt.dataset.payday) document.getElementById('ctr-payday').value  = opt.dataset.payday;
-  };
-  // Pre-select the student
-  sel.value = matricula;
-  document.getElementById('ctr-months').value = '';
-  document.getElementById('ctr-hours').value  = '';
-  document.getElementById('ctr-course').value = '';
-  document.getElementById('ctr-price').value  = price || '';
-  document.getElementById('ctr-payday').value = payday || '';
-  document.getElementById('ctr-start').value  = '';
-  document.getElementById('ctr-teacher-cpf').value = '';
-  initSigPad('sig-contract-teacher');
-  openModal('modal-contract');
-  toast('Aluno vinculado! Preencha os detalhes e assine o contrato.');
 }
 
 // ── Student self-registration ─────────────────────────────────────────────────
