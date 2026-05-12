@@ -2148,15 +2148,45 @@ const LANG_LABELS = { en:'🇺🇸 Inglês', es:'🇪🇸 Espanhol', fr:'🇫�
 async function loadTeacherNetworkProfile() {
   const el = document.getElementById('t-network-content');
   el.innerHTML = '<p class="empty">Carregando...</p>';
-  let p = {};
-  try { p = await api('GET', '/api/teacher/network-profile'); } catch(e) {}
+  let p = {}, ratingData = { avg: 0, count: 0, ratings: [] };
+  try {
+    [p, ratingData] = await Promise.all([
+      api('GET', '/api/teacher/network-profile'),
+      fetch(`/api/ratings/${ME.login}`).then(r => r.json()).catch(() => ({ avg: 0, count: 0, ratings: [] })),
+    ]);
+  } catch(e) {}
 
   const langCheckboxes = Object.entries(LANG_LABELS).map(([code, label]) =>
     `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px;${(p.networkLanguages||[]).includes(code)?'background:var(--blue);color:white;border-color:var(--blue)':''}">
       <input type="checkbox" value="${code}" ${(p.networkLanguages||[]).includes(code)?'checked':''} style="accent-color:#fff" onchange="updateNetworkLangStyle(this)"> ${label}</label>`
   ).join('');
 
-  el.innerHTML = `
+  const avgStars = Math.round(ratingData.avg);
+  const ratingCard = ratingData.count > 0
+    ? `<div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:20px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a">
+        <div style="text-align:center;flex-shrink:0">
+          <div style="font-size:42px;font-weight:800;color:var(--navy);line-height:1">${ratingData.avg.toFixed(1)}</div>
+          <div style="font-size:20px;margin:4px 0">${'⭐'.repeat(avgStars)}${'☆'.repeat(5-avgStars)}</div>
+          <div style="font-size:12px;color:var(--g500)">${ratingData.count} avaliação${ratingData.count !== 1 ? 'ões' : ''}</div>
+        </div>
+        <div style="flex:1;display:flex;flex-wrap:wrap;gap:8px">
+          ${ratingData.ratings.filter(r => r.comment).slice(0,3).map(r => `
+            <div style="background:white;border-radius:var(--r-sm);padding:10px 12px;flex:1;min-width:160px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <span style="font-size:12px;font-weight:600;color:var(--navy)">${escHtml(r.studentName)}</span>
+                <span style="font-size:12px">${'⭐'.repeat(r.stars)}</span>
+              </div>
+              <p style="font-size:12px;color:var(--g600);margin:0;line-height:1.4">${escHtml(r.comment)}</p>
+            </div>`).join('')}
+          ${!ratingData.ratings.some(r => r.comment) ? '<p style="font-size:13px;color:var(--g500);margin:0">Seus alunos ainda não deixaram comentários.</p>' : ''}
+        </div>
+      </div>`
+    : `<div class="card" style="margin-bottom:16px;text-align:center;padding:20px;color:var(--g400)">
+        <div style="font-size:32px;margin-bottom:8px">⭐</div>
+        <p style="margin:0;font-size:14px">Você ainda não tem avaliações. Quando seus alunos avaliarem você, a média aparecerá aqui.</p>
+      </div>`;
+
+  el.innerHTML = ratingCard + `
     <div class="card" style="margin-bottom:16px">
       <div class="ch" style="flex-wrap:wrap;gap:12px">
         <div>
@@ -2323,7 +2353,8 @@ function filterNetworkByLang(lang) {
 
 async function viewTeacherProfile(login) {
   const el = document.getElementById('teacher-profile-view-content');
-  el.innerHTML = '<p class="empty">Carregando...</p>';
+  el.style.display = 'block';
+  el.innerHTML = '<p class="empty" style="padding:32px;grid-column:1/-1">Carregando...</p>';
   openModal('modal-teacher-profile-view');
   try {
     const [t, ratingData] = await Promise.all([
@@ -2331,60 +2362,74 @@ async function viewTeacherProfile(login) {
       fetch(`/api/ratings/${login}`).then(r => r.json()).catch(() => ({ avg: 0, count: 0, ratings: [] })),
     ]);
     const photoHTML = t.photo
-      ? `<img src="${t.photo}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:4px solid var(--blue);display:block;margin:0 auto 12px">`
-      : `<div style="width:96px;height:96px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;margin:0 auto 12px">${t.name.charAt(0).toUpperCase()}</div>`;
-    const langs = (t.languages||[]).map(l => `<span class="lang-badge-en" style="font-size:12px">${LANG_LABELS[l]||l}</span>`).join(' ');
-    const rateStr = t.rateNegotiable ? '<span style="background:#d1fae5;color:#065f46;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">💬 Vamos Combinar</span>'
-      : (t.rate ? `<span style="background:#fef3c7;color:#92400e;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/hora</span>` : '');
-    const starsSection = ratingData.count > 0
-      ? `<div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
-          <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Avaliações (${ratingData.count})</p>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-            <span style="font-size:28px;font-weight:800;color:var(--navy)">${ratingData.avg.toFixed(1)}</span>
-            <div>
-              <div style="font-size:18px;letter-spacing:2px">${'⭐'.repeat(Math.round(ratingData.avg))}${'☆'.repeat(5-Math.round(ratingData.avg))}</div>
-              <div style="font-size:12px;color:var(--g400)">${ratingData.count} avaliação${ratingData.count > 1 ? 'ões' : ''}</div>
-            </div>
-          </div>
-          ${ratingData.ratings.filter(r => r.comment).slice(0,3).map(r => `
-            <div style="background:var(--g50);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:8px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-size:12px;font-weight:600;color:var(--navy)">${escHtml(r.studentName)}</span>
-                <span style="font-size:13px">${'⭐'.repeat(r.stars)}</span>
-              </div>
-              <p style="font-size:13px;color:var(--g600);margin:0;line-height:1.5">${escHtml(r.comment)}</p>
-            </div>`).join('')}
-        </div>`
-      : `<div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
-          <p style="font-size:13px;color:var(--g300);text-align:center">Ainda sem avaliações</p>
-        </div>`;
-    el.innerHTML = `
-      <div style="text-align:center;margin-bottom:20px">
-        ${photoHTML}
-        <h3 style="font-size:20px;color:var(--navy);margin-bottom:6px">${escHtml(t.name)}</h3>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px">${langs}</div>
-        ${rateStr}
-      </div>
-      ${t.bio ? `<div style="background:var(--g50);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:16px">
-        <p style="font-size:13px;color:var(--g600);line-height:1.7;margin:0">${escHtml(t.bio)}</p>
-      </div>` : ''}
-      <div style="border-top:1px solid var(--g100);padding-top:16px">
-        <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Contato</p>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          ${t.publicEmail ? `<a href="mailto:${t.publicEmail}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--g50);border-radius:var(--r-sm);text-decoration:none;color:var(--navy)"><span style="font-size:18px">📧</span><span style="font-size:14px">${escHtml(t.publicEmail)}</span></a>` : ''}
-          ${t.publicWhatsapp ? `<a href="https://wa.me/55${t.publicWhatsapp.replace(/\D/g,'')}" target="_blank" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#d1fae5;border-radius:var(--r-sm);text-decoration:none;color:#065f46"><span style="font-size:18px">💬</span><span style="font-size:14px">${escHtml(t.publicWhatsapp)}</span></a>` : ''}
-          ${!t.publicEmail && !t.publicWhatsapp ? '<p style="font-size:13px;color:var(--g400);text-align:center">Nenhuma informação de contato disponível.</p>' : ''}
+      ? `<img src="${t.photo}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--blue);display:block;margin:0 auto 10px">`
+      : `<div style="width:80px;height:80px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;margin:0 auto 10px">${t.name.charAt(0).toUpperCase()}</div>`;
+    const langs = (t.languages||[]).map(l => `<span class="lang-badge-en" style="font-size:11px">${LANG_LABELS[l]||l}</span>`).join(' ');
+    const rateStr = t.rateNegotiable ? '<span style="background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">💬 Vamos Combinar</span>'
+      : (t.rate ? `<span style="background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/hora</span>` : '');
+
+    // Left column: profile + contact + message
+    const leftCol = `
+      <div style="padding:20px;overflow-y:auto;border-right:1px solid var(--g100);display:flex;flex-direction:column;gap:14px">
+        <div style="text-align:center">
+          ${photoHTML}
+          <h3 style="font-size:18px;color:var(--navy);margin:0 0 6px">${escHtml(t.name)}</h3>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-bottom:6px">${langs}</div>
+          ${rateStr}
         </div>
-      </div>
-      ${starsSection}
-      <div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
-        <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Fale com o Professor</p>
-        <div id="network-msg-area">
-          <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem — combine data, horário e valor antes de solicitar aulas..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
-          <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendNetworkMessage('${escHtml(t.login)}')">✉️ Enviar mensagem</button>
+        ${t.bio ? `<div style="background:var(--g50);border-radius:var(--r-sm);padding:12px 14px">
+          <p style="font-size:13px;color:var(--g600);line-height:1.6;margin:0">${escHtml(t.bio)}</p>
+        </div>` : ''}
+        <div>
+          <p style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">Contato</p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${t.publicEmail ? `<a href="mailto:${t.publicEmail}" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--g50);border-radius:var(--r-sm);text-decoration:none;color:var(--navy)"><span style="font-size:16px">📧</span><span style="font-size:13px">${escHtml(t.publicEmail)}</span></a>` : ''}
+            ${t.publicWhatsapp ? `<a href="https://wa.me/55${t.publicWhatsapp.replace(/\D/g,'')}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#d1fae5;border-radius:var(--r-sm);text-decoration:none;color:#065f46"><span style="font-size:16px">💬</span><span style="font-size:13px">${escHtml(t.publicWhatsapp)}</span></a>` : ''}
+            ${!t.publicEmail && !t.publicWhatsapp ? '<p style="font-size:13px;color:var(--g300);margin:0">Sem informações de contato.</p>' : ''}
+          </div>
+        </div>
+        <div style="margin-top:auto">
+          <p style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">Fale com o Professor</p>
+          <div id="network-msg-area">
+            <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem — combine data, horário e valor antes de solicitar aulas..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:9px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+            <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendNetworkMessage('${escHtml(t.login)}')">✉️ Enviar mensagem</button>
+          </div>
         </div>
       </div>`;
-  } catch(e) { el.innerHTML = `<p class="empty">Erro ao carregar perfil: ${e.message}</p>`; }
+
+    // Right column: ratings
+    const avgStars = Math.round(ratingData.avg);
+    const rightCol = `
+      <div style="padding:20px;overflow-y:auto;background:var(--g50)">
+        <p style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin:0 0 14px">Avaliações dos alunos</p>
+        ${ratingData.count > 0 ? `
+          <div style="display:flex;align-items:center;gap:14px;background:white;border-radius:var(--r-md);padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+            <div style="text-align:center">
+              <div style="font-size:40px;font-weight:800;color:var(--navy);line-height:1">${ratingData.avg.toFixed(1)}</div>
+              <div style="font-size:18px;margin:4px 0">${'⭐'.repeat(avgStars)}${'☆'.repeat(5-avgStars)}</div>
+              <div style="font-size:12px;color:var(--g400)">${ratingData.count} avaliação${ratingData.count !== 1 ? 'ões' : ''}</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${ratingData.ratings.map(r => `
+              <div style="background:white;border-radius:var(--r-sm);padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${r.comment ? '6px' : '0'}">
+                  <span style="font-size:13px;font-weight:600;color:var(--navy)">${escHtml(r.studentName)}</span>
+                  <span style="font-size:14px;letter-spacing:1px">${'⭐'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</span>
+                </div>
+                ${r.comment ? `<p style="font-size:13px;color:var(--g600);margin:0;line-height:1.5">${escHtml(r.comment)}</p>` : ''}
+              </div>`).join('')}
+          </div>
+        ` : `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:10px">
+            <div style="font-size:40px">⭐</div>
+            <p style="font-size:14px;color:var(--g400);margin:0;text-align:center">Nenhuma avaliação ainda.<br>Seja o primeiro a avaliar!</p>
+          </div>`}
+      </div>`;
+
+    el.style.display = 'grid';
+    el.innerHTML = leftCol + rightCol;
+  } catch(e) { el.innerHTML = `<p class="empty" style="padding:32px;grid-column:1/-1">Erro ao carregar perfil: ${e.message}</p>`; }
 }
 
 function renderNetworkRequestButton(teacherLogin, teacherName, reqStatus) {
