@@ -2266,8 +2266,26 @@ async function viewTeacherProfile(login) {
           ${t.publicWhatsapp ? `<a href="https://wa.me/55${t.publicWhatsapp.replace(/\D/g,'')}" target="_blank" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#d1fae5;border-radius:var(--r-sm);text-decoration:none;color:#065f46"><span style="font-size:18px">💬</span><span style="font-size:14px">${escHtml(t.publicWhatsapp)}</span></a>` : ''}
           ${!t.publicEmail && !t.publicWhatsapp ? '<p style="font-size:13px;color:var(--g400);text-align:center">Nenhuma informação de contato disponível.</p>' : ''}
         </div>
+      </div>
+      <div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
+        <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Mensagem pela Plataforma</p>
+        <div id="network-msg-area">
+          <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem para o professor..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+          <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendNetworkMessage('${escHtml(t.login)}')">✉️ Enviar mensagem</button>
+        </div>
       </div>`;
   } catch(e) { el.innerHTML = `<p class="empty">Erro ao carregar perfil: ${e.message}</p>`; }
+}
+
+async function sendNetworkMessage(teacherLogin) {
+  const textarea = document.getElementById('network-msg-text');
+  const content = textarea?.value.trim();
+  if (!content) { toast('Escreva uma mensagem antes de enviar.'); return; }
+  try {
+    await api('POST', '/api/messages', { content, toLogin: teacherLogin });
+    const area = document.getElementById('network-msg-area');
+    if (area) area.innerHTML = '<p style="text-align:center;color:#065f46;background:#d1fae5;padding:12px;border-radius:var(--r-sm);font-size:14px">✅ Mensagem enviada! O professor irá respondê-la em breve.</p>';
+  } catch(e) { toast('Erro ao enviar mensagem: ' + e.message); }
 }
 
 // ── Student self-registration ─────────────────────────────────────────────────

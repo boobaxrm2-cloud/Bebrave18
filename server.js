@@ -1250,8 +1250,15 @@ app.post('/api/messages', auth, (req, res) => {
   if (u.role === 'student') {
     const student = Students.findOne({ matricula: u.login });
     if (!student) return res.status(404).json({ error: 'Dados não encontrados' });
-    toUser = Users.findOne({ login: student.teacherLogin });
-    teacherLogin = student.teacherLogin;
+    if (toLogin) {
+      // Network contact: student messaging a teacher they found in Network
+      toUser = Users.findOne({ login: toLogin, role: 'teacher' });
+      if (!toUser) return res.status(404).json({ error: 'Professor não encontrado' });
+      teacherLogin = toLogin;
+    } else {
+      toUser = Users.findOne({ login: student.teacherLogin });
+      teacherLogin = student.teacherLogin;
+    }
   } else if (u.role === 'teacher') {
     const student = Students.findOne({ matricula: toLogin, teacherLogin: u.login });
     if (!student) return res.status(403).json({ error: 'Sem permissão' });
