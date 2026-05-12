@@ -166,6 +166,7 @@ async function loadAdminStudents(teacherFilter) {
   const filterBar = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
     <select id="adm-teacher-filter" onchange="loadAdminStudents(this.value)" style="font-size:13px;padding:8px 14px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif">
       <option value="">Todos os professores</option>
+      <option value="__none__"${_adminStudentFilter==='__none__'?' selected':''}>⚠️ Sem professor</option>
       ${teachers.map(t=>`<option value="${t.login}"${t.login===_adminStudentFilter?' selected':''}>${t.name}</option>`).join('')}
     </select>
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--g600)">
@@ -176,7 +177,11 @@ async function loadAdminStudents(teacherFilter) {
   </div>`;
 
   // Separate active vs inactive
-  const allFiltered = _adminStudentFilter ? students.filter(s=>s.teacherLogin===_adminStudentFilter) : students;
+  const allFiltered = _adminStudentFilter === '__none__'
+    ? students.filter(s => !s.teacherLogin)
+    : _adminStudentFilter
+      ? students.filter(s => s.teacherLogin === _adminStudentFilter)
+      : students;
   let filtered  = allFiltered.filter(s => s.active !== false);
   const inactiveStudents = allFiltered.filter(s => s.active === false);
 
