@@ -789,6 +789,15 @@ async function loadStudent() {
   loadNotifications();
   loadStudentRating();
   setInterval(loadNotifications, 30000);
+  checkStudentWelcome();
+}
+
+function checkStudentWelcome() {
+  if (ME.teacherLogin) return;
+  const key = 'bb_welcome_' + ME.login;
+  if (localStorage.getItem(key)) return;
+  localStorage.setItem(key, '1');
+  setTimeout(() => openModal('modal-student-welcome'), 600);
 }
 
 async function refreshStudentAll() {
