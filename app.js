@@ -2201,40 +2201,82 @@ async function saveTeacherNetworkProfile() {
 }
 
 // ── Student: browse teacher network ──────────────────────────────────────────
+let _networkTeachers = [];
+let _networkActiveLang = 'all';
+
 async function loadStudentNetwork() {
   const el = document.getElementById('s-network-content');
   el.innerHTML = '<p class="empty">Carregando professores...</p>';
   try {
-    const teachers = await api('GET', '/api/network/teachers');
-    if (!teachers.length) {
-      el.innerHTML = '<div class="card"><p class="empty" style="text-align:center;padding:32px 0">Nenhum professor disponível na Network no momento.</p></div>';
-      return;
-    }
-    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">` +
-      teachers.map(t => {
-        const photoHTML = t.photo
-          ? `<img src="${t.photo}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">`
-          : `<div style="width:72px;height:72px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">${t.name.charAt(0).toUpperCase()}</div>`;
-        const langs = (t.languages||[]).map(l => `<span style="font-size:11px;background:#e8eeff;color:var(--blue);padding:2px 8px;border-radius:20px">${LANG_LABELS[l]||l}</span>`).join('');
-        const rateStr = t.rateNegotiable ? '<span style="font-size:12px;background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:20px">💬 Vamos Combinar</span>'
-          : (t.rate ? `<span style="font-size:12px;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/h</span>` : '');
-        const bioExcerpt = t.bio ? (t.bio.length > 90 ? t.bio.slice(0, 90) + '...' : t.bio) : '';
-        return `<div style="background:white;border-radius:var(--r-md);box-shadow:0 1px 8px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column">
-          <div style="background:linear-gradient(135deg,var(--navy),#2a5fcc);padding:20px;display:flex;gap:14px;align-items:center">
-            ${photoHTML}
-            <div style="flex:1;min-width:0">
-              <div style="font-size:15px;font-weight:700;color:white;margin-bottom:4px">${escHtml(t.name)}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:4px">${langs||'<span style="font-size:11px;color:rgba(255,255,255,.6)">Idiomas não informados</span>'}</div>
-            </div>
-          </div>
-          <div style="padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:8px">
-            ${rateStr}
-            ${bioExcerpt ? `<p style="font-size:13px;color:var(--g500);line-height:1.5;flex:1">${escHtml(bioExcerpt)}</p>` : '<p style="font-size:13px;color:var(--g300);flex:1">Sem descrição.</p>'}
-            <button class="btn-primary" style="width:100%;margin-top:8px" onclick="viewTeacherProfile('${t.login}')">👁 Visualizar perfil</button>
-          </div>
-        </div>`;
-      }).join('') + '</div>';
+    _networkTeachers = await api('GET', '/api/network/teachers');
+    _networkActiveLang = 'all';
+    renderNetworkPage();
   } catch(e) { el.innerHTML = `<div class="card"><p class="empty">Erro ao carregar: ${e.message}</p></div>`; }
+}
+
+function renderNetworkPage() {
+  const el = document.getElementById('s-network-content');
+  if (!_networkTeachers.length) {
+    el.innerHTML = '<div class="card"><p class="empty" style="text-align:center;padding:32px 0">Nenhum professor disponível na Network no momento.</p></div>';
+    return;
+  }
+
+  // Collect all unique languages across visible teachers
+  const allLangs = [...new Set(_networkTeachers.flatMap(t => t.languages || []))].sort();
+
+  // Filter
+  const filtered = _networkActiveLang === 'all'
+    ? _networkTeachers
+    : _networkTeachers.filter(t => (t.languages||[]).includes(_networkActiveLang));
+
+  // Pill styles
+  const pillBase = 'border:none;cursor:pointer;border-radius:20px;padding:6px 16px;font-size:13px;font-weight:600;font-family:inherit;transition:all .15s;';
+  const pillActive = pillBase + 'background:var(--blue);color:white;';
+  const pillInactive = pillBase + 'background:#f1f5f9;color:var(--g600);';
+
+  const filterBar = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;align-items:center">
+      <button style="${_networkActiveLang==='all'?pillActive:pillInactive}" onclick="filterNetworkByLang('all')">Todos</button>
+      ${allLangs.map(l => `<button style="${_networkActiveLang===l?pillActive:pillInactive}" onclick="filterNetworkByLang('${l}')">${LANG_LABELS[l]||l}</button>`).join('')}
+    </div>`;
+
+  const noResult = filtered.length === 0
+    ? '<p class="empty" style="text-align:center;padding:32px 0">Nenhum professor encontrado para este idioma.</p>'
+    : '';
+
+  const grid = filtered.length
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">` +
+        filtered.map(t => {
+          const photoHTML = t.photo
+            ? `<img src="${t.photo}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">`
+            : `<div style="width:72px;height:72px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">${t.name.charAt(0).toUpperCase()}</div>`;
+          const langs = (t.languages||[]).map(l => `<span style="font-size:11px;background:#e8eeff;color:var(--blue);padding:2px 8px;border-radius:20px">${LANG_LABELS[l]||l}</span>`).join('');
+          const rateStr = t.rateNegotiable ? '<span style="font-size:12px;background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:20px">💬 Vamos Combinar</span>'
+            : (t.rate ? `<span style="font-size:12px;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/h</span>` : '');
+          const bioExcerpt = t.bio ? (t.bio.length > 90 ? t.bio.slice(0, 90) + '...' : t.bio) : '';
+          return `<div style="background:white;border-radius:var(--r-md);box-shadow:0 1px 8px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column">
+            <div style="background:linear-gradient(135deg,var(--navy),#2a5fcc);padding:20px;display:flex;gap:14px;align-items:center">
+              ${photoHTML}
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:700;color:white;margin-bottom:4px">${escHtml(t.name)}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px">${langs||'<span style="font-size:11px;color:rgba(255,255,255,.6)">Idiomas não informados</span>'}</div>
+              </div>
+            </div>
+            <div style="padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:8px">
+              ${rateStr}
+              ${bioExcerpt ? `<p style="font-size:13px;color:var(--g500);line-height:1.5;flex:1">${escHtml(bioExcerpt)}</p>` : '<p style="font-size:13px;color:var(--g300);flex:1">Sem descrição.</p>'}
+              <button class="btn-primary" style="width:100%;margin-top:8px" onclick="viewTeacherProfile('${t.login}')">👁 Visualizar perfil</button>
+            </div>
+          </div>`;
+        }).join('') + '</div>'
+    : '';
+
+  el.innerHTML = filterBar + noResult + grid;
+}
+
+function filterNetworkByLang(lang) {
+  _networkActiveLang = lang;
+  renderNetworkPage();
 }
 
 async function viewTeacherProfile(login) {
