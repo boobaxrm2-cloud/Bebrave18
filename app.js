@@ -2320,7 +2320,7 @@ async function submitStudentRegister() {
 
   try {
     const r = await api('POST', '/api/register/student', { name, cpf, dob, languages, email, whatsapp, password });
-    document.getElementById('reg-success-login').textContent = r.login;
+    document.getElementById('student-reg-success-login').textContent = r.login;
     openModal('modal-register-success');
   } catch(e) { showErr('❌ ' + e.message); }
 }
