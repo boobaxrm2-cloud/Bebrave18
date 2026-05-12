@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -48,6 +48,8 @@ function dbReady() {
   StudyPlans       = db.getCollection('studyPlans')       || db.addCollection('studyPlans',       { indices: ['studentMatricula', 'teacherLogin'] });
   NetworkRequests  = db.getCollection('networkRequests')  || db.addCollection('networkRequests',  { indices: ['studentLogin', 'teacherLogin'] });
   AdminMessages    = db.getCollection('adminMessages')    || db.addCollection('adminMessages',    { indices: ['fromLogin'] });
+  Notifications    = db.getCollection('notifications')    || db.addCollection('notifications',    { indices: ['toLogin'] });
+  Ratings          = db.getCollection('ratings')          || db.addCollection('ratings',          { indices: ['teacherLogin', 'studentLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -59,6 +61,10 @@ function dbReady() {
 // ── Helpers ──────────────────────────────────────────────────
 const now   = () => new Date().toISOString();
 const today = () => new Date().toISOString().split('T')[0];
+
+function notify(toLogin, type, title, body) {
+  try { Notifications.insert({ toLogin, type, title, body, read: false, createdAt: now() }); } catch(e) {}
+}
 
 // Brazil is UTC-3. Railway runs UTC, so we shift timestamps before extracting calendar day.
 const BR_OFFSET_MS = -3 * 60 * 60 * 1000;
@@ -718,6 +724,7 @@ app.post('/api/contracts', auth, isTeach, async (req, res) => {
       price: data.price, payday: data.payday, startDate: data.start_date, issuedDate,
       teacherSignature: teacher_signature, studentSignature: '', status: 'pending_student', createdAt: now(),
     });
+    notify(studentMatricula, 'contract_pending', 'Contrato aguardando sua assinatura ✍️', `${req.session.user.name} assinou o contrato — agora é a sua vez!`);
     res.json({ ok: true, contractId, $loki: c.$loki });
   } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar contrato' }); }
 });
@@ -745,6 +752,7 @@ app.put('/api/contracts/:id/student-sign', auth, async (req, res) => {
     c.studentCpf = student_cpf || c.studentCpf;
     c.status = 'complete';
     Contracts.update(c);
+    notify(c.teacherLogin, 'contract_signed', 'Contrato assinado! ✅', `${req.session.user.name} assinou o contrato`);
     res.json({ ok: true, contractId: c.contractId });
   } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao finalizar contrato' }); }
 });
@@ -1305,6 +1313,7 @@ app.post('/api/messages', auth, (req, res) => {
   }
   if (!toUser) return res.status(404).json({ error: 'Destinatário não encontrado' });
   Messages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, toLogin: toUser.login, toName: toUser.name, toRole: toUser.role, teacherLogin, content: content.trim(), createdAt: Date.now(), read: false });
+  notify(toUser.login, 'new_message', 'Nova mensagem', `${u.name} enviou uma mensagem`);
   res.json({ ok: true });
 });
 
@@ -1472,15 +1481,67 @@ app.get('/api/network/teachers', (req, res) => {
     })
     .map(t => {
       const u = Users.findOne({ login: t.login });
+      const rs = Ratings ? Ratings.find({ teacherLogin: t.login }) : [];
+      const avgRating = rs.length ? Math.round(rs.reduce((s, r) => s + r.stars, 0) / rs.length * 10) / 10 : 0;
       return {
         login: t.login, name: t.name, photo: u?.photo || null,
         bio: t.networkBio || '', languages: t.networkLanguages || [],
         rate: t.networkRate || null, rateNegotiable: t.networkRateNegotiable || false,
         publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '',
         studentCount: Students.find({ teacherLogin: t.login, active: { '$ne': false } }).length,
+        avgRating, ratingCount: rs.length,
       };
     });
   res.json(result);
+});
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+app.get('/api/notifications', auth, (req, res) => {
+  const all = Notifications.find({ toLogin: req.session.user.login })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 40);
+  res.json(all);
+});
+
+app.put('/api/notifications/read-all', auth, (req, res) => {
+  Notifications.find({ toLogin: req.session.user.login, read: false })
+    .forEach(n => { n.read = true; Notifications.update(n); });
+  res.json({ ok: true });
+});
+
+// ── Ratings ────────────────────────────────────────────────────────────────────
+app.get('/api/ratings/my', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos' });
+  const student = Students.findOne({ matricula: u.login });
+  if (!student?.teacherLogin) return res.json(null);
+  const r = Ratings.findOne({ studentLogin: u.login, teacherLogin: student.teacherLogin });
+  res.json(r || null);
+});
+
+app.post('/api/ratings', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos podem avaliar' });
+  const { stars, comment } = req.body;
+  const s = parseInt(stars);
+  if (!s || s < 1 || s > 5) return res.status(400).json({ error: 'Nota inválida (1–5)' });
+  const student = Students.findOne({ matricula: u.login });
+  if (!student?.teacherLogin) return res.status(400).json({ error: 'Você não tem professor vinculado' });
+  const teacherLogin = student.teacherLogin;
+  const existing = Ratings.findOne({ studentLogin: u.login, teacherLogin });
+  if (existing) {
+    existing.stars = s; existing.comment = comment?.trim() || ''; existing.updatedAt = now();
+    Ratings.update(existing);
+  } else {
+    Ratings.insert({ teacherLogin, studentLogin: u.login, studentName: u.name, stars: s, comment: comment?.trim() || '', createdAt: now() });
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/ratings/:teacherLogin', (req, res) => {
+  const rs = Ratings.find({ teacherLogin: req.params.teacherLogin });
+  const avg = rs.length ? Math.round(rs.reduce((s, r) => s + r.stars, 0) / rs.length * 10) / 10 : 0;
+  res.json({ avg, count: rs.length, ratings: rs.map(r => ({ stars: r.stars, comment: r.comment, studentName: r.studentName, createdAt: r.createdAt })) });
 });
 
 // ── Network Requests ──────────────────────────────────────────────────────────
@@ -1494,6 +1555,7 @@ app.post('/api/network/request', auth, (req, res) => {
   const existing = NetworkRequests.findOne({ studentLogin: u.login, status: 'pending' });
   if (existing) return res.status(400).json({ error: 'Você já tem uma solicitação pendente' });
   NetworkRequests.insert({ studentLogin: u.login, studentName: u.name, teacherLogin, teacherName: teacher.name, status: 'pending', createdAt: now() });
+  notify(teacherLogin, 'network_request', 'Nova solicitação de aula 📬', `${u.name} quer ter aulas com você`);
   res.json({ ok: true });
 });
 
@@ -1527,6 +1589,7 @@ app.put('/api/network/request/:id/accept', auth, isTeach, (req, res) => {
   if (!r || r.teacherLogin !== req.session.user.login) return res.status(404).json({ error: 'Não encontrado' });
   r.status = 'accepted';
   NetworkRequests.update(r);
+  notify(r.studentLogin, 'network_accepted', 'Solicitação aceita! 🎉', `${req.session.user.name} aceitou sua solicitação de aula`);
   res.json({ ok: true, studentLogin: r.studentLogin, studentName: r.studentName });
 });
 
@@ -1535,6 +1598,7 @@ app.put('/api/network/request/:id/reject', auth, isTeach, (req, res) => {
   if (!r || r.teacherLogin !== req.session.user.login) return res.status(404).json({ error: 'Não encontrado' });
   r.status = 'rejected';
   NetworkRequests.update(r);
+  notify(r.studentLogin, 'network_rejected', 'Solicitação recusada', `${req.session.user.name} não pôde aceitar sua solicitação no momento`);
   res.json({ ok: true });
 });
 

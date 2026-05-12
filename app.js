@@ -365,6 +365,8 @@ async function loadTeacher() {
   await refreshTeacherAll();
   checkPendingContracts('teacher');
   refreshInboxBadges();
+  loadNotifications();
+  setInterval(loadNotifications, 30000);
   checkTermsAccepted();
 }
 
@@ -784,6 +786,9 @@ async function loadStudent() {
   checkPendingContracts('student');
   checkPaymentAlert();
   refreshInboxBadges();
+  loadNotifications();
+  loadStudentRating();
+  setInterval(loadNotifications, 30000);
 }
 
 async function refreshStudentAll() {
@@ -2283,6 +2288,13 @@ function renderNetworkPage() {
           const rateStr = t.rateNegotiable ? '<span style="font-size:12px;background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:20px">💬 Vamos Combinar</span>'
             : (t.rate ? `<span style="font-size:12px;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/h</span>` : '');
           const bioExcerpt = t.bio ? (t.bio.length > 90 ? t.bio.slice(0, 90) + '...' : t.bio) : '';
+          const starsHTML = t.ratingCount > 0
+            ? `<div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--g500)">
+                <span style="color:#f59e0b;font-size:14px">${'⭐'.repeat(Math.round(t.avgRating))}</span>
+                <span style="font-weight:600;color:var(--g700)">${t.avgRating.toFixed(1)}</span>
+                <span>(${t.ratingCount} avaliação${t.ratingCount > 1 ? 'ões' : ''})</span>
+              </div>`
+            : `<div style="font-size:12px;color:var(--g300)">Sem avaliações ainda</div>`;
           return `<div style="background:white;border-radius:var(--r-md);box-shadow:0 1px 8px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column">
             <div style="background:linear-gradient(135deg,var(--navy),#2a5fcc);padding:20px;display:flex;gap:14px;align-items:center">
               ${photoHTML}
@@ -2292,6 +2304,7 @@ function renderNetworkPage() {
               </div>
             </div>
             <div style="padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:8px">
+              ${starsHTML}
               ${rateStr}
               ${bioExcerpt ? `<p style="font-size:13px;color:var(--g500);line-height:1.5;flex:1">${escHtml(bioExcerpt)}</p>` : '<p style="font-size:13px;color:var(--g300);flex:1">Sem descrição.</p>'}
               <button class="btn-primary" style="width:100%;margin-top:8px" onclick="viewTeacherProfile('${t.login}')">👁 Visualizar perfil</button>
@@ -2313,13 +2326,38 @@ async function viewTeacherProfile(login) {
   el.innerHTML = '<p class="empty">Carregando...</p>';
   openModal('modal-teacher-profile-view');
   try {
-    const t = await api('GET', `/api/network/teachers/${login}`);
+    const [t, ratingData] = await Promise.all([
+      api('GET', `/api/network/teachers/${login}`),
+      fetch(`/api/ratings/${login}`).then(r => r.json()).catch(() => ({ avg: 0, count: 0, ratings: [] })),
+    ]);
     const photoHTML = t.photo
       ? `<img src="${t.photo}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:4px solid var(--blue);display:block;margin:0 auto 12px">`
       : `<div style="width:96px;height:96px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;margin:0 auto 12px">${t.name.charAt(0).toUpperCase()}</div>`;
     const langs = (t.languages||[]).map(l => `<span class="lang-badge-en" style="font-size:12px">${LANG_LABELS[l]||l}</span>`).join(' ');
     const rateStr = t.rateNegotiable ? '<span style="background:#d1fae5;color:#065f46;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">💬 Vamos Combinar</span>'
       : (t.rate ? `<span style="background:#fef3c7;color:#92400e;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/hora</span>` : '');
+    const starsSection = ratingData.count > 0
+      ? `<div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
+          <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Avaliações (${ratingData.count})</p>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <span style="font-size:28px;font-weight:800;color:var(--navy)">${ratingData.avg.toFixed(1)}</span>
+            <div>
+              <div style="font-size:18px;letter-spacing:2px">${'⭐'.repeat(Math.round(ratingData.avg))}${'☆'.repeat(5-Math.round(ratingData.avg))}</div>
+              <div style="font-size:12px;color:var(--g400)">${ratingData.count} avaliação${ratingData.count > 1 ? 'ões' : ''}</div>
+            </div>
+          </div>
+          ${ratingData.ratings.filter(r => r.comment).slice(0,3).map(r => `
+            <div style="background:var(--g50);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:12px;font-weight:600;color:var(--navy)">${escHtml(r.studentName)}</span>
+                <span style="font-size:13px">${'⭐'.repeat(r.stars)}</span>
+              </div>
+              <p style="font-size:13px;color:var(--g600);margin:0;line-height:1.5">${escHtml(r.comment)}</p>
+            </div>`).join('')}
+        </div>`
+      : `<div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
+          <p style="font-size:13px;color:var(--g300);text-align:center">Ainda sem avaliações</p>
+        </div>`;
     el.innerHTML = `
       <div style="text-align:center;margin-bottom:20px">
         ${photoHTML}
@@ -2338,6 +2376,7 @@ async function viewTeacherProfile(login) {
           ${!t.publicEmail && !t.publicWhatsapp ? '<p style="font-size:13px;color:var(--g400);text-align:center">Nenhuma informação de contato disponível.</p>' : ''}
         </div>
       </div>
+      ${starsSection}
       <div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
         <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Fale com o Professor</p>
         <div id="network-msg-area">
@@ -3614,5 +3653,157 @@ async function submitTermsAcceptance() {
     document.getElementById('new-login-display').textContent = r.newLogin;
     openModal('modal-new-login');
     loadTeacherBebraveContracts();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ══════════════════════════════════════════════════════════════
+
+const NOTIF_ICONS = {
+  new_message:      '💬',
+  network_request:  '📬',
+  network_accepted: '🎉',
+  network_rejected: '❌',
+  contract_pending: '✍️',
+  contract_signed:  '✅',
+};
+
+let _notifOpen = false;
+
+async function loadNotifications() {
+  try {
+    const notifs = await api('GET', '/api/notifications');
+    const unread = notifs.filter(n => !n.read).length;
+    ['t-notif-badge', 's-notif-badge'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = unread > 99 ? '99+' : unread;
+      el.style.display = unread > 0 ? 'inline-block' : 'none';
+    });
+    if (_notifOpen) _renderNotifDropdown(notifs);
+  } catch(e) {}
+}
+
+function _renderNotifDropdown(notifs) {
+  const content = document.getElementById('notif-dropdown-content');
+  if (!content) return;
+  const header = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g100);position:sticky;top:0;background:white;z-index:1">
+      <strong style="font-size:14px">Notificações</strong>
+      <button class="btn-sm" onclick="markAllNotifsRead()">Marcar todas como lidas</button>
+    </div>`;
+  if (!notifs.length) {
+    content.innerHTML = header + '<div style="padding:32px;text-align:center;color:var(--g400);font-size:14px">Nenhuma notificação ainda</div>';
+    return;
+  }
+  content.innerHTML = header + notifs.map(n => `
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid var(--g50);background:${n.read ? 'white' : '#f0f4ff'}">
+      <div style="font-size:20px;flex-shrink:0;margin-top:1px">${NOTIF_ICONS[n.type] || '🔔'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:${n.read ? '500' : '700'};font-size:13px;line-height:1.4">${escHtml(n.title)}</div>
+        <div style="font-size:12px;color:var(--g500);margin-top:2px">${escHtml(n.body)}</div>
+        <div style="font-size:11px;color:var(--g300);margin-top:4px">${fmtTimeAgo(n.createdAt)}</div>
+      </div>
+      ${!n.read ? '<div style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:5px"></div>' : ''}
+    </div>`).join('');
+}
+
+function toggleNotifications(triggerEl) {
+  const dropdown = document.getElementById('notif-dropdown');
+  const backdrop = document.getElementById('notif-backdrop');
+  _notifOpen = !_notifOpen;
+  if (_notifOpen) {
+    const rect = triggerEl.getBoundingClientRect();
+    const left = Math.min(rect.left, window.innerWidth - 370);
+    dropdown.style.top  = (rect.bottom + 6) + 'px';
+    dropdown.style.left = left + 'px';
+    dropdown.style.display = 'block';
+    backdrop.style.display = 'block';
+    api('GET', '/api/notifications').then(notifs => {
+      _renderNotifDropdown(notifs);
+      const unread = notifs.filter(n => !n.read).length;
+      ['t-notif-badge', 's-notif-badge'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = unread > 99 ? '99+' : unread; el.style.display = unread > 0 ? 'inline-block' : 'none'; }
+      });
+    }).catch(() => {});
+  } else {
+    closeNotifications();
+  }
+}
+
+function closeNotifications() {
+  _notifOpen = false;
+  document.getElementById('notif-dropdown').style.display = 'none';
+  document.getElementById('notif-backdrop').style.display = 'none';
+}
+
+async function markAllNotifsRead() {
+  await api('PUT', '/api/notifications/read-all').catch(() => {});
+  ['t-notif-badge', 's-notif-badge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  const notifs = await api('GET', '/api/notifications').catch(() => []);
+  _renderNotifDropdown(notifs);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RATINGS
+// ══════════════════════════════════════════════════════════════
+
+let _selectedRating = 0;
+
+async function loadStudentRating() {
+  const card = document.getElementById('s-rating-card');
+  if (!card) return;
+  if (!ME?.teacherLogin) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const [existing] = await Promise.all([
+    api('GET', '/api/ratings/my').catch(() => null),
+  ]);
+  _selectedRating = existing?.stars || 0;
+  const teacherName = ME.teacherName || 'seu professor';
+  const content = document.getElementById('s-rating-content');
+  content.innerHTML = `
+    <p style="font-size:13px;color:var(--g500);margin:0 0 10px">
+      ${existing ? `Sua avaliação atual para <strong>${escHtml(teacherName)}</strong>:` : `Avalie <strong>${escHtml(teacherName)}</strong>:`}
+    </p>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      ${[1,2,3,4,5].map(s => `<span id="star-${s}" onclick="setRating(${s})" style="font-size:30px;cursor:pointer;transition:transform .1s;line-height:1" onmouseenter="hoverRating(${s})" onmouseleave="unhoverRating()">${s <= _selectedRating ? '⭐' : '☆'}</span>`).join('')}
+    </div>
+    <textarea id="rating-comment" rows="2" placeholder="Comentário opcional..." style="width:100%;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;box-sizing:border-box;resize:vertical">${escHtml(existing?.comment || '')}</textarea>
+    <button class="btn-primary" style="margin-top:10px" onclick="submitRating()">
+      ${existing ? '✏️ Atualizar avaliação' : '⭐ Enviar avaliação'}
+    </button>`;
+}
+
+function hoverRating(stars) {
+  [1,2,3,4,5].forEach(s => {
+    const el = document.getElementById(`star-${s}`);
+    if (el) el.textContent = s <= stars ? '⭐' : '☆';
+  });
+}
+
+function unhoverRating() {
+  [1,2,3,4,5].forEach(s => {
+    const el = document.getElementById(`star-${s}`);
+    if (el) el.textContent = s <= _selectedRating ? '⭐' : '☆';
+  });
+}
+
+function setRating(stars) {
+  _selectedRating = stars;
+  unhoverRating();
+}
+
+async function submitRating() {
+  if (!_selectedRating) { showToast('⚠️ Selecione uma nota de 1 a 5'); return; }
+  const comment = document.getElementById('rating-comment')?.value.trim() || '';
+  try {
+    await api('POST', '/api/ratings', { stars: _selectedRating, comment });
+    showToast('✅ Avaliação enviada!');
+    loadStudentRating();
   } catch(e) { showToast('❌ ' + e.message); }
 }
