@@ -2310,13 +2310,13 @@ async function viewTeacherProfile(login) {
         </div>
       </div>
       <div style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px">
-        <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Mensagem pela Plataforma</p>
+        <p style="font-size:12px;font-weight:600;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Fale com o Professor</p>
         <div id="network-msg-area">
-          <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem para o professor..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+          <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem — combine data, horário e valor antes de solicitar aulas..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
           <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendNetworkMessage('${escHtml(t.login)}')">✉️ Enviar mensagem</button>
         </div>
-      </div>
-      <div id="network-request-area" style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px"></div>`;
+        <div id="network-request-area" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--g100)"></div>
+      </div>`;
     // Load request status for the request button area
     try {
       const reqStatus = await api('GET', '/api/network/my-request');
@@ -2405,11 +2405,9 @@ function updateRequestsBadge(count) {
 }
 
 async function acceptNetworkRequest(id, studentName, studentLogin) {
-  try {
-    await api('PUT', `/api/network/request/${id}/accept`);
-    openCompleteNetworkReg(studentLogin, studentName);
-    loadTeacherRequests();
-  } catch(e) { toast('Erro: ' + e.message); }
+  // Don't call API yet — only open the modal. The request stays 'pending'
+  // until the teacher actually submits the registration form.
+  openCompleteNetworkReg(studentLogin, studentName, id);
 }
 
 async function rejectNetworkRequest(id) {
@@ -2420,8 +2418,9 @@ async function rejectNetworkRequest(id) {
   } catch(e) { toast('Erro: ' + e.message); }
 }
 
-function openCompleteNetworkReg(studentLogin, studentName) {
+function openCompleteNetworkReg(studentLogin, studentName, requestId) {
   document.getElementById('cnr-student-login').value = studentLogin;
+  document.getElementById('cnr-request-id').value = requestId || '';
   document.getElementById('cnr-student-name').textContent = '👤 ' + studentName;
   document.getElementById('cnr-price').value = '';
   document.getElementById('cnr-payday').value = '';
@@ -2431,6 +2430,7 @@ function openCompleteNetworkReg(studentLogin, studentName) {
 
 async function submitCompleteNetworkReg() {
   const studentLogin = document.getElementById('cnr-student-login').value;
+  const requestId    = document.getElementById('cnr-request-id').value;
   const price  = document.getElementById('cnr-price').value.trim();
   const payday = document.getElementById('cnr-payday').value.trim();
   const err = document.getElementById('cnr-err');
@@ -2439,11 +2439,13 @@ async function submitCompleteNetworkReg() {
   if (!price || parseFloat(price) <= 0) return showErr('⚠️ Informe o valor da mensalidade');
   if (!payday || parseInt(payday) < 1 || parseInt(payday) > 28) return showErr('⚠️ Dia de vencimento deve ser entre 1 e 28');
   try {
+    // Accept the request first (if it came from Solicitações tab)
+    if (requestId) await api('PUT', `/api/network/request/${requestId}/accept`);
     await api('POST', '/api/network/complete-registration', { studentLogin, price, payday });
     closeModal('modal-complete-network-reg');
     toast('Aluno vinculado com sucesso! Agora gere o contrato na aba Contratos.');
     loadStudents();
-    // Navigate to contracts tab
+    loadTeacherRequests();
     const contractNav = document.querySelector('#teacher-sidebar .nav-item:nth-child(7)');
     showTeacher('t-contracts', contractNav);
     loadTeacherContracts?.();
