@@ -331,7 +331,14 @@
           <button id="tab-btn-active" onclick="showStudentsTab('active')" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--blue);border-bottom:2px solid var(--blue);margin-bottom:-2px">Ativos</button>
           <button id="tab-btn-inactive" onclick="showStudentsTab('inactive')" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:var(--g400);border-bottom:2px solid transparent;margin-bottom:-2px">Inativos</button>
         </div>
-        <div id="t-student-detail-list"></div>
+        <div id="t-students-active-panel">
+          <div style="position:relative;margin-bottom:16px">
+            <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.4" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="student-search" placeholder="Pesquisar aluno por nome, e-mail ou matrícula..." oninput="filterStudentCards(this.value)" style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box;outline:none" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--g200)'">
+          </div>
+          <p id="t-search-empty" style="display:none;text-align:center;color:var(--g400);padding:32px 0;font-size:14px">Nenhum aluno encontrado para essa busca.</p>
+          <div id="t-student-detail-list"></div>
+        </div>
         <div id="t-student-inactive-list" style="display:none"></div>
       </section>
 

@@ -426,12 +426,18 @@ function renderTeacherStudents(students, lessons, plans = []) {
         </div>
       </div>`;
     })() : '';
-    return `<div class="sdc">
-      <div class="sdc-hd">
-        <div class="sdc-hd-av">${s.initials}</div>
-        <div>
-          <div class="sdc-n">${s.name}</div>
-          <div class="sdc-sub">Matrícula: ${s.matricula} &nbsp;|&nbsp; Nível: ${s.level} &nbsp;|&nbsp; ${langBadge(s.lang||"en")}</div>
+    const infoChips = [
+      s.email    ? `<span>📧 ${s.email}</span>` : '',
+      s.whatsapp ? `<span>📱 ${s.whatsapp}</span>` : '',
+      s.cpf      ? `<span>CPF ${s.cpf}</span>` : '',
+      s.payday   ? `<span>💰 Dia ${s.payday}${s.price?' · R$ '+s.price:''}</span>` : '',
+    ].filter(Boolean).join('');
+    return `<div class="sdc" data-search="${s.name.toLowerCase()} ${s.matricula} ${(s.email||'').toLowerCase()}">
+      <div class="sdc-hd" style="padding:10px 14px">
+        <div class="sdc-hd-av" style="width:34px;height:34px;font-size:12px;border-radius:50%;margin-right:10px">${s.initials}</div>
+        <div style="flex:1;min-width:0">
+          <div class="sdc-n" style="font-size:14px;line-height:1.3">${s.name}</div>
+          <div class="sdc-sub" style="font-size:11px;margin-top:1px">Mat. ${s.matricula} &nbsp;·&nbsp; ${s.level} &nbsp;·&nbsp; ${langBadge(s.lang||'en')}</div>
         </div>
         <div class="sdc-hd-actions">
           <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Redefinir senha" onclick="openResetPw('${s.matricula}','${escJs(s.name)}')">🔑</button>
@@ -439,34 +445,40 @@ function renderTeacherStudents(students, lessons, plans = []) {
           <button class="btn-icon" style="background:rgba(255,255,255,.1);color:white;border-color:rgba(255,255,255,.2)" title="Inativar aluno" onclick="confirmInactivateStudent('${s.matricula}','${escJs(s.name)}')">🚫</button>
         </div>
       </div>
-      <div class="sdc-body">
-        <div class="sdc-mini-grid">
-          <div class="sdc-mini"><div class="sdc-mini-val">${done}</div><div class="sdc-mini-lbl">Aulas realizadas</div></div>
-          <div class="sdc-mini"><div class="sdc-mini-val">${sched}</div><div class="sdc-mini-lbl">Próximas aulas</div></div>
-          <div class="sdc-mini"><div class="sdc-mini-val">${s.level}</div><div class="sdc-mini-lbl">Nível atual</div></div>
-          <div class="sdc-mini"><div class="sdc-mini-val">${absences}</div><div class="sdc-mini-lbl">Faltas</div></div>
+      <div class="sdc-body" style="padding:10px 14px 12px">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12px;padding-bottom:8px;border-bottom:1px solid var(--g100);margin-bottom:8px">
+          <span style="color:var(--g600)">✅ <strong>${done}</strong> realizadas</span>
+          <span style="color:var(--g600)">📅 <strong>${sched}</strong> agendadas</span>
+          <span style="color:var(--g600)">❌ <strong>${absences}</strong> faltas</span>
+          ${infoChips ? `<span style="color:var(--g300)">·</span><span style="color:var(--g400);display:flex;gap:10px;flex-wrap:wrap">${infoChips}</span>` : ''}
         </div>
         ${planBar}
-        ${(s.email||s.whatsapp||s.cpf||s.payday)?`<div class="student-info-grid">
-          ${s.email?`<div class="si-field"><div class="si-label">E-mail</div><div class="si-value">${s.email}</div></div>`:''}
-          ${s.whatsapp?`<div class="si-field"><div class="si-label">WhatsApp</div><div class="si-value">${s.whatsapp}</div></div>`:''}
-          ${s.cpf?`<div class="si-field"><div class="si-label">CPF</div><div class="si-value">${s.cpf}</div></div>`:''}
-          ${s.payday?`<div class="si-field"><div class="si-label">Venc. mensalidade</div><div class="si-value">Todo dia ${s.payday}${s.price?' — R$ '+s.price:''}</div></div>`:''}
-        </div>`:''}
-        <div class="sdc-actions">
-          <button class="btn-primary" onclick="openLessonFor('${s.matricula}')">+ Agendar Aula</button>
-          <button class="btn-secondary" onclick="openNoteFor('${s.matricula}')">📝 Anotação</button>
-          <select onchange="updateStudentLevel('${s.matricula}',this.value)" style="font-size:13px;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);cursor:pointer;font-family:'DM Sans',sans-serif">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+          <button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="openLessonFor('${s.matricula}')">+ Agendar</button>
+          <button class="btn-secondary" style="font-size:12px;padding:6px 11px" onclick="openNoteFor('${s.matricula}')">📝 Anotação</button>
+          <select onchange="updateStudentLevel('${s.matricula}',this.value)" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--g200);border-radius:var(--r-sm);cursor:pointer;font-family:'DM Sans',sans-serif">
             ${['A1','A2','B1','B2','C1','C2'].map(l=>`<option value="${l}"${l===s.level?' selected':''}>${l}</option>`).join('')}
           </select>
-          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
-          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:#fff7ed;color:#c2410c;border:1.5px solid #fed7aa" onclick="confirmInactivateStudent('${s.matricula}','${escJs(s.name)}')">🚫 Inativar Aluno</button>
-          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openReportModal('${s.matricula}','${escJs(s.name)}')">📄 Relatório</button>
-          <button class="btn-sm" style="font-size:13px;padding:8px 16px;background:var(--g50);color:var(--navy);border:1.5px solid var(--g200)" onclick="openStudyPlan('${s.matricula}','${escJs(s.name)}')">📋 Plano</button>
+          <button class="btn-sm" style="font-size:12px;padding:6px 11px" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
+          <button class="btn-sm" style="font-size:12px;padding:6px 11px" onclick="openReportModal('${s.matricula}','${escJs(s.name)}')">📄 Relatório</button>
+          <button class="btn-sm" style="font-size:12px;padding:6px 11px" onclick="openStudyPlan('${s.matricula}','${escJs(s.name)}')">📋 Plano</button>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function filterStudentCards(q) {
+  const term = (q || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#t-student-detail-list .sdc');
+  let visible = 0;
+  cards.forEach(card => {
+    const match = !term || (card.dataset.search || '').includes(term);
+    card.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const empty = document.getElementById('t-search-empty');
+  if (empty) empty.style.display = (term && visible === 0) ? '' : 'none';
 }
 
 let _calLessonsT = [];
@@ -631,29 +643,19 @@ function confirmInactivateStudent(mat, name) {
 }
 
 function showStudentsTab(tab) {
-  const activeList   = document.getElementById('t-student-detail-list');
+  const activePanel  = document.getElementById('t-students-active-panel');
   const inactiveList = document.getElementById('t-student-inactive-list');
   const btnActive    = document.getElementById('tab-btn-active');
   const btnInactive  = document.getElementById('tab-btn-inactive');
-  if (tab === 'active') {
-    activeList.style.display   = '';
-    inactiveList.style.display = 'none';
-    btnActive.style.color        = 'var(--blue)';
-    btnActive.style.borderBottomColor  = 'var(--blue)';
-    btnActive.style.fontWeight   = '600';
-    btnInactive.style.color      = 'var(--g400)';
-    btnInactive.style.borderBottomColor = 'transparent';
-    btnInactive.style.fontWeight = '500';
-  } else {
-    activeList.style.display   = 'none';
-    inactiveList.style.display = '';
-    btnInactive.style.color      = 'var(--blue)';
-    btnInactive.style.borderBottomColor  = 'var(--blue)';
-    btnInactive.style.fontWeight = '600';
-    btnActive.style.color        = 'var(--g400)';
-    btnActive.style.borderBottomColor   = 'transparent';
-    btnActive.style.fontWeight   = '500';
-  }
+  const isActive = tab === 'active';
+  activePanel.style.display   = isActive ? '' : 'none';
+  inactiveList.style.display  = isActive ? 'none' : '';
+  btnActive.style.color               = isActive ? 'var(--blue)' : 'var(--g400)';
+  btnActive.style.borderBottomColor   = isActive ? 'var(--blue)' : 'transparent';
+  btnActive.style.fontWeight          = isActive ? '600' : '500';
+  btnInactive.style.color             = isActive ? 'var(--g400)' : 'var(--blue)';
+  btnInactive.style.borderBottomColor = isActive ? 'transparent' : 'var(--blue)';
+  btnInactive.style.fontWeight        = isActive ? '500' : '600';
 }
 
 function renderInactiveStudents(students) {
