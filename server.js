@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -46,6 +46,7 @@ function dbReady() {
   Payments         = db.getCollection('payments')         || db.addCollection('payments',         { indices: ['studentMatricula', 'teacherLogin', 'month'] });
   Messages         = db.getCollection('messages')         || db.addCollection('messages',         { indices: ['fromLogin', 'toLogin', 'teacherLogin'] });
   StudyPlans       = db.getCollection('studyPlans')       || db.addCollection('studyPlans',       { indices: ['studentMatricula', 'teacherLogin'] });
+  NetworkRequests  = db.getCollection('networkRequests')  || db.addCollection('networkRequests',  { indices: ['studentLogin', 'teacherLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -1402,17 +1403,108 @@ app.delete('/api/study-plan/:matricula', auth, isTeach, (req, res) => {
 
 // ── Network ──────────────────────────────────────────────────────────────────
 app.get('/api/network/teachers', (req, res) => {
+  // Determine languages the student already has a teacher for (to exclude)
+  let excludeLangs = [];
+  const sess = req.session?.user;
+  if (sess?.role === 'student') {
+    const stu = Students.findOne({ matricula: sess.login });
+    if (stu?.teacherLogin) {
+      const myTeacher = Teachers.findOne({ login: stu.teacherLogin });
+      excludeLangs = myTeacher?.networkLanguages || [];
+    }
+  }
   const teachers = Teachers.find({ networkVisible: true });
-  res.json(teachers.map(t => {
-    const u = Users.findOne({ login: t.login });
-    return {
-      login: t.login, name: t.name, photo: u?.photo || null,
-      bio: t.networkBio || '', languages: t.networkLanguages || [],
-      rate: t.networkRate || null, rateNegotiable: t.networkRateNegotiable || false,
-      publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '',
-      studentCount: Students.find({ teacherLogin: t.login, active: { '$ne': false } }).length,
-    };
-  }));
+  const result = teachers
+    .filter(t => {
+      if (!excludeLangs.length) return true;
+      const tLangs = t.networkLanguages || [];
+      return !tLangs.some(l => excludeLangs.includes(l));
+    })
+    .map(t => {
+      const u = Users.findOne({ login: t.login });
+      return {
+        login: t.login, name: t.name, photo: u?.photo || null,
+        bio: t.networkBio || '', languages: t.networkLanguages || [],
+        rate: t.networkRate || null, rateNegotiable: t.networkRateNegotiable || false,
+        publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '',
+        studentCount: Students.find({ teacherLogin: t.login, active: { '$ne': false } }).length,
+      };
+    });
+  res.json(result);
+});
+
+// ── Network Requests ──────────────────────────────────────────────────────────
+app.post('/api/network/request', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos podem solicitar' });
+  const { teacherLogin } = req.body;
+  if (!teacherLogin) return res.status(400).json({ error: 'Professor obrigatório' });
+  const teacher = Teachers.findOne({ login: teacherLogin, networkVisible: true });
+  if (!teacher) return res.status(404).json({ error: 'Professor não encontrado' });
+  const existing = NetworkRequests.findOne({ studentLogin: u.login, status: 'pending' });
+  if (existing) return res.status(400).json({ error: 'Você já tem uma solicitação pendente' });
+  NetworkRequests.insert({ studentLogin: u.login, studentName: u.name, teacherLogin, teacherName: teacher.name, status: 'pending', createdAt: now() });
+  res.json({ ok: true });
+});
+
+app.get('/api/network/my-request', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos' });
+  const r = NetworkRequests.findOne({ studentLogin: u.login, status: 'pending' });
+  res.json(r ? { status: r.status, teacherLogin: r.teacherLogin, teacherName: r.teacherName } : { status: null });
+});
+
+app.delete('/api/network/request', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos' });
+  const r = NetworkRequests.findOne({ studentLogin: u.login, status: 'pending' });
+  if (!r) return res.status(404).json({ error: 'Solicitação não encontrada' });
+  NetworkRequests.remove(r);
+  res.json({ ok: true });
+});
+
+app.get('/api/network/requests', auth, isTeach, (req, res) => {
+  const tLogin = req.session.user.login;
+  const reqs = NetworkRequests.find({ teacherLogin: tLogin, status: 'pending' });
+  res.json(reqs.map(r => ({
+    id: r.$loki, studentLogin: r.studentLogin, studentName: r.studentName,
+    teacherLogin: r.teacherLogin, status: r.status, createdAt: r.createdAt,
+  })));
+});
+
+app.put('/api/network/request/:id/accept', auth, isTeach, (req, res) => {
+  const r = NetworkRequests.get(parseInt(req.params.id));
+  if (!r || r.teacherLogin !== req.session.user.login) return res.status(404).json({ error: 'Não encontrado' });
+  r.status = 'accepted';
+  NetworkRequests.update(r);
+  res.json({ ok: true, studentLogin: r.studentLogin, studentName: r.studentName });
+});
+
+app.put('/api/network/request/:id/reject', auth, isTeach, (req, res) => {
+  const r = NetworkRequests.get(parseInt(req.params.id));
+  if (!r || r.teacherLogin !== req.session.user.login) return res.status(404).json({ error: 'Não encontrado' });
+  r.status = 'rejected';
+  NetworkRequests.update(r);
+  res.json({ ok: true });
+});
+
+app.post('/api/network/complete-registration', auth, isTeach, (req, res) => {
+  const { studentLogin, price, payday } = req.body;
+  if (!studentLogin || !price || !payday) return res.status(400).json({ error: 'Dados obrigatórios' });
+  const t = req.session.user;
+  const s = Students.findOne({ matricula: studentLogin });
+  if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
+  s.teacherLogin = t.login;
+  s.teacherName  = t.name;
+  s.price        = String(price);
+  s.payday       = String(payday);
+  Students.update(s);
+  // Mark any accepted/pending request as contracted
+  const r = NetworkRequests.findOne({ studentLogin, teacherLogin: t.login });
+  if (r) { r.status = 'contracted'; NetworkRequests.update(r); }
+  // Ensure next payment is scheduled
+  try { ensurePaymentForStudent(s); } catch(e) { /* ok */ }
+  res.json({ ok: true, studentMatricula: studentLogin });
 });
 
 app.get('/api/network/teachers/:login', (req, res) => {

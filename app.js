@@ -2315,8 +2315,50 @@ async function viewTeacherProfile(login) {
           <textarea id="network-msg-text" rows="3" placeholder="Escreva sua mensagem para o professor..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
           <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendNetworkMessage('${escHtml(t.login)}')">✉️ Enviar mensagem</button>
         </div>
-      </div>`;
+      </div>
+      <div id="network-request-area" style="border-top:1px solid var(--g100);padding-top:16px;margin-top:16px"></div>`;
+    // Load request status for the request button area
+    try {
+      const reqStatus = await api('GET', '/api/network/my-request');
+      renderNetworkRequestButton(t.login, t.name, reqStatus);
+    } catch(e) { /* not a student, hide area */ }
   } catch(e) { el.innerHTML = `<p class="empty">Erro ao carregar perfil: ${e.message}</p>`; }
+}
+
+function renderNetworkRequestButton(teacherLogin, teacherName, reqStatus) {
+  const area = document.getElementById('network-request-area');
+  if (!area) return;
+  if (reqStatus.status === 'pending') {
+    if (reqStatus.teacherLogin === teacherLogin) {
+      area.innerHTML = `
+        <p style="font-size:13px;font-weight:600;color:#92400e;background:#fef3c7;padding:12px;border-radius:var(--r-sm);margin-bottom:10px;text-align:center">⏳ Solicitação enviada — aguardando resposta do professor</p>
+        <button class="btn-secondary" style="width:100%" onclick="cancelNetworkRequest()">Cancelar solicitação</button>`;
+    } else {
+      area.innerHTML = `<p style="font-size:13px;color:var(--g400);text-align:center">Você já tem uma solicitação pendente com outro professor.</p>`;
+    }
+  } else {
+    area.innerHTML = `
+      <button class="btn-primary" style="width:100%;background:#16a34a;border-color:#16a34a" onmouseenter="this.style.background='#15803d'" onmouseleave="this.style.background='#16a34a'" onclick="requestTeacher('${teacherLogin}','${escHtml(teacherName)}')">🎓 Solicitar aulas com este professor</button>`;
+  }
+}
+
+async function requestTeacher(teacherLogin, teacherName) {
+  try {
+    await api('POST', '/api/network/request', { teacherLogin });
+    renderNetworkRequestButton(teacherLogin, teacherName, { status: 'pending', teacherLogin });
+    toast('Solicitação enviada! O professor será notificado.');
+    renderNetworkPage();
+  } catch(e) { toast('Erro: ' + e.message); }
+}
+
+async function cancelNetworkRequest() {
+  try {
+    await api('DELETE', '/api/network/request');
+    const area = document.getElementById('network-request-area');
+    if (area) area.innerHTML = `<button class="btn-primary" style="width:100%;background:#16a34a" onclick="toast('Reabra o perfil do professor para solicitar novamente.')">🎓 Solicitar aulas com este professor</button>`;
+    toast('Solicitação cancelada.');
+    renderNetworkPage();
+  } catch(e) { toast('Erro: ' + e.message); }
 }
 
 async function sendNetworkMessage(teacherLogin) {
@@ -2328,6 +2370,84 @@ async function sendNetworkMessage(teacherLogin) {
     const area = document.getElementById('network-msg-area');
     if (area) area.innerHTML = '<p style="text-align:center;color:#065f46;background:#d1fae5;padding:12px;border-radius:var(--r-sm);font-size:14px">✅ Mensagem enviada! O professor irá respondê-la em breve.</p>';
   } catch(e) { toast('Erro ao enviar mensagem: ' + e.message); }
+}
+
+// ── Teacher: Network Requests ─────────────────────────────────────────────────
+async function loadTeacherRequests() {
+  const el = document.getElementById('t-requests-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const reqs = await api('GET', '/api/network/requests');
+    updateRequestsBadge(reqs.length);
+    if (!reqs.length) {
+      el.innerHTML = '<div class="card"><p class="empty" style="text-align:center;padding:32px 0">Nenhuma solicitação pendente no momento.</p></div>';
+      return;
+    }
+    el.innerHTML = reqs.map(r => `
+      <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <p style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px">${escHtml(r.studentName)}</p>
+          <p style="font-size:12px;color:var(--g400)">Solicitou aulas • ${new Date(r.createdAt).toLocaleDateString('pt-BR')}</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-secondary" style="color:#dc2626;border-color:#dc2626" onclick="rejectNetworkRequest(${r.id})">Recusar</button>
+          <button class="btn-primary" onclick="acceptNetworkRequest(${r.id},'${escHtml(r.studentName)}','${r.studentLogin}')">Aceitar</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="card"><p class="empty">Erro: ${e.message}</p></div>`; }
+}
+
+function updateRequestsBadge(count) {
+  const badge = document.getElementById('t-requests-badge');
+  if (!badge) return;
+  if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; }
+  else badge.style.display = 'none';
+}
+
+async function acceptNetworkRequest(id, studentName, studentLogin) {
+  try {
+    await api('PUT', `/api/network/request/${id}/accept`);
+    openCompleteNetworkReg(studentLogin, studentName);
+    loadTeacherRequests();
+  } catch(e) { toast('Erro: ' + e.message); }
+}
+
+async function rejectNetworkRequest(id) {
+  try {
+    await api('PUT', `/api/network/request/${id}/reject`);
+    toast('Solicitação recusada.');
+    loadTeacherRequests();
+  } catch(e) { toast('Erro: ' + e.message); }
+}
+
+function openCompleteNetworkReg(studentLogin, studentName) {
+  document.getElementById('cnr-student-login').value = studentLogin;
+  document.getElementById('cnr-student-name').textContent = '👤 ' + studentName;
+  document.getElementById('cnr-price').value = '';
+  document.getElementById('cnr-payday').value = '';
+  const err = document.getElementById('cnr-err'); if (err) { err.style.display='none'; err.textContent=''; }
+  openModal('modal-complete-network-reg');
+}
+
+async function submitCompleteNetworkReg() {
+  const studentLogin = document.getElementById('cnr-student-login').value;
+  const price  = document.getElementById('cnr-price').value.trim();
+  const payday = document.getElementById('cnr-payday').value.trim();
+  const err = document.getElementById('cnr-err');
+  const showErr = msg => { err.textContent = msg; err.style.display = 'block'; };
+  err.style.display = 'none';
+  if (!price || parseFloat(price) <= 0) return showErr('⚠️ Informe o valor da mensalidade');
+  if (!payday || parseInt(payday) < 1 || parseInt(payday) > 28) return showErr('⚠️ Dia de vencimento deve ser entre 1 e 28');
+  try {
+    await api('POST', '/api/network/complete-registration', { studentLogin, price, payday });
+    closeModal('modal-complete-network-reg');
+    toast('Aluno vinculado com sucesso! Agora gere o contrato na aba Contratos.');
+    loadStudents();
+    // Navigate to contracts tab
+    const contractNav = document.querySelector('#teacher-sidebar .nav-item:nth-child(7)');
+    showTeacher('t-contracts', contractNav);
+    loadTeacherContracts?.();
+  } catch(e) { showErr('❌ ' + e.message); }
 }
 
 // ── Student self-registration ─────────────────────────────────────────────────
@@ -2834,6 +2954,11 @@ async function refreshInboxBadges() {
       if (mb) { mb.textContent = msgCount; mb.style.display = msgCount > 0 ? '' : 'none'; }
       const sb = document.getElementById('t-sugg-badge');
       if (sb) { sb.textContent = suggCount; sb.style.display = suggCount > 0 ? '' : 'none'; }
+      // Network requests badge
+      try {
+        const reqs = await api('GET', '/api/network/requests');
+        updateRequestsBadge(reqs.length);
+      } catch(e) {}
       return;
     }
     const badgeId = ME.role === 'admin' ? 'adm-inbox-badge' : 's-inbox-badge';
