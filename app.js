@@ -2452,13 +2452,41 @@ async function submitCompleteNetworkReg() {
     if (requestId) await api('PUT', `/api/network/request/${requestId}/accept`);
     await api('POST', '/api/network/complete-registration', { studentLogin, price, payday });
     closeModal('modal-complete-network-reg');
-    toast('Aluno vinculado com sucesso! Agora gere o contrato na aba Contratos.');
     loadStudents();
     loadTeacherRequests();
-    const contractNav = document.querySelector('#teacher-sidebar .nav-item:nth-child(7)');
+    // Navigate to Contratos and open contract modal pre-filled
+    const contractNav = document.querySelector('[onclick*="t-contracts"]');
     showTeacher('t-contracts', contractNav);
-    loadTeacherContracts?.();
+    await loadTeacherContracts();
+    await openContractModalForNetworkStudent(studentLogin, price, payday);
   } catch(e) { showErr('❌ ' + e.message); }
+}
+
+async function openContractModalForNetworkStudent(matricula, price, payday) {
+  // Load students into the modal
+  _contractStudents = await api('GET', '/api/students');
+  const sel = document.getElementById('ctr-student');
+  sel.innerHTML = '<option value="">Selecione o aluno...</option>' +
+    _contractStudents.map(s => `<option value="${s.matricula}" data-lang="${s.lang||''}" data-price="${s.price||''}" data-payday="${s.payday||''}">${s.name}</option>`).join('');
+  sel.onchange = () => {
+    const opt = sel.selectedOptions[0];
+    if (!opt) return;
+    if (opt.dataset.lang)   document.getElementById('ctr-course').value  = opt.dataset.lang;
+    if (opt.dataset.price)  document.getElementById('ctr-price').value   = opt.dataset.price;
+    if (opt.dataset.payday) document.getElementById('ctr-payday').value  = opt.dataset.payday;
+  };
+  // Pre-select the student
+  sel.value = matricula;
+  document.getElementById('ctr-months').value = '';
+  document.getElementById('ctr-hours').value  = '';
+  document.getElementById('ctr-course').value = '';
+  document.getElementById('ctr-price').value  = price || '';
+  document.getElementById('ctr-payday').value = payday || '';
+  document.getElementById('ctr-start').value  = '';
+  document.getElementById('ctr-teacher-cpf').value = '';
+  initSigPad('sig-contract-teacher');
+  openModal('modal-contract');
+  toast('Aluno vinculado! Preencha os detalhes e assine o contrato.');
 }
 
 // ── Student self-registration ─────────────────────────────────────────────────
