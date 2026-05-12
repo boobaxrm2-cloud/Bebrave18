@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -47,6 +47,7 @@ function dbReady() {
   Messages         = db.getCollection('messages')         || db.addCollection('messages',         { indices: ['fromLogin', 'toLogin', 'teacherLogin'] });
   StudyPlans       = db.getCollection('studyPlans')       || db.addCollection('studyPlans',       { indices: ['studentMatricula', 'teacherLogin'] });
   NetworkRequests  = db.getCollection('networkRequests')  || db.addCollection('networkRequests',  { indices: ['studentLogin', 'teacherLogin'] });
+  AdminMessages    = db.getCollection('adminMessages')    || db.addCollection('adminMessages',    { indices: ['fromLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -1124,12 +1125,33 @@ app.delete('/api/forum/replies/:id', auth, (req, res) => {
 // ════════════════════════════════════════════════════════════
 //  SUGGESTIONS
 // ════════════════════════════════════════════════════════════
-// Blocked teacher can still contact admin
+// Blocked teacher contact — no isTeach middleware
 app.post('/api/contact-admin', auth, (req, res) => {
   const { content } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Mensagem obrigatória' });
   const u = req.session.user;
-  Suggestions.insert({ teacherLogin: u.login, teacherName: u.name, content: content.trim(), fromBlocked: true, createdAt: now(), adminReply: null, teacherRead: false });
+  AdminMessages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, content: content.trim(), createdAt: now(), read: false, adminReply: null, adminRepliedAt: null });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/messages', auth, isAdmin, (req, res) => {
+  res.json(AdminMessages.find().sort((a, b) => b.createdAt - a.createdAt));
+});
+
+app.put('/api/admin/messages/:id/read', auth, isAdmin, (req, res) => {
+  const m = AdminMessages.get(parseInt(req.params.id));
+  if (!m) return res.status(404).json({ error: 'Não encontrado' });
+  m.read = true; AdminMessages.update(m);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/messages/:id/reply', auth, isAdmin, (req, res) => {
+  const { reply } = req.body;
+  if (!reply?.trim()) return res.status(400).json({ error: 'Resposta obrigatória' });
+  const m = AdminMessages.get(parseInt(req.params.id));
+  if (!m) return res.status(404).json({ error: 'Não encontrado' });
+  m.adminReply = reply.trim(); m.adminRepliedAt = now(); m.read = true;
+  AdminMessages.update(m);
   res.json({ ok: true });
 });
 

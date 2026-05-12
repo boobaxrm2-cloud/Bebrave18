@@ -3027,7 +3027,24 @@ async function refreshInboxBadges() {
       } catch(e) {}
       return;
     }
-    const badgeId = ME.role === 'admin' ? 'adm-inbox-badge' : 's-inbox-badge';
+    if (ME.role === 'admin') {
+      const suggBadge = document.getElementById('adm-inbox-badge');
+      if (suggBadge) {
+        if (count > 0) { suggBadge.textContent = count > 99 ? '99+' : count; suggBadge.style.display = 'inline-block'; }
+        else { suggBadge.style.display = 'none'; }
+      }
+      try {
+        const msgs = await api('GET', '/api/admin/messages');
+        const unread = msgs.filter(m => !m.read).length;
+        const msgBadge = document.getElementById('adm-msg-badge');
+        if (msgBadge) {
+          if (unread > 0) { msgBadge.textContent = unread > 99 ? '99+' : unread; msgBadge.style.display = 'inline-block'; }
+          else { msgBadge.style.display = 'none'; }
+        }
+      } catch(e) {}
+      return;
+    }
+    const badgeId = 's-inbox-badge';
     const badge = document.getElementById(badgeId);
     if (!badge) return;
     if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'inline-block'; }
@@ -3425,11 +3442,11 @@ async function loadAdminSuggestions(tab) {
   }
 
   el.innerHTML = tabs + list.map(s => `
-    <div class="card" style="margin-bottom:14px;${s.fromBlocked ? 'border-left:4px solid #ef4444;background:#fff5f5' : !s.read && !s.adminReply ? 'border-left:4px solid var(--navy)' : s.adminReply ? 'border-left:4px solid #22c55e' : ''}">
+    <div class="card" style="margin-bottom:14px;${!s.read && !s.adminReply ? 'border-left:4px solid var(--navy)' : s.adminReply ? 'border-left:4px solid #22c55e' : ''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:36px;height:36px;border-radius:50%;background:${s.fromBlocked ? '#fee2e2' : 'var(--g100)'};color:${s.fromBlocked ? '#dc2626' : 'inherit'};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(s.teacherName||'?').charAt(0)}</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(s.teacherName||'?').charAt(0)}</div>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)} ${s.fromBlocked ? '<span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:4px">🔒 Conta Bloqueada</span>' : ''}</div>
+          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)}</div>
           <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)} · ${s.adminReply ? '<span style="color:#16a34a;font-weight:600">✅ Respondida</span>' : s.read ? 'Lida' : '<strong style="color:var(--navy)">Nova</strong>'}</div>
         </div>
       </div>
@@ -3454,6 +3471,74 @@ async function replyToSuggestion(id) {
     await api('PUT', `/api/admin/suggestions/${id}/reply`, { reply });
     showToast('✅ Resposta enviada!');
     loadAdminSuggestions();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ADMIN MESSAGES (blocked teacher contact)
+// ══════════════════════════════════════════════════════════════
+
+async function loadAdminMessages() {
+  const msgs = await api('GET', '/api/admin/messages').catch(() => []);
+  const el = document.getElementById('adm-messages-list');
+  if (!el) return;
+  refreshInboxBadges();
+
+  const pending  = msgs.filter(m => !m.adminReply);
+  const historic = msgs.filter(m =>  m.adminReply);
+
+  if (!_adminMsgTab) _adminMsgTab = 'pending';
+  const list = _adminMsgTab === 'pending' ? pending : historic;
+
+  const tabs = `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn-sm" onclick="_adminMsgTab='pending';loadAdminMessages()"
+        style="${_adminMsgTab==='pending' ? 'background:var(--navy);color:#fff' : ''}">
+        Pendentes <span style="background:${pending.length?'#ef4444':'var(--g200)'};color:${pending.length?'#fff':'var(--g600)'};border-radius:99px;padding:0 7px;font-size:11px;font-weight:700">${pending.length}</span>
+      </button>
+      <button class="btn-sm" onclick="_adminMsgTab='history';loadAdminMessages()"
+        style="${_adminMsgTab==='history' ? 'background:var(--navy);color:#fff' : ''}">
+        Histórico <span style="background:var(--g200);color:var(--g600);border-radius:99px;padding:0 7px;font-size:11px;font-weight:700">${historic.length}</span>
+      </button>
+    </div>`;
+
+  if (!list.length) {
+    el.innerHTML = tabs + `<div class="card"><p class="empty">${_adminMsgTab === 'pending' ? 'Nenhuma mensagem pendente.' : 'Nenhum histórico ainda.'}</p></div>`;
+    return;
+  }
+
+  el.innerHTML = tabs + list.map(m => `
+    <div class="card" style="margin-bottom:14px;border-left:4px solid ${m.adminReply ? '#22c55e' : !m.read ? '#ef4444' : 'var(--g200)'}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:36px;height:36px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(m.fromName||'?').charAt(0)}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${escHtml(m.fromName)} <span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:4px">🔒 Conta Bloqueada</span></div>
+          <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(m.createdAt)} · ${m.adminReply ? '<span style="color:#16a34a;font-weight:600">✅ Respondida</span>' : m.read ? 'Lida' : '<strong style="color:#ef4444">Nova</strong>'}</div>
+        </div>
+      </div>
+      <p style="margin:0 0 12px;font-size:14px;color:var(--g700);line-height:1.6;white-space:pre-wrap">${escHtml(m.content)}</p>
+      ${m.adminReply ? `
+        <div style="background:#f0fdf4;border-radius:var(--r-sm);padding:12px 16px;border-left:3px solid #22c55e;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">✅ Sua resposta · ${fmtTimeAgo(m.adminRepliedAt)}</div>
+          <p style="margin:0;font-size:14px;color:var(--g700);white-space:pre-wrap;line-height:1.6">${escHtml(m.adminReply)}</p>
+        </div>` : ''}
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px">
+        <textarea id="adm-msg-reply-${m.$loki}" rows="2" placeholder="${m.adminReply ? 'Atualizar resposta...' : 'Escrever resposta...'}" style="flex:1;padding:8px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical"></textarea>
+        <button class="btn-sm" style="margin-top:2px" onclick="replyToAdminMessage(${m.$loki})">${m.adminReply ? 'Atualizar' : 'Responder'}</button>
+      </div>
+    </div>`).join('');
+}
+
+let _adminMsgTab = 'pending';
+
+async function replyToAdminMessage(id) {
+  const input = document.getElementById(`adm-msg-reply-${id}`);
+  const reply = input?.value.trim();
+  if (!reply) { showToast('⚠️ Escreva uma resposta'); return; }
+  try {
+    await api('PUT', `/api/admin/messages/${id}/reply`, { reply });
+    showToast('✅ Resposta registrada!');
+    loadAdminMessages();
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
