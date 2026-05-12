@@ -1045,14 +1045,37 @@ function showTeacherBlockedOverlay() {
     ov.id = 'teacher-blocked-overlay';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;text-align:center;padding:32px';
     ov.innerHTML = `
-      <div style="font-size:56px;margin-bottom:24px">🔒</div>
-      <h2 style="font-size:22px;font-weight:700;margin-bottom:12px;font-family:'DM Sans',sans-serif">Conta Bloqueada</h2>
-      <p style="font-size:15px;color:#94a3b8;max-width:420px;line-height:1.7;margin-bottom:28px;font-family:'DM Sans',sans-serif">Sua conta foi temporariamente bloqueada pelo administrador. Entre em contato com o administrador para regularizar o acesso.</p>
-      <button onclick="doLogout()" style="background:#3b6ef5;color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Sair</button>
+      <div style="font-size:56px;margin-bottom:16px">🔒</div>
+      <h2 style="font-size:22px;font-weight:700;margin-bottom:10px;font-family:'DM Sans',sans-serif">Conta Bloqueada</h2>
+      <p style="font-size:15px;color:#94a3b8;max-width:420px;line-height:1.7;margin-bottom:24px;font-family:'DM Sans',sans-serif">Sua conta foi temporariamente bloqueada pelo administrador. Envie uma mensagem abaixo para solicitar a regularização.</p>
+      <div style="width:100%;max-width:440px;margin-bottom:20px;text-align:left">
+        <textarea id="blocked-msg-input" rows="4" placeholder="Escreva sua mensagem para o administrador..." style="width:100%;box-sizing:border-box;background:#1e293b;border:1px solid #334155;border-radius:10px;color:#f1f5f9;font-size:14px;font-family:'DM Sans',sans-serif;padding:12px 14px;resize:vertical;outline:none"></textarea>
+        <p id="blocked-msg-status" style="font-size:13px;margin:6px 0 0;min-height:18px"></p>
+        <button onclick="sendBlockedMessage()" style="width:100%;margin-top:10px;background:#3b6ef5;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">✉️ Enviar mensagem ao administrador</button>
+      </div>
+      <button onclick="doLogout()" style="background:transparent;color:#64748b;border:1px solid #334155;border-radius:10px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Sair</button>
     `;
     document.body.appendChild(ov);
   }
   ov.style.display = 'flex';
+}
+
+async function sendBlockedMessage() {
+  const input = document.getElementById('blocked-msg-input');
+  const status = document.getElementById('blocked-msg-status');
+  const content = input?.value.trim();
+  if (!content) { if (status) { status.style.color = '#f87171'; status.textContent = '⚠️ Escreva uma mensagem antes de enviar.'; } return; }
+  try {
+    await fetch('/api/contact-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    if (input) input.value = '';
+    if (status) { status.style.color = '#4ade80'; status.textContent = '✅ Mensagem enviada! O administrador entrará em contato.'; }
+  } catch(e) {
+    if (status) { status.style.color = '#f87171'; status.textContent = '❌ Erro ao enviar. Tente novamente.'; }
+  }
 }
 
 let toastT;
@@ -3402,11 +3425,11 @@ async function loadAdminSuggestions(tab) {
   }
 
   el.innerHTML = tabs + list.map(s => `
-    <div class="card" style="margin-bottom:14px;${!s.read && !s.adminReply ? 'border-left:4px solid var(--navy)' : s.adminReply ? 'border-left:4px solid #22c55e' : ''}">
+    <div class="card" style="margin-bottom:14px;${s.fromBlocked ? 'border-left:4px solid #ef4444;background:#fff5f5' : !s.read && !s.adminReply ? 'border-left:4px solid var(--navy)' : s.adminReply ? 'border-left:4px solid #22c55e' : ''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(s.teacherName||'?').charAt(0)}</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:${s.fromBlocked ? '#fee2e2' : 'var(--g100)'};color:${s.fromBlocked ? '#dc2626' : 'inherit'};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(s.teacherName||'?').charAt(0)}</div>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)}</div>
+          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)} ${s.fromBlocked ? '<span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:4px">🔒 Conta Bloqueada</span>' : ''}</div>
           <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)} · ${s.adminReply ? '<span style="color:#16a34a;font-weight:600">✅ Respondida</span>' : s.read ? 'Lida' : '<strong style="color:var(--navy)">Nova</strong>'}</div>
         </div>
       </div>

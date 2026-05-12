@@ -1124,6 +1124,15 @@ app.delete('/api/forum/replies/:id', auth, (req, res) => {
 // ════════════════════════════════════════════════════════════
 //  SUGGESTIONS
 // ════════════════════════════════════════════════════════════
+// Blocked teacher can still contact admin
+app.post('/api/contact-admin', auth, (req, res) => {
+  const { content } = req.body;
+  if (!content?.trim()) return res.status(400).json({ error: 'Mensagem obrigatória' });
+  const u = req.session.user;
+  Suggestions.insert({ teacherLogin: u.login, teacherName: u.name, content: content.trim(), fromBlocked: true, createdAt: now(), adminReply: null, teacherRead: false });
+  res.json({ ok: true });
+});
+
 app.post('/api/suggestions', auth, isTeach, (req, res) => {
   const { content } = req.body;
   if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
