@@ -269,7 +269,8 @@ function _csvEscape(val) {
 }
 
 function _downloadCsv(filename, headers, rows) {
-  const lines = [headers.map(_csvEscape).join(','), ...rows.map(r => r.map(_csvEscape).join(','))];
+  const sep = ';';
+  const lines = [headers.map(_csvEscape).join(sep), ...rows.map(r => r.map(_csvEscape).join(sep))];
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
