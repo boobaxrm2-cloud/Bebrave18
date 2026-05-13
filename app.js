@@ -110,8 +110,11 @@ async function loadAdminTeachers() {
   const teachers = await api('GET','/api/admin/teachers');
   const el = document.getElementById('adm-teachers-list');
   if (!teachers.length) { el.innerHTML = '<p class="empty">Nenhum professor cadastrado ainda.</p>'; return; }
-  el.innerHTML = `<table class="list-table"><thead><tr>
-    <th>Professor</th><th>Login</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Cadastrado em</th><th>Ações</th>
+  const exportBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn-sm" onclick="exportTeachersCsv()" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7;font-weight:600">📥 Exportar Excel (.csv)</button>
+  </div>`;
+  el.innerHTML = exportBtn + `<table class="list-table"><thead><tr>
+    <th>Professor</th><th>Login</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th>
   </tr></thead><tbody>
     ${teachers.map(t=>{
       const termsHtml = t.termsAccepted
@@ -140,6 +143,7 @@ async function loadAdminTeachers() {
         <td>${termsHtml}</td>
         <td>${t.studentCount} aluno${t.studentCount!==1?'s':''}</td>
         <td>${fmtDate(t.createdAt)}</td>
+        <td>${t.lastLogin ? fmtDate(t.lastLogin) : '<span style="color:var(--g400);font-size:12px">Nunca</span>'}</td>
         <td><div class="lt-actions">
           <button class="btn-icon" title="${t.blocked?'Desbloquear':'Bloquear'} professor" onclick="toggleBlockTeacher('${t.login}',${!!t.blocked})" style="${t.blocked?'color:#22c55e':'color:#ef4444'}">${t.blocked?'🔓':'🔒'}</button>
           <button class="btn-icon" title="Redefinir senha" onclick="openResetPw('${t.login}','${t.name}')">🔑</button>
@@ -192,6 +196,7 @@ async function loadAdminStudents(teacherFilter) {
     <td>${s.teacherName||'—'}</td>
     <td>${s.lessonCount}</td>
     <td>${fmtDate(s.createdAt)}</td>
+    <td>${s.lastLogin ? fmtDate(s.lastLogin) : '<span style="color:var(--g400);font-size:12px">Nunca</span>'}</td>
     <td><div class="lt-actions">
       <button class="btn-icon" title="Redefinir senha" onclick="openResetPw('${s.matricula}','${escJs(s.name)}')">🔑</button>
       <button class="btn-icon danger" title="Excluir" onclick="confirmDelete('student','${s.matricula}','${escJs(s.name)}')">🗑</button>
@@ -206,6 +211,7 @@ async function loadAdminStudents(teacherFilter) {
     <td>${s.teacherName||'—'}</td>
     <td>${s.lessonCount||0}</td>
     <td>${s.inactivatedAt ? fmtDate(s.inactivatedAt) : '—'}</td>
+    <td><span style="color:var(--g400);font-size:12px">—</span></td>
     <td><button class="btn-sm" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7" onclick="reactivateInactiveStudent('${s.matricula}','${escJs(s.name)}')">♻️ Reativar</button></td>
   </tr>`).join('');
 
@@ -222,6 +228,7 @@ async function loadAdminStudents(teacherFilter) {
       <td>${s.teacherName||'—'}</td>
       <td>${s.lessonCount||0}</td>
       <td>${fmtDate(s.deletedAt)}</td>
+      <td><span style="color:var(--g400);font-size:12px">—</span></td>
       <td><button class="btn-sm" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7" onclick="reactivateStudent('${s.matricula}','${escJs(s.name)}')">♻️ Reativar</button></td>
     </tr>`).join('');
   }
@@ -231,7 +238,10 @@ async function loadAdminStudents(teacherFilter) {
     return;
   }
 
-  el.innerHTML = filterBar + `<table class="list-table"><thead><tr><th>Aluno</th><th>Matrícula</th><th>Nível</th><th>Professor</th><th>Aulas</th><th>Data</th><th>Ações</th></tr></thead><tbody>
+  const exportStudBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn-sm" onclick="exportStudentsCsv()" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7;font-weight:600">📥 Exportar Excel (.csv)</button>
+  </div>`;
+  el.innerHTML = filterBar + exportStudBtn + `<table class="list-table"><thead><tr><th>Aluno</th><th>Matrícula</th><th>Nível</th><th>Professor</th><th>Aulas</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th></tr></thead><tbody>
     ${activeRows}${inactiveRows}${deletedRows}
   </tbody></table>`;
 }
@@ -252,6 +262,60 @@ async function reactivateInactiveStudent(matricula, name) {
     showToast('✅ Aluno ' + name + ' reativado!');
     loadAdminStudents();
   } catch(e) { showToast('❌ ' + e.message); }
+}
+
+function _csvEscape(val) {
+  return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
+}
+
+function _downloadCsv(filename, headers, rows) {
+  const lines = [headers.map(_csvEscape).join(','), ...rows.map(r => r.map(_csvEscape).join(','))];
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+async function exportTeachersCsv() {
+  try {
+    const teachers = await api('GET', '/api/admin/teachers');
+    const headers = ['Nome', 'Login', 'E-mail', 'WhatsApp', 'Idiomas', 'Alunos', 'Termo de Uso', 'Cadastrado em', 'Último Login', 'Bloqueado'];
+    const rows = teachers.map(t => [
+      t.name,
+      t.login,
+      t.email || '',
+      t.whatsapp || '',
+      Array.isArray(t.languages) ? t.languages.join('; ') : (t.languages || ''),
+      t.studentCount,
+      t.termsAccepted ? 'Sim' : 'Não',
+      t.createdAt ? new Date(t.createdAt).toLocaleString('pt-BR') : '',
+      t.lastLogin ? new Date(t.lastLogin).toLocaleString('pt-BR') : 'Nunca',
+      t.blocked ? 'Sim' : 'Não',
+    ]);
+    _downloadCsv('professores_bebrave.csv', headers, rows);
+  } catch(e) { showToast('❌ Erro ao exportar: ' + e.message); }
+}
+
+async function exportStudentsCsv() {
+  try {
+    const students = await api('GET', '/api/admin/students');
+    const headers = ['Nome', 'Matrícula', 'Nível', 'Professor', 'Total de Aulas', 'Cadastrado em', 'Último Login', 'Status'];
+    const rows = students.map(s => [
+      s.name,
+      s.matricula,
+      s.level || '',
+      s.teacherName || '',
+      s.lessonCount,
+      s.createdAt ? new Date(s.createdAt).toLocaleString('pt-BR') : '',
+      s.lastLogin ? new Date(s.lastLogin).toLocaleString('pt-BR') : 'Nunca',
+      s.active === false ? 'Inativo' : 'Ativo',
+    ]);
+    _downloadCsv('alunos_bebrave.csv', headers, rows);
+  } catch(e) { showToast('❌ Erro ao exportar: ' + e.message); }
 }
 
 async function adminAddTeacher() {

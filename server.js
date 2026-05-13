@@ -197,6 +197,8 @@ app.post('/api/auth/login', (req, res) => {
       if (teacher?.blocked) return res.status(403).json({ error: 'Seu professor está temporariamente indisponível. Entre em contato com seu professor para regularizar o acesso.' });
     }
   }
+  user.lastLogin = now();
+  Users.update(user);
   req.session.user = { id: user.$loki, login: user.login, role: user.role, name: user.name };
   if (user.role === 'teacher') {
     const t = Teachers.findOne({ login: user.login });
@@ -315,7 +317,10 @@ app.post('/api/auth/change-password', auth, (req, res) => {
 //  ADMIN — TEACHERS
 // ════════════════════════════════════════════════════════════
 app.get('/api/admin/teachers', auth, isAdmin, (req, res) => {
-  const teachers = Teachers.find().map(t => ({ ...t, studentCount: Students.find({ teacherLogin: t.login }).length, plainPassword: t.plainPassword || '', languages: t.languages || '', termsAccepted: t.termsAccepted || false, termsAcceptedAt: t.termsAcceptedAt || null }));
+  const teachers = Teachers.find().map(t => {
+    const u = Users.findOne({ login: t.login });
+    return { ...t, studentCount: Students.find({ teacherLogin: t.login }).length, plainPassword: t.plainPassword || '', languages: t.languages || '', termsAccepted: t.termsAccepted || false, termsAcceptedAt: t.termsAcceptedAt || null, lastLogin: u?.lastLogin || null };
+  });
   res.json(teachers);
 });
 
@@ -370,7 +375,10 @@ app.delete('/api/admin/teachers/:login', auth, isAdmin, (req, res) => {
 });
 
 app.get('/api/admin/students', auth, isAdmin, (req, res) => {
-  res.json(Students.find().map(s => ({ ...s, lessonCount: Lessons.find({ studentMatricula: s.matricula }).length })));
+  res.json(Students.find().map(s => {
+    const u = Users.findOne({ login: s.matricula });
+    return { ...s, lessonCount: Lessons.find({ studentMatricula: s.matricula }).length, lastLogin: u?.lastLogin || null };
+  }));
 });
 
 app.delete('/api/admin/students/:matricula', auth, isAdmin, (req, res) => {
