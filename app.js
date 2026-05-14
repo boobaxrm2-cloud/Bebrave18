@@ -325,6 +325,7 @@ async function adminAddTeacher() {
   const cpf      = document.getElementById('at-cpf')?.value.trim() || '';
   const whatsapp = document.getElementById('at-whatsapp')?.value.trim() || '';
   if (!name) return showToast('⚠️ Nome é obrigatório');
+  if (!document.getElementById('at-lgpd')?.checked) return showToast('⚠️ É necessário confirmar o consentimento LGPD');
   try {
     const r = await api('POST','/api/admin/teachers',{name,email,cpf,whatsapp});
     document.getElementById('tcred-name').textContent  = r.name;
@@ -622,6 +623,7 @@ async function teacherAddStudent() {
   if (!email)   return showToast('⚠️ E-mail é obrigatório');
   if (!payday)  return showToast('⚠️ Dia de vencimento é obrigatório');
   if (!price)   return showToast('⚠️ Valor da mensalidade é obrigatório');
+  if (!document.getElementById('as-lgpd')?.checked) return showToast('⚠️ É necessário confirmar o consentimento LGPD');
   try {
     const r = await api('POST','/api/students',{name,socialname,level,lang,cpf,email,whatsapp,payday,price});
     document.getElementById('cred-name').textContent  = r.name;
@@ -2679,6 +2681,7 @@ function openStudentRegister() {
   ['sr-name','sr-cpf','sr-email','sr-whatsapp','sr-password'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   const dob = document.getElementById('sr-dob'); if(dob) dob.value = '';
   document.querySelectorAll('#sr-langs-wrap input[type=checkbox]').forEach(cb => cb.checked = false);
+  const lgpd = document.getElementById('sr-lgpd'); if(lgpd) lgpd.checked = false;
   const err = document.getElementById('sr-err'); if(err) { err.style.display='none'; err.textContent=''; }
   openModal('modal-student-register');
 }
@@ -2703,6 +2706,7 @@ async function submitStudentRegister() {
   if (!email)         return showErr('⚠️ E-mail é obrigatório');
   if (!whatsapp)      return showErr('⚠️ WhatsApp é obrigatório');
   if (!password || password.length < 4) return showErr('⚠️ Senha mínimo 4 caracteres');
+  if (!document.getElementById('sr-lgpd')?.checked) return showErr('⚠️ Você precisa aceitar os Termos de Uso e a LGPD para continuar');
 
   try {
     const r = await api('POST', '/api/register/student', { name, cpf, dob, languages, email, whatsapp, password });
