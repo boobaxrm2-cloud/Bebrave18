@@ -177,7 +177,7 @@ app.get('/api/check-login', (req, res) => {
 app.get('/api/check-cpf', (req, res) => {
   const digits = (req.query.cpf || '').replace(/\D/g, '');
   if (digits.length !== 11) return res.json({ available: false });
-  const usedByTeacher = Teachers.findOne({ cpf: { $regex: digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') } }) || Teachers.find().some(t => t.cpf && t.cpf.replace(/\D/g,'') === digits);
+  const usedByTeacher = Teachers.find().some(t => t.cpf && t.cpf.replace(/\D/g,'') === digits);
   const usedByStudent = Students.find().some(s => s.cpf && s.cpf.replace(/\D/g,'') === digits);
   res.json({ available: !usedByTeacher && !usedByStudent });
 });
