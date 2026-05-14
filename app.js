@@ -1582,6 +1582,13 @@ async function openProfile() {
     document.getElementById('profile-login').value    = profile.login    || '';
     document.getElementById('profile-email').value    = profile.email    || '';
     document.getElementById('profile-whatsapp').value = profile.whatsapp || '';
+    const igWrap = document.getElementById('profile-instagram-wrap');
+    if (ME && ME.role === 'teacher') {
+      igWrap.style.display = '';
+      document.getElementById('profile-instagram').value = profile.instagram || '';
+    } else {
+      igWrap.style.display = 'none';
+    }
     document.getElementById('profile-pw-current').value = '';
     document.getElementById('profile-pw-new').value     = '';
     _profilePhotoB64 = null;
@@ -1695,6 +1702,7 @@ async function saveProfile() {
   const newPw    = document.getElementById('profile-pw-new').value;
 
   const payload = { email, whatsapp };
+  if (ME && ME.role === 'teacher') payload.instagram = document.getElementById('profile-instagram').value.trim().replace(/^@/, '');
   if (ME && ME.role === 'admin') payload.name = document.getElementById('profile-name').value.trim();
   if (_profilePhotoB64) payload.photo = _profilePhotoB64;
   if (newPw) { payload.currentPassword = curPw; payload.newPassword = newPw; }
@@ -2313,6 +2321,13 @@ async function loadTeacherNetworkProfile() {
             <input type="text" id="np-whatsapp" value="${escHtml(p.networkWhatsapp||'')}" placeholder="(21) 99999-9999" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
           </div>
         </div>
+        <div>
+          <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Instagram público</label>
+          <div style="position:relative;max-width:260px">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--g400);font-size:15px;font-weight:600">@</span>
+            <input type="text" id="np-instagram" value="${escHtml((p.networkInstagram||'').replace(/^@/,''))}" placeholder="seuperfil" style="width:100%;padding:10px 12px 10px 30px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+          </div>
+        </div>
       </div>
       <div class="mf" style="margin-top:20px;justify-content:flex-end">
         <button class="btn-primary" onclick="saveTeacherNetworkProfile()">💾 Salvar perfil</button>
@@ -2337,6 +2352,7 @@ async function saveTeacherNetworkProfile() {
     networkRateNegotiable: document.getElementById('np-negotiable').checked,
     networkEmail:         document.getElementById('np-email').value.trim(),
     networkWhatsapp:      document.getElementById('np-whatsapp').value.trim(),
+    networkInstagram:     document.getElementById('np-instagram').value.trim().replace(/^@/, ''),
   }).then(() => showToast('✅ Perfil salvo!')).catch(e => showToast('❌ ' + e.message));
 }
 
@@ -2461,7 +2477,8 @@ async function viewTeacherProfile(login) {
           <div style="display:flex;flex-direction:column;gap:8px">
             ${t.publicEmail ? `<a href="mailto:${t.publicEmail}" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--g50);border-radius:var(--r-sm);text-decoration:none;color:var(--navy)"><span style="font-size:16px">📧</span><span style="font-size:13px">${escHtml(t.publicEmail)}</span></a>` : ''}
             ${t.publicWhatsapp ? `<a href="https://wa.me/55${t.publicWhatsapp.replace(/\D/g,'')}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#d1fae5;border-radius:var(--r-sm);text-decoration:none;color:#065f46"><span style="font-size:16px">💬</span><span style="font-size:13px">${escHtml(t.publicWhatsapp)}</span></a>` : ''}
-            ${!t.publicEmail && !t.publicWhatsapp ? '<p style="font-size:13px;color:var(--g300);margin:0">Sem informações de contato.</p>' : ''}
+            ${t.publicInstagram ? `<a href="https://instagram.com/${t.publicInstagram.replace(/^@/,'')}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:linear-gradient(135deg,#fce7f3,#ede9fe);border-radius:var(--r-sm);text-decoration:none;color:#7c3aed"><span style="font-size:16px">📸</span><span style="font-size:13px">@${escHtml(t.publicInstagram.replace(/^@/,''))}</span></a>` : ''}
+            ${!t.publicEmail && !t.publicWhatsapp && !t.publicInstagram ? '<p style="font-size:13px;color:var(--g300);margin:0">Sem informações de contato.</p>' : ''}
           </div>
         </div>
         <div style="margin-top:auto">

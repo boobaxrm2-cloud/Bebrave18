@@ -919,7 +919,7 @@ app.get('/api/profile', auth, (req, res) => {
   let extra = {};
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
-    extra = { email: t?.email||'', whatsapp: t?.whatsapp||'', cpf: t?.cpf||'', socialname: t?.socialname||'', photo: t?.photo||'' };
+    extra = { email: t?.email||'', whatsapp: t?.whatsapp||'', cpf: t?.cpf||'', socialname: t?.socialname||'', photo: t?.photo||'', instagram: t?.instagram||'' };
   } else if (u.role === 'student') {
     const s = Students.findOne({ matricula: u.login });
     extra = { email: s?.email||'', whatsapp: s?.whatsapp||'', cpf: s?.cpf||'', socialname: s?.socialname||'', photo: s?.photo||'' };
@@ -932,7 +932,7 @@ app.get('/api/profile', auth, (req, res) => {
 // PUT /api/profile — update editable fields
 app.put('/api/profile', auth, (req, res) => {
   const u = req.session.user;
-  const { email, whatsapp, socialname, photo, currentPassword, newPassword } = req.body;
+  const { email, whatsapp, socialname, photo, instagram, currentPassword, newPassword } = req.body;
 
   // Password change (optional)
   if (newPassword) {
@@ -958,6 +958,7 @@ app.put('/api/profile', auth, (req, res) => {
       if (whatsapp   !== undefined) t.whatsapp   = whatsapp;
       if (socialname !== undefined) t.socialname = socialname;
       if (photo      !== undefined) t.photo      = photo;
+      if (instagram  !== undefined) t.instagram  = instagram;
       Teachers.update(t);
     }
   } else if (u.role === 'student') {
@@ -1637,14 +1638,14 @@ app.get('/api/network/teachers/:login', (req, res) => {
     login: t.login, name: t.name, photo: u?.photo || null,
     bio: t.networkBio || '', languages: t.networkLanguages || [],
     rate: t.networkRate || null, rateNegotiable: t.networkRateNegotiable || false,
-    publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '',
+    publicEmail: t.networkEmail || '', publicWhatsapp: t.networkWhatsapp || '', publicInstagram: t.networkInstagram || '',
   });
 });
 
 app.put('/api/teacher/network-profile', auth, isTeach, (req, res) => {
   const t = Teachers.findOne({ login: req.session.user.login });
   if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
-  const fields = ['networkVisible','networkBio','networkLanguages','networkRate','networkRateNegotiable','networkEmail','networkWhatsapp'];
+  const fields = ['networkVisible','networkBio','networkLanguages','networkRate','networkRateNegotiable','networkEmail','networkWhatsapp','networkInstagram'];
   fields.forEach(f => { if (req.body[f] !== undefined) t[f] = req.body[f]; });
   Teachers.update(t);
   res.json({ ok: true });
@@ -1661,6 +1662,7 @@ app.get('/api/teacher/network-profile', auth, isTeach, (req, res) => {
     networkRateNegotiable: t.networkRateNegotiable || false,
     networkEmail: t.networkEmail || '',
     networkWhatsapp: t.networkWhatsapp || '',
+    networkInstagram: t.networkInstagram || '',
   });
 });
 
