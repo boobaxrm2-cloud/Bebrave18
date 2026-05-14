@@ -37,10 +37,13 @@ async function doLogin() {
   err.classList.add('hidden');
   if (!login || !password) { err.textContent = 'Preencha todos os campos.'; err.classList.remove('hidden'); return; }
   try {
-    ME = await api('POST', '/api/auth/login', { login: login.toUpperCase(), password });
+    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) });
+    const json = await r.json();
+    if (!r.ok) { err.textContent = json.error || 'Login ou senha incorretos.'; err.classList.remove('hidden'); return; }
+    ME = json;
     bootRole(ME.role);
   } catch(e) {
-    err.textContent = e.message || 'Login ou senha incorretos.';
+    err.textContent = 'Erro de conexão. Tente novamente.';
     err.classList.remove('hidden');
   }
 }

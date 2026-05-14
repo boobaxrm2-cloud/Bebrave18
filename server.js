@@ -199,7 +199,8 @@ app.post('/api/auth/register-teacher', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) return res.status(400).json({ error: 'Preencha todos os campos' });
-  const user = Users.findOne({ login: login.trim().toUpperCase() }) || Users.findOne({ login: login.trim() });
+  const loginTrim = login.trim();
+  const user = Users.findOne({ login: loginTrim }) || Users.findOne({ login: loginTrim.toUpperCase() }) || Users.findOne({ login: loginTrim.toLowerCase() });
   if (!user || !bcrypt.compareSync(password, user.password))
     return res.status(401).json({ error: 'Login ou senha incorretos' });
   if (user.inactive) return res.status(403).json({ error: 'Acesso inativo. Entre em contato com seu professor.' });
