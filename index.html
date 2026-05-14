@@ -154,6 +154,12 @@
         <div class="lv2-field"><label class="lv2-label">E-mail *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg><input id="reg-email" type="email" class="lv2-input" placeholder="seu@email.com"></div></div>
         <div class="lv2-field"><label class="lv2-label">WhatsApp *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
         <div class="lv2-field"><label class="lv2-label">Senha de acesso *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input id="reg-password" type="password" class="lv2-input" placeholder="Mínimo 4 caracteres"><button type="button" class="lv2-eye" onclick="togglePw('reg-password',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <div style="margin:16px 0;padding:12px 14px;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#0c4a6e;line-height:1.5">
+            <input type="checkbox" id="reg-lgpd" style="margin-top:2px;accent-color:#2A5FCC;flex-shrink:0">
+            <span>Li e concordo com os <strong>Termos de Uso</strong> e autorizo o tratamento dos meus dados pessoais pela plataforma BeBrave conforme a <strong>LGPD (Lei nº 13.709/2018)</strong>.</span>
+          </label>
+        </div>
         <button class="lv2-btn" onclick="submitTeacherRegistration()">Criar Conta</button>
         <p style="text-align:center;margin-top:14px"><button onclick="showPage('page-login')" style="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">← Voltar ao login</button></p>
       </div>
@@ -698,10 +704,10 @@
   <div class="modal-card" style="max-width:400px;text-align:center">
     <div style="font-size:48px;margin-bottom:12px">🔑</div>
     <h3 style="margin-bottom:8px;color:#0f172a">Seu novo LOGIN foi gerado!</h3>
-    <p style="font-size:14px;color:#64748b;margin-bottom:6px">A partir de agora, seu login são os <strong>5 primeiros dígitos do seu CPF</strong>.</p>
+    <p style="font-size:14px;color:#64748b;margin-bottom:6px">A partir de agora, seu login são os <strong>primeiros dígitos do seu CPF</strong>.</p>
     <p style="font-size:14px;color:#64748b;margin-bottom:20px">Guarde este código — você precisará dele para entrar na plataforma.</p>
     <div style="background:#f1f5f9;border-radius:12px;padding:20px 24px;margin-bottom:20px;border:2px solid #2A5FCC">
-      <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Seu novo login (5 primeiros dígitos do CPF)</div>
+      <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Seu novo login</div>
       <div id="new-login-display" style="font-size:36px;font-weight:800;color:#2A5FCC;font-family:monospace;letter-spacing:.15em"></div>
     </div>
     <button class="btn-primary" style="width:100%;font-size:15px;padding:13px" onclick="closeModal('modal-new-login')">Entendi, vou guardar!</button>

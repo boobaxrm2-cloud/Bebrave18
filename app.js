@@ -3750,6 +3750,7 @@ async function submitTeacherRegistration() {
   if (!email || !email.includes('@')) { showToast('⚠️ Informe um e-mail válido'); return; }
   if (!whatsapp)           { showToast('⚠️ Informe o WhatsApp'); return; }
   if (password.length < 4) { showToast('⚠️ A senha deve ter ao menos 4 caracteres'); return; }
+  if (!document.getElementById('reg-lgpd')?.checked) { showToast('⚠️ Você precisa aceitar os Termos de Uso e a LGPD para continuar'); return; }
 
   try {
     const r = await api('POST', '/api/auth/register-teacher', { name, email, whatsapp, password });
