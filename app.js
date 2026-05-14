@@ -25,8 +25,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 function bootRole(role) {
   if (role === 'admin')   { showPage('page-admin');   loadAdmin(); }
-  if (role === 'teacher') { showPage('page-teacher'); loadTeacher(); }
-  if (role === 'student') { showPage('page-student'); loadStudent(); }
+  if (role === 'teacher') { showPage('page-teacher'); loadTeacher(); chatInit(); }
+  if (role === 'student') { showPage('page-student'); loadStudent(); chatInit(); }
 }
 
 // ── Auth ─────────────────────────────────────────────────────
@@ -3549,7 +3549,7 @@ function renderForumPosts(posts, role, listId, inputId) {
 }
 
 function escHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 }
 
 async function loadTeacherForum() {
@@ -3823,10 +3823,7 @@ async function submitTermsAcceptance() {
   try {
     const r = await api('POST', '/api/teacher/accept-terms', { signature, cpf });
     ME.termsAccepted = true;
-    ME.login = r.newLogin;
     closeModal('modal-terms-of-use');
-    document.getElementById('new-login-display').textContent = r.newLogin;
-    openModal('modal-new-login');
     loadTeacherBebraveContracts();
   } catch(e) { showToast('❌ ' + e.message); }
 }
@@ -3950,4 +3947,170 @@ async function submitRating() {
     showToast('✅ Avaliação enviada!');
     loadStudentRating();
   } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHAT FLUTUANTE
+// ══════════════════════════════════════════════════════════════
+
+let _chatOpen = false;
+let _chatConvLogin = null;
+let _chatConvName = '';
+let _chatPollInterval = null;
+let _chatHeartbeatInterval = null;
+let _chatContactsCache = [];
+
+function chatInit() {
+  const widget = document.getElementById('chat-widget');
+  if (widget) widget.classList.remove('hidden');
+  // heartbeat a cada 20s
+  _chatHeartbeatInterval = setInterval(() => {
+    fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
+  }, 20000);
+  fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
+  // badge de não lidas a cada 10s
+  chatUpdateBadge();
+  setInterval(chatUpdateBadge, 10000);
+}
+
+async function chatUpdateBadge() {
+  try {
+    const r = await fetch('/api/chat/unread');
+    if (!r.ok) return;
+    const { count } = await r.json();
+    const badge = document.getElementById('chat-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  } catch {}
+}
+
+function chatToggle() {
+  if (_chatOpen) {
+    chatClose();
+  } else {
+    chatOpen();
+  }
+}
+
+function chatOpen() {
+  _chatOpen = true;
+  _chatConvLogin = null;
+  document.getElementById('chat-contacts-panel').classList.remove('hidden');
+  document.getElementById('chat-conv-panel').classList.add('hidden');
+  chatLoadContacts();
+}
+
+function chatClose() {
+  _chatOpen = false;
+  _chatConvLogin = null;
+  document.getElementById('chat-contacts-panel').classList.add('hidden');
+  document.getElementById('chat-conv-panel').classList.add('hidden');
+  if (_chatPollInterval) { clearInterval(_chatPollInterval); _chatPollInterval = null; }
+}
+
+async function chatLoadContacts() {
+  const list = document.getElementById('chat-contacts-list');
+  list.innerHTML = '<div class="chat-loading">Carregando...</div>';
+  try {
+    const contacts = await api('GET', '/api/chat/contacts');
+    _chatContactsCache = contacts;
+    if (!contacts.length) {
+      list.innerHTML = '<div class="chat-loading">Nenhum contato disponível.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    contacts.forEach(c => {
+      const initials = c.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+      const div = document.createElement('div');
+      div.className = 'chat-contact-item';
+      div.onclick = () => chatOpenConv(c.login, c.name, c.online);
+      div.innerHTML = `
+        <div class="chat-contact-avatar">
+          ${initials}
+          ${c.online ? '<span class="chat-online-dot"></span>' : ''}
+        </div>
+        <div class="chat-contact-info">
+          <div class="chat-contact-name">${escHtml(c.name)}</div>
+          <div class="chat-contact-status">${c.online ? 'Online agora' : 'Offline'}</div>
+        </div>
+        ${c.unread > 0 ? `<div class="chat-contact-unread">${c.unread}</div>` : ''}
+      `;
+      list.appendChild(div);
+    });
+  } catch(e) {
+    list.innerHTML = '<div class="chat-loading">Erro ao carregar contatos.</div>';
+  }
+}
+
+function chatBackToContacts() {
+  if (_chatPollInterval) { clearInterval(_chatPollInterval); _chatPollInterval = null; }
+  _chatConvLogin = null;
+  document.getElementById('chat-conv-panel').classList.add('hidden');
+  document.getElementById('chat-contacts-panel').classList.remove('hidden');
+  chatLoadContacts();
+}
+
+async function chatOpenConv(login, name, online) {
+  _chatConvLogin = login;
+  _chatConvName = name;
+  document.getElementById('chat-contacts-panel').classList.add('hidden');
+  document.getElementById('chat-conv-panel').classList.remove('hidden');
+  document.getElementById('chat-conv-name').textContent = name;
+  const dot = document.getElementById('chat-conv-online');
+  if (online) {
+    dot.style.display = 'inline-block';
+    dot.title = 'Online';
+  } else {
+    dot.style.display = 'none';
+  }
+  await chatLoadMessages();
+  document.getElementById('chat-input').focus();
+  // polling a cada 4s para novas mensagens
+  if (_chatPollInterval) clearInterval(_chatPollInterval);
+  _chatPollInterval = setInterval(() => { if (_chatConvLogin) chatLoadMessages(); }, 4000);
+  chatUpdateBadge();
+}
+
+async function chatLoadMessages() {
+  if (!_chatConvLogin) return;
+  try {
+    const msgs = await api('GET', `/api/chat/messages/${encodeURIComponent(_chatConvLogin)}`);
+    const list = document.getElementById('chat-messages-list');
+    const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    list.innerHTML = '';
+    if (!msgs.length) {
+      list.innerHTML = '<div class="chat-loading">Nenhuma mensagem ainda. Diga olá!</div>';
+      return;
+    }
+    msgs.forEach(m => {
+      const div = document.createElement('div');
+      div.className = `chat-msg ${m.mine ? 'mine' : 'theirs'}`;
+      const time = new Date(m.sentAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      div.innerHTML = `${escHtml(m.text)}<div class="chat-msg-time">${time}</div>`;
+      list.appendChild(div);
+    });
+    if (wasAtBottom || msgs[msgs.length - 1]?.mine) {
+      list.scrollTop = list.scrollHeight;
+    }
+    chatUpdateBadge();
+  } catch {}
+}
+
+async function chatSend() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !_chatConvLogin) return;
+  input.value = '';
+  try {
+    await api('POST', '/api/chat/messages', { to: _chatConvLogin, text });
+    await chatLoadMessages();
+  } catch(e) {
+    showToast('❌ Erro ao enviar mensagem');
+    input.value = text;
+  }
 }

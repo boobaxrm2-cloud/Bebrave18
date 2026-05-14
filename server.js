@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -50,6 +50,7 @@ function dbReady() {
   AdminMessages    = db.getCollection('adminMessages')    || db.addCollection('adminMessages',    { indices: ['fromLogin'] });
   Notifications    = db.getCollection('notifications')    || db.addCollection('notifications',    { indices: ['toLogin'] });
   Ratings          = db.getCollection('ratings')          || db.addCollection('ratings',          { indices: ['teacherLogin', 'studentLogin'] });
+  ChatMessages     = db.getCollection('chatMessages')     || db.addCollection('chatMessages',     { indices: ['fromLogin', 'toLogin'] });
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
@@ -1697,6 +1698,79 @@ app.post('/api/register/student', (req, res) => {
     selfRegistered: true, createdAt: now(), active: true,
   });
   res.json({ ok: true, login, name: name.trim() });
+});
+
+// ── CHAT & HEARTBEAT ─────────────────────────────────────────────
+
+// Heartbeat: atualiza lastSeen do usuário logado
+app.post('/api/heartbeat', requireLogin, (req, res) => {
+  const u = Users.findOne({ login: req.session.user.login });
+  if (u) { u.lastSeen = Date.now(); Users.update(u); }
+  res.json({ ok: true });
+});
+
+// Contatos disponíveis para chat (professor → alunos; aluno → professor)
+app.get('/api/chat/contacts', requireLogin, (req, res) => {
+  const me = req.session.user;
+  const threshold = Date.now() - 30000; // online = visto nos últimos 30s
+  if (me.role === 'teacher') {
+    const students = Students.find({ teacherLogin: me.login, active: true });
+    const contacts = students.map(s => {
+      const u = Users.findOne({ login: s.login });
+      const unread = ChatMessages.find({ fromLogin: s.login, toLogin: me.login, read: false }).length;
+      return { login: s.login, name: s.name, online: u ? u.lastSeen > threshold : false, unread };
+    });
+    return res.json(contacts);
+  } else {
+    const s = Students.findOne({ login: me.login });
+    if (!s) return res.json([]);
+    const t = Teachers.findOne({ login: s.teacherLogin });
+    if (!t) return res.json([]);
+    const u = Users.findOne({ login: t.login });
+    const unread = ChatMessages.find({ fromLogin: t.login, toLogin: me.login, read: false }).length;
+    return res.json([{ login: t.login, name: t.name, online: u ? u.lastSeen > threshold : false, unread }]);
+  }
+});
+
+// Mensagens entre usuário logado e outro login
+app.get('/api/chat/messages/:login', requireLogin, (req, res) => {
+  const me = req.session.user.login;
+  const other = req.params.login;
+  const msgs = ChatMessages.find({
+    $or: [
+      { fromLogin: me, toLogin: other },
+      { fromLogin: other, toLogin: me }
+    ]
+  }).sort((a, b) => a.sentAt - b.sentAt);
+  // marca como lidas as mensagens recebidas por mim
+  msgs.forEach(m => { if (m.toLogin === me && !m.read) { m.read = true; ChatMessages.update(m); } });
+  res.json(msgs.map(m => ({ id: m.$loki, from: m.fromLogin, text: m.text, sentAt: m.sentAt, mine: m.fromLogin === me })));
+});
+
+// Enviar mensagem
+app.post('/api/chat/messages', requireLogin, (req, res) => {
+  const me = req.session.user.login;
+  const { to, text } = req.body;
+  if (!to || !text || !text.trim()) return res.status(400).json({ error: 'Mensagem inválida.' });
+  // verifica se pode conversar com "to"
+  const user = req.session.user;
+  let allowed = false;
+  if (user.role === 'teacher') {
+    allowed = !!Students.findOne({ teacherLogin: me, login: to, active: true });
+  } else {
+    const s = Students.findOne({ login: me });
+    allowed = s && s.teacherLogin === to;
+  }
+  if (!allowed) return res.status(403).json({ error: 'Sem permissão.' });
+  const msg = ChatMessages.insert({ fromLogin: me, toLogin: to, text: text.trim(), sentAt: Date.now(), read: false });
+  res.json({ ok: true, id: msg.$loki, sentAt: msg.sentAt });
+});
+
+// Contar mensagens não lidas (para badge)
+app.get('/api/chat/unread', requireLogin, (req, res) => {
+  const me = req.session.user.login;
+  const count = ChatMessages.find({ toLogin: me, read: false }).length;
+  res.json({ count });
 });
 
 // SPA fallback - serve index.html for all non-API routes
