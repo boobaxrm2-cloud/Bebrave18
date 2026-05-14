@@ -264,6 +264,28 @@ async function reactivateInactiveStudent(matricula, name) {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+let _loginCheckTimer = null;
+function checkLoginField(inputId, statusId) {
+  const input = document.getElementById(inputId);
+  const status = document.getElementById(statusId);
+  const val = input.value.trim();
+  status.textContent = '';
+  if (!val) return;
+  if (!/^[a-zA-Z0-9_]{4,20}$/.test(val)) { status.textContent = '❌'; input.style.borderColor = '#ef4444'; return; }
+  input.style.borderColor = '';
+  status.textContent = '⏳';
+  clearTimeout(_loginCheckTimer);
+  _loginCheckTimer = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/check-login?login=' + encodeURIComponent(val)).then(x => x.json());
+      status.textContent = r.available ? '✅' : '❌';
+      input.style.borderColor = r.available ? '#22c55e' : '#ef4444';
+      if (!r.available) input.title = 'Login já está em uso';
+      else input.title = '';
+    } catch { status.textContent = ''; }
+  }, 500);
+}
+
 function _csvEscape(val) {
   return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
 }
@@ -2695,16 +2717,18 @@ async function submitCompleteNetworkReg() {
 
 // ── Student self-registration ─────────────────────────────────────────────────
 function openStudentRegister() {
-  ['sr-name','sr-cpf','sr-email','sr-whatsapp','sr-password'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['sr-name','sr-login','sr-cpf','sr-email','sr-whatsapp','sr-password'].forEach(id => { const el = document.getElementById(id); if(el) { el.value = ''; el.style.borderColor = ''; } });
   const dob = document.getElementById('sr-dob'); if(dob) dob.value = '';
   document.querySelectorAll('#sr-langs-wrap input[type=checkbox]').forEach(cb => cb.checked = false);
   const lgpd = document.getElementById('sr-lgpd'); if(lgpd) lgpd.checked = false;
+  const ls = document.getElementById('sr-login-status'); if(ls) ls.textContent = '';
   const err = document.getElementById('sr-err'); if(err) { err.style.display='none'; err.textContent=''; }
   openModal('modal-student-register');
 }
 
 async function submitStudentRegister() {
   const name     = document.getElementById('sr-name').value.trim();
+  const login    = document.getElementById('sr-login').value.trim();
   const cpf      = document.getElementById('sr-cpf').value.trim();
   const dob      = document.getElementById('sr-dob').value.trim();
   const email    = document.getElementById('sr-email').value.trim();
@@ -2717,6 +2741,8 @@ async function submitStudentRegister() {
   err.style.display = 'none';
 
   if (!name)          return showErr('⚠️ Nome é obrigatório');
+  if (!login)         return showErr('⚠️ Crie um login');
+  if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) return showErr('⚠️ Login deve ter entre 4 e 20 caracteres (letras, números e _)');
   if (!cpf)           return showErr('⚠️ CPF é obrigatório');
   if (!dob)           return showErr('⚠️ Data de nascimento é obrigatória');
   if (!languages.length) return showErr('⚠️ Selecione ao menos um idioma');
@@ -2726,7 +2752,7 @@ async function submitStudentRegister() {
   if (!document.getElementById('sr-lgpd')?.checked) return showErr('⚠️ Você precisa aceitar os Termos de Uso e a LGPD para continuar');
 
   try {
-    const r = await api('POST', '/api/register/student', { name, cpf, dob, languages, email, whatsapp, password });
+    const r = await api('POST', '/api/register/student', { name, login, cpf, dob, languages, email, whatsapp, password });
     document.getElementById('student-reg-success-login').textContent = r.login;
     openModal('modal-register-success');
   } catch(e) { showErr('❌ ' + e.message); }
@@ -3742,25 +3768,30 @@ function fmtCpf(input) {
 
 async function submitTeacherRegistration() {
   const name     = document.getElementById('reg-name').value.trim();
+  const login    = document.getElementById('reg-login').value.trim();
   const email    = document.getElementById('reg-email').value.trim();
   const whatsapp = document.getElementById('reg-whatsapp').value.trim();
   const password = document.getElementById('reg-password').value;
 
   if (!name)               { showToast('⚠️ Informe o nome completo'); return; }
+  if (!login)              { showToast('⚠️ Crie um login'); return; }
+  if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) { showToast('⚠️ Login deve ter entre 4 e 20 caracteres (letras, números e _)'); return; }
   if (!email || !email.includes('@')) { showToast('⚠️ Informe um e-mail válido'); return; }
   if (!whatsapp)           { showToast('⚠️ Informe o WhatsApp'); return; }
   if (password.length < 4) { showToast('⚠️ A senha deve ter ao menos 4 caracteres'); return; }
   if (!document.getElementById('reg-lgpd')?.checked) { showToast('⚠️ Você precisa aceitar os Termos de Uso e a LGPD para continuar'); return; }
 
   try {
-    const r = await api('POST', '/api/auth/register-teacher', { name, email, whatsapp, password });
+    const r = await api('POST', '/api/auth/register-teacher', { name, login, email, whatsapp, password });
     document.getElementById('reg-success-login').textContent    = r.login;
     document.getElementById('reg-success-password').textContent = password;
     openModal('modal-registration-success');
     document.getElementById('reg-name').value = '';
+    document.getElementById('reg-login').value = '';
     document.getElementById('reg-email').value = '';
     document.getElementById('reg-whatsapp').value = '';
     document.getElementById('reg-password').value = '';
+    const ls = document.getElementById('reg-login-status'); if(ls) ls.textContent = '';
   } catch(e) { showToast('❌ ' + e.message); }
 }
 

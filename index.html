@@ -151,6 +151,15 @@
         <p class="lv2-sub">Preencha seus dados para criar sua conta</p>
         <div id="reg-err" class="alert-err hidden"></div>
         <div class="lv2-field"><label class="lv2-label">Nome completo *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><input id="reg-name" type="text" class="lv2-input" placeholder="Seu nome completo"></div></div>
+        <div class="lv2-field">
+          <label class="lv2-label">Crie seu login *</label>
+          <div class="lv2-input-wrap" style="position:relative">
+            <svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="reg-login" type="text" class="lv2-input" placeholder="Ex: maria_silva (4–20 caracteres)" oninput="checkLoginField('reg-login','reg-login-status')" style="padding-right:36px">
+            <span id="reg-login-status" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:16px"></span>
+          </div>
+          <p style="font-size:11px;color:#94a3b8;margin:4px 0 0 0">Letras, números e _ (sem espaços). Este será seu login permanente.</p>
+        </div>
         <div class="lv2-field"><label class="lv2-label">E-mail *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg><input id="reg-email" type="email" class="lv2-input" placeholder="seu@email.com"></div></div>
         <div class="lv2-field"><label class="lv2-label">WhatsApp *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
         <div class="lv2-field"><label class="lv2-label">Senha de acesso *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input id="reg-password" type="password" class="lv2-input" placeholder="Mínimo 4 caracteres"><button type="button" class="lv2-eye" onclick="togglePw('reg-password',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
@@ -1356,6 +1365,14 @@
     <div style="overflow-y:auto;flex:1;padding-bottom:4px;display:flex;flex-direction:column;gap:12px">
       <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">Nome completo *</label>
         <input type="text" id="sr-name" placeholder="Seu nome completo" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>
+      <div>
+        <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">Crie seu login *</label>
+        <div style="position:relative">
+          <input type="text" id="sr-login" placeholder="Ex: joao_silva (4–20 caracteres)" oninput="checkLoginField('sr-login','sr-login-status')" style="width:100%;padding:10px 36px 10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box">
+          <span id="sr-login-status" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:16px"></span>
+        </div>
+        <p style="font-size:11px;color:var(--g400);margin:4px 0 0 0">Letras, números e _ (sem espaços). Este será seu login permanente.</p>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div><label style="font-size:12px;color:var(--g500);display:block;margin-bottom:5px">CPF *</label>
           <input type="text" id="sr-cpf" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)" style="width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;box-sizing:border-box"></div>

@@ -167,15 +167,28 @@ const isAdminOrTeach = (req, res, next) => {
 //  AUTH
 // ════════════════════════════════════════════════════════════
 // ── Teacher self-registration (public) ────────────────────────
+app.get('/api/check-login', (req, res) => {
+  const login = (req.query.login || '').trim();
+  if (!login) return res.json({ available: false });
+  const exists = !!(Users.findOne({ login }) || Users.findOne({ login: login.toUpperCase() }));
+  res.json({ available: !exists });
+});
+
+app.get('/api/check-cpf', (req, res) => {
+  const digits = (req.query.cpf || '').replace(/\D/g, '');
+  if (digits.length !== 11) return res.json({ available: false });
+  const usedByTeacher = Teachers.findOne({ cpf: { $regex: digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') } }) || Teachers.find().some(t => t.cpf && t.cpf.replace(/\D/g,'') === digits);
+  const usedByStudent = Students.find().some(s => s.cpf && s.cpf.replace(/\D/g,'') === digits);
+  res.json({ available: !usedByTeacher && !usedByStudent });
+});
+
 app.post('/api/auth/register-teacher', (req, res) => {
-  const { name, languages, email, whatsapp, password } = req.body;
-  if (!name || !email || !whatsapp || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
+  const { name, login: rawLogin, languages, email, whatsapp, password } = req.body;
+  if (!name || !rawLogin || !email || !whatsapp || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
   if (password.length < 4) return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres' });
-  // Generate temporary numeric login (10001, 10002, ...)
-  let login = String(10000 + Teachers.count() + 1);
-  let tries = 0;
-  while (Users.findOne({ login }) && tries < 200) { tries++; login = String(10000 + Teachers.count() + 1 + tries); }
-  if (Users.findOne({ login })) return res.status(500).json({ error: 'Não foi possível gerar login. Tente novamente.' });
+  const login = rawLogin.trim();
+  if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) return res.status(400).json({ error: 'Login deve ter entre 4 e 20 caracteres (letras, números e _)' });
+  if (Users.findOne({ login }) || Users.findOne({ login: login.toUpperCase() })) return res.status(409).json({ error: 'Este login já está em uso. Escolha outro.' });
   const ini = initials(name);
   const { color, bg } = pickColor(Teachers.count());
   Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
@@ -233,33 +246,20 @@ app.post('/api/teacher/accept-terms', auth, isTeach, (req, res) => {
   if (!cpf) return res.status(400).json({ error: 'CPF obrigatório' });
   const cpfDigits = cpf.replace(/\D/g, '');
   if (cpfDigits.length < 11) return res.status(400).json({ error: 'CPF inválido — informe os 11 dígitos' });
-  const oldLogin = req.session.user.login;
-  const t = Teachers.findOne({ login: oldLogin });
+  const currentLogin = req.session.user.login;
+  const t = Teachers.findOne({ login: currentLogin });
   if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
-  // Generate CPF-based login
-  let newLogin = cpfDigits.slice(0, 5);
-  const conflict1 = Users.findOne({ login: newLogin });
-  if (conflict1 && conflict1.login !== oldLogin) {
-    newLogin = cpfDigits.slice(0, 6);
-    const conflict2 = Users.findOne({ login: newLogin });
-    if (conflict2 && conflict2.login !== oldLogin) return res.status(409).json({ error: 'Esse CPF já está cadastrado. Entre em contato com o administrador.' });
-  }
-  // Update Users record
-  const u = Users.findOne({ login: oldLogin });
-  u.login = newLogin;
-  Users.update(u);
-  // Update students referencing this teacher
-  Students.find({ teacherLogin: oldLogin }).forEach(s => { s.teacherLogin = newLogin; Students.update(s); });
-  // Update teacher record
-  t.login = newLogin;
+  // Validate CPF uniqueness
+  const cpfUsed = Teachers.find().some(x => x.login !== currentLogin && x.cpf && x.cpf.replace(/\D/g,'') === cpfDigits)
+    || Students.find().some(s => s.cpf && s.cpf.replace(/\D/g,'') === cpfDigits);
+  if (cpfUsed) return res.status(409).json({ error: 'Este CPF já está cadastrado na plataforma.' });
+  // Update teacher record (no login change)
   t.cpf = cpf.trim();
   t.termsAccepted = true;
   t.termsAcceptedAt = Date.now();
   t.termsSignature = signature;
   Teachers.update(t);
-  // Update session
-  req.session.user.login = newLogin;
-  res.json({ ok: true, newLogin });
+  res.json({ ok: true, newLogin: currentLogin });
 });
 
 app.get('/api/teacher/my-terms', auth, isTeach, (req, res) => {
@@ -1668,20 +1668,23 @@ app.get('/api/teacher/network-profile', auth, isTeach, (req, res) => {
 
 // ── Student self-registration ──────────────────────────────────────────────
 app.post('/api/register/student', (req, res) => {
-  const { name, cpf, dob, languages, email, whatsapp, password } = req.body;
+  const { name, login: rawLogin, cpf, dob, languages, email, whatsapp, password } = req.body;
   if (!name?.trim())      return res.status(400).json({ error: 'Nome é obrigatório' });
+  if (!rawLogin?.trim())  return res.status(400).json({ error: 'Login é obrigatório' });
   if (!cpf?.trim())       return res.status(400).json({ error: 'CPF é obrigatório' });
   if (!dob?.trim())       return res.status(400).json({ error: 'Data de nascimento é obrigatória' });
   if (!languages?.length) return res.status(400).json({ error: 'Selecione ao menos um idioma' });
   if (!email?.trim())     return res.status(400).json({ error: 'E-mail é obrigatório' });
   if (!whatsapp?.trim())  return res.status(400).json({ error: 'WhatsApp é obrigatório' });
   if (!password || password.length < 4) return res.status(400).json({ error: 'Senha mínimo 4 caracteres' });
+  const login = rawLogin.trim();
+  if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) return res.status(400).json({ error: 'Login deve ter entre 4 e 20 caracteres (letras, números e _)' });
+  if (Users.findOne({ login }) || Users.findOne({ login: login.toUpperCase() })) return res.status(409).json({ error: 'Este login já está em uso. Escolha outro.' });
   const cpfDigits = cpf.replace(/\D/g, '');
   if (cpfDigits.length !== 11) return res.status(400).json({ error: 'CPF deve ter 11 dígitos' });
-  let login = cpfDigits.slice(0, 4);
-  let attempt = 4;
-  while (Users.findOne({ login }) && attempt < cpfDigits.length) login = cpfDigits.slice(0, ++attempt);
-  if (Users.findOne({ login })) login = genMatricula();
+  const cpfUsed = Teachers.find().some(t => t.cpf && t.cpf.replace(/\D/g,'') === cpfDigits)
+    || Students.find().some(s => s.cpf && s.cpf.replace(/\D/g,'') === cpfDigits);
+  if (cpfUsed) return res.status(409).json({ error: 'Este CPF já está cadastrado na plataforma.' });
   const ini = initials(name);
   const { color, bg } = pickColor(Students.count());
   Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'student', name: name.trim(), createdAt: now() });
