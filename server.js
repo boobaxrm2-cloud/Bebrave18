@@ -1716,13 +1716,13 @@ app.get('/api/chat/contacts', auth, (req, res) => {
   if (me.role === 'teacher') {
     const students = Students.find({ teacherLogin: me.login, active: true });
     const contacts = students.map(s => {
-      const u = Users.findOne({ login: s.login });
-      const unread = ChatMessages.find({ fromLogin: s.login, toLogin: me.login, read: false }).length;
-      return { login: s.login, name: s.name, online: u ? u.lastSeen > threshold : false, unread };
+      const u = Users.findOne({ login: s.matricula });
+      const unread = ChatMessages.find({ fromLogin: s.matricula, toLogin: me.login, read: false }).length;
+      return { login: s.matricula, name: s.name, online: u ? u.lastSeen > threshold : false, unread };
     });
     return res.json(contacts);
   } else {
-    const s = Students.findOne({ login: me.login });
+    const s = Students.findOne({ matricula: me.login });
     if (!s) return res.json([]);
     const t = Teachers.findOne({ login: s.teacherLogin });
     if (!t) return res.json([]);
@@ -1756,9 +1756,9 @@ app.post('/api/chat/messages', auth, (req, res) => {
   const user = req.session.user;
   let allowed = false;
   if (user.role === 'teacher') {
-    allowed = !!Students.findOne({ teacherLogin: me, login: to, active: true });
+    allowed = !!Students.findOne({ teacherLogin: me, matricula: to, active: true });
   } else {
-    const s = Students.findOne({ login: me });
+    const s = Students.findOne({ matricula: me });
     allowed = s && s.teacherLogin === to;
   }
   if (!allowed) return res.status(403).json({ error: 'Sem permissão.' });
