@@ -1703,14 +1703,14 @@ app.post('/api/register/student', (req, res) => {
 // ── CHAT & HEARTBEAT ─────────────────────────────────────────────
 
 // Heartbeat: atualiza lastSeen do usuário logado
-app.post('/api/heartbeat', requireLogin, (req, res) => {
+app.post('/api/heartbeat', auth, (req, res) => {
   const u = Users.findOne({ login: req.session.user.login });
   if (u) { u.lastSeen = Date.now(); Users.update(u); }
   res.json({ ok: true });
 });
 
 // Contatos disponíveis para chat (professor → alunos; aluno → professor)
-app.get('/api/chat/contacts', requireLogin, (req, res) => {
+app.get('/api/chat/contacts', auth, (req, res) => {
   const me = req.session.user;
   const threshold = Date.now() - 30000; // online = visto nos últimos 30s
   if (me.role === 'teacher') {
@@ -1733,7 +1733,7 @@ app.get('/api/chat/contacts', requireLogin, (req, res) => {
 });
 
 // Mensagens entre usuário logado e outro login
-app.get('/api/chat/messages/:login', requireLogin, (req, res) => {
+app.get('/api/chat/messages/:login', auth, (req, res) => {
   const me = req.session.user.login;
   const other = req.params.login;
   const msgs = ChatMessages.find({
@@ -1748,7 +1748,7 @@ app.get('/api/chat/messages/:login', requireLogin, (req, res) => {
 });
 
 // Enviar mensagem
-app.post('/api/chat/messages', requireLogin, (req, res) => {
+app.post('/api/chat/messages', auth, (req, res) => {
   const me = req.session.user.login;
   const { to, text } = req.body;
   if (!to || !text || !text.trim()) return res.status(400).json({ error: 'Mensagem inválida.' });
@@ -1767,7 +1767,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
 });
 
 // Contar mensagens não lidas (para badge)
-app.get('/api/chat/unread', requireLogin, (req, res) => {
+app.get('/api/chat/unread', auth, (req, res) => {
   const me = req.session.user.login;
   const count = ChatMessages.find({ toLogin: me, read: false }).length;
   res.json({ count });
