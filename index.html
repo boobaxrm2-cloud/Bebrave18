@@ -1488,6 +1488,17 @@
 <!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
+<!-- Aviso de aula próxima -->
+<div id="lesson-alert" class="lesson-alert hidden">
+  <div class="lesson-alert-icon">🔔</div>
+  <div class="lesson-alert-body">
+    <div class="lesson-alert-title">Sua aula começa em breve!</div>
+    <div id="lesson-alert-desc" class="lesson-alert-desc"></div>
+  </div>
+  <a id="lesson-alert-link" href="#" target="_blank" class="lesson-alert-btn hidden">Entrar na aula</a>
+  <button class="lesson-alert-close" onclick="document.getElementById('lesson-alert').classList.add('hidden')">✕</button>
+</div>
+
 
 <!-- ═══════ Chat Flutuante ═══════ -->
 <div id="chat-widget" class="hidden">

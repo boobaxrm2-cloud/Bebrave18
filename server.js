@@ -1700,6 +1700,30 @@ app.post('/api/register/student', (req, res) => {
   res.json({ ok: true, login, name: name.trim() });
 });
 
+// ── AVISO DE AULA PRÓXIMA ────────────────────────────────────────
+app.get('/api/upcoming-lesson', auth, (req, res) => {
+  const me = req.session.user;
+  const now = new Date();
+  let lessons = [];
+  if (me.role === 'teacher') {
+    lessons = Lessons.find({ teacherLogin: me.login, status: 'scheduled' });
+  } else {
+    const s = Students.findOne({ matricula: me.login });
+    if (s) lessons = Lessons.find({ studentMatricula: me.login, status: 'scheduled' });
+  }
+  // Encontra aula que começa entre -2min e +6min (janela de 8min centrada em 5min antes)
+  const upcoming = lessons.find(l => {
+    if (!l.date || !l.time) return false;
+    const start = new Date(`${l.date}T${l.time}:00`);
+    const diffMs = start - now;
+    return diffMs >= -120000 && diffMs <= 360000; // de -2min a +6min
+  });
+  if (!upcoming) return res.json({ lesson: null });
+  const start = new Date(`${upcoming.date}T${upcoming.time}:00`);
+  const diffMin = Math.round((start - now) / 60000);
+  res.json({ lesson: { id: upcoming.$loki, topic: upcoming.topic || upcoming.subject, date: upcoming.date, time: upcoming.time, meetLink: upcoming.meetLink || '', jitsiRoom: upcoming.jitsiRoom || '', studentName: upcoming.studentName || '', diffMin } });
+});
+
 // ── CHAT & HEARTBEAT ─────────────────────────────────────────────
 
 // Heartbeat: atualiza lastSeen do usuário logado

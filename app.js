@@ -25,8 +25,48 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 function bootRole(role) {
   if (role === 'admin')   { showPage('page-admin');   loadAdmin(); }
-  if (role === 'teacher') { showPage('page-teacher'); loadTeacher(); chatInit(); }
-  if (role === 'student') { showPage('page-student'); loadStudent(); chatInit(); }
+  if (role === 'teacher') { showPage('page-teacher'); loadTeacher(); chatInit(); lessonAlertInit(); }
+  if (role === 'student') { showPage('page-student'); loadStudent(); chatInit(); lessonAlertInit(); }
+}
+
+// ── AVISO DE AULA PRÓXIMA ────────────────────────────────────
+let _lessonAlertShown = new Set();
+
+function lessonAlertInit() {
+  checkUpcomingLesson();
+  setInterval(checkUpcomingLesson, 30000);
+}
+
+async function checkUpcomingLesson() {
+  try {
+    const { lesson } = await api('GET', '/api/upcoming-lesson');
+    if (!lesson) return;
+    if (_lessonAlertShown.has(lesson.id)) return;
+    _lessonAlertShown.add(lesson.id);
+    showLessonAlert(lesson);
+  } catch {}
+}
+
+function showLessonAlert(lesson) {
+  const banner = document.getElementById('lesson-alert');
+  const desc   = document.getElementById('lesson-alert-desc');
+  const link   = document.getElementById('lesson-alert-link');
+
+  const when = lesson.diffMin <= 0 ? 'está começando agora' : `começa em ${lesson.diffMin} minuto${lesson.diffMin !== 1 ? 's' : ''}`;
+  const who  = lesson.studentName ? ` com ${lesson.studentName}` : '';
+  desc.textContent = `"${lesson.topic}"${who} — ${when} (${lesson.time})`;
+
+  const meetUrl = lesson.meetLink || (lesson.jitsiRoom ? `https://meet.jit.si/${lesson.jitsiRoom}` : '');
+  if (meetUrl) {
+    link.href = meetUrl;
+    link.classList.remove('hidden');
+  } else {
+    link.classList.add('hidden');
+  }
+
+  banner.classList.remove('hidden');
+  // fecha automaticamente após 2 minutos se o usuário não fechar
+  setTimeout(() => banner.classList.add('hidden'), 120000);
 }
 
 // ── Auth ─────────────────────────────────────────────────────
