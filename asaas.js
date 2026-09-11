@@ -47,4 +47,10 @@ async function getSubscriptionInvoiceUrl(subscriptionId) {
   return first ? first.invoiceUrl : null;
 }
 
-module.exports = { findOrCreateCustomer, createSubscription, getSubscriptionInvoiceUrl };
+async function cancelSubscription(subscriptionId) {
+  // DELETE cancela a assinatura no Asaas: nenhuma cobrança futura e gerada.
+  // Uma fatura do ciclo atual que ja tenha sido criada nao e afetada.
+  return asaasRequest('DELETE', `/subscriptions/${subscriptionId}`);
+}
+
+module.exports = { findOrCreateCustomer, createSubscription, getSubscriptionInvoiceUrl, cancelSubscription };

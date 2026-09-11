@@ -328,11 +328,14 @@ app.post('/api/teacher/accept-terms', auth, isTeach, (req, res) => {
 app.get('/api/teacher/plan', auth, isTeach, (req, res) => {
   const login = req.session.user.login;
   const planKey = planKeyOf(login);
+  const t = Teachers.findOne({ login });
   res.json({
     plan: planKey,
     studentCount: activeStudentCount(login),
     plans: Plans.find().sort((a, b) => (a.maxStudents ?? Infinity) - (b.maxStudents ?? Infinity))
       .map(p => ({ key: p.key, label: p.label, maxStudents: p.maxStudents, restrictedTools: p.restrictedTools, price: p.price ?? null })),
+    subscriptionStatus: t?.subscriptionStatus || null,
+    canCancelSubscription: !!(t?.asaasSubscriptionId && (t.subscriptionStatus === 'active' || t.subscriptionStatus === 'overdue')),
   });
 });
 
@@ -378,6 +381,23 @@ app.post('/api/teacher/plan/request-upgrade', auth, isTeach, async (req, res) =>
     console.error('Erro Asaas:', e.message);
     res.status(500).json({ error: 'Não foi possível iniciar o pagamento agora. Tente novamente em instantes.' });
   }
+});
+
+app.post('/api/teacher/plan/cancel-subscription', auth, isTeach, async (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (!t || !t.asaasSubscriptionId) return res.status(400).json({ error: 'Você não tem uma assinatura ativa.' });
+  try {
+    await asaas.cancelSubscription(t.asaasSubscriptionId);
+  } catch (e) {
+    console.error('Erro ao cancelar assinatura no Asaas:', e.message);
+    return res.status(500).json({ error: 'Não foi possível cancelar agora. Tente novamente em instantes.' });
+  }
+  t.plan = getDefaultPlanKey();
+  t.subscriptionStatus = 'canceled';
+  t.pendingPlanKey = null;
+  Teachers.update(t);
+  notify(t.login, 'plan_changed', 'Assinatura cancelada', `Sua assinatura foi cancelada. Você voltou para o plano ${getPlan(t.plan).label}.`);
+  res.json({ ok: true, plan: t.plan });
 });
 
 // ── Asaas webhook (público — chamado pelo Asaas, não pelo navegador) ─────

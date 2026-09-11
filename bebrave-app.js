@@ -1185,8 +1185,18 @@ async function loadTeacherPlan() {
       </div>`;
     }).join('');
     el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">${cards}</div>
-      <p style="font-size:12.5px;color:var(--g400);margin-top:16px">💳 No cartão de crédito a cobrança é automática todo mês. No Pix, você recebe um lembrete mensal com o link de pagamento (não é debitado sozinho).</p>`;
+      <p style="font-size:12.5px;color:var(--g400);margin-top:16px">💳 No cartão de crédito a cobrança é automática todo mês. No Pix, você recebe um lembrete mensal com o link de pagamento (não é debitado sozinho).</p>
+      ${data.canCancelSubscription ? `<button class="btn-secondary" style="margin-top:16px;color:#dc2626;border-color:#dc2626" onclick="cancelSubscription()">Cancelar assinatura</button>` : ''}`;
   } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function cancelSubscription() {
+  if (!confirm('Tem certeza que deseja cancelar sua assinatura? Você voltará ao plano Free imediatamente e nenhuma cobrança futura será feita.')) return;
+  try {
+    await api('POST', '/api/teacher/plan/cancel-subscription');
+    showToast('✅ Assinatura cancelada. Você voltou ao plano Free.');
+    loadTeacherPlan();
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 async function requestPlanUpgrade(planKey) {
