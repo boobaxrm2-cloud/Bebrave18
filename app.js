@@ -2527,7 +2527,7 @@ async function viewTeacherProfile(login) {
 
     // Left column: profile + contact + message
     const leftCol = `
-      <div style="padding:20px;overflow-y:auto;border-right:1px solid var(--g100);display:flex;flex-direction:column;gap:14px">
+      <div style="padding:20px;overflow-y:auto;min-height:0;border-right:1px solid var(--g100);display:flex;flex-direction:column;gap:14px">
         <div style="text-align:center">
           ${photoHTML}
           <h3 style="font-size:18px;color:var(--navy);margin:0 0 6px">${escHtml(t.name)}</h3>
@@ -2558,7 +2558,7 @@ async function viewTeacherProfile(login) {
     // Right column: ratings
     const avgStars = Math.round(ratingData.avg);
     const rightCol = `
-      <div style="padding:20px;overflow-y:auto;background:var(--g50)">
+      <div style="padding:20px;overflow-y:auto;min-height:0;background:var(--g50)">
         <p style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin:0 0 14px">Avaliações dos alunos</p>
         ${ratingData.count > 0 ? `
           <div style="display:flex;align-items:center;gap:14px;background:white;border-radius:var(--r-md);padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">

@@ -560,6 +560,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
   font-size: 13px; color: #94a3b8;
 }
 
+/* Secondary CTAs (register as teacher / student) */
+.lv2-alt-wrap { margin-top: 14px; text-align: center; padding-top: 18px; border-top: 1px solid rgba(15,27,53,.08); }
+.lv2-alt-label { font-size: 13px; color: #475569; margin: 0 0 10px; }
+.lv2-alt-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px;
+  background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+  padding: 12px 20px; font-family: 'DM Sans', sans-serif; font-size: 14.5px; font-weight: 700;
+  cursor: pointer; letter-spacing: .01em; color: #334155;
+  transition: border-color .18s, background .18s, color .18s, transform .1s;
+}
+.lv2-alt-btn svg { flex-shrink: 0; transition: color .18s; }
+.lv2-alt-btn:active { transform: scale(.98); }
+.lv2-alt-btn.teach { color: #C8281E; border-color: #f3c9c5; background: #fef6f5; }
+.lv2-alt-btn.teach:hover { background: #E8381E; border-color: #E8381E; color: #fff; }
+.lv2-alt-btn.stud { color: #1A3FA0; border-color: #c7d5f5; background: #f5f8ff; }
+.lv2-alt-btn.stud:hover { background: #1A3FA0; border-color: #1A3FA0; color: #fff; }
+
 @media (max-width: 560px) {
   .lv2-card { padding: 36px 24px 32px; border-radius: 18px; }
   .lv2-logo-svg { max-width: 300px; }
