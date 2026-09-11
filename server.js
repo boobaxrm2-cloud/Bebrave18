@@ -532,6 +532,18 @@ app.put('/api/admin/teachers/:login/plan', auth, isAdmin, (req, res) => {
   res.json({ ok: true, plan });
 });
 
+// Limpa vínculo de assinatura Asaas travada/obsoleta (ex: teste de sandbox), sem mexer no plano atual
+app.put('/api/admin/teachers/:login/reset-subscription', auth, isAdmin, (req, res) => {
+  const t = Teachers.findOne({ login: req.params.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  delete t.asaasCustomerId;
+  delete t.asaasSubscriptionId;
+  delete t.pendingPlanKey;
+  delete t.subscriptionStatus;
+  Teachers.update(t);
+  res.json({ ok: true });
+});
+
 app.post('/api/admin/teachers', auth, isAdmin, (req, res) => {
   const { name, email } = req.body;
   if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
