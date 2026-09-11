@@ -1,4 +1,5 @@
 'use strict';
+require('dotenv').config();
 const express  = require('express');
 const session  = require('express-session');
 const bcrypt   = require('bcryptjs');
@@ -8,6 +9,7 @@ const fs       = require('fs');
 const Loki     = require('lokijs');
 const { generateCertificate } = require('./certGenerator');
 const { generateContract, generateTeacherContract } = require('./contractGenerator');
+const asaas = require('./asaas');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -69,8 +71,8 @@ function dbReady() {
 const now   = () => new Date().toISOString();
 const today = () => new Date().toISOString().split('T')[0];
 
-function notify(toLogin, type, title, body) {
-  try { Notifications.insert({ toLogin, type, title, body, read: false, createdAt: now() }); } catch(e) {}
+function notify(toLogin, type, title, body, link) {
+  try { Notifications.insert({ toLogin, type, title, body, link: link || null, read: false, createdAt: now() }); } catch(e) {}
 }
 
 // Brazil is UTC-3. Railway runs UTC, so we shift timestamps before extracting calendar day.
@@ -334,12 +336,77 @@ app.get('/api/teacher/plan', auth, isTeach, (req, res) => {
   });
 });
 
-app.post('/api/teacher/plan/request-upgrade', auth, isTeach, (req, res) => {
+app.post('/api/teacher/plan/request-upgrade', auth, isTeach, async (req, res) => {
   const { plan } = req.body;
   const target = Plans.findOne({ key: plan });
   if (!target || plan === planKeyOf(req.session.user.login)) return res.status(400).json({ error: 'Plano inválido' });
   const u = req.session.user;
-  AdminMessages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, content: `Solicitou upgrade para o plano ${target.label}.`, createdAt: now(), read: false, adminReply: null, adminRepliedAt: null });
+
+  // Plano sem preço configurado: mantém o fluxo antigo (avisa o admin, sem cobrança)
+  if (target.price == null || target.price <= 0) {
+    AdminMessages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, content: `Solicitou upgrade para o plano ${target.label}.`, createdAt: now(), read: false, adminReply: null, adminRepliedAt: null });
+    return res.json({ ok: true });
+  }
+
+  // Plano com preço: cria cobrança recorrente no Asaas e retorna o link de checkout
+  const t = Teachers.findOne({ login: u.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  if (!t.cpf) return res.status(400).json({ error: 'Complete seu CPF (em Meu Perfil) antes de assinar um plano.' });
+  try {
+    const customer = await asaas.findOrCreateCustomer({
+      externalReference: t.login,
+      name: t.name,
+      cpfCnpj: t.cpf,
+      email: t.email || undefined,
+      mobilePhone: (t.whatsapp || '').replace(/\D/g, '') || undefined,
+    });
+    const subscription = await asaas.createSubscription({
+      customerId: customer.id,
+      value: target.price,
+      nextDueDate: todayBR(),
+      description: `Assinatura BeBrave — Plano ${target.label}`,
+      externalReference: t.login,
+    });
+    const checkoutUrl = await asaas.getSubscriptionInvoiceUrl(subscription.id);
+    t.asaasCustomerId = customer.id;
+    t.asaasSubscriptionId = subscription.id;
+    t.pendingPlanKey = target.key;
+    t.subscriptionStatus = 'pending';
+    Teachers.update(t);
+    res.json({ ok: true, checkoutUrl });
+  } catch (e) {
+    console.error('Erro Asaas:', e.message);
+    res.status(500).json({ error: 'Não foi possível iniciar o pagamento agora. Tente novamente em instantes.' });
+  }
+});
+
+// ── Asaas webhook (público — chamado pelo Asaas, não pelo navegador) ─────
+app.post('/api/webhooks/asaas', (req, res) => {
+  if (req.headers['asaas-access-token'] !== process.env.ASAAS_WEBHOOK_TOKEN) {
+    return res.status(401).json({ error: 'Token inválido' });
+  }
+  const { event, payment } = req.body || {};
+  if (!payment) return res.json({ ok: true });
+
+  const login = payment.externalReference;
+  const t = (login && Teachers.findOne({ login }))
+    || Teachers.findOne({ asaasSubscriptionId: payment.subscription })
+    || Teachers.findOne({ asaasCustomerId: payment.customer });
+  if (!t) { console.warn('Webhook Asaas: professor não encontrado para', login || payment.subscription || payment.customer); return res.json({ ok: true }); }
+
+  if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
+    if (t.pendingPlanKey) { t.plan = t.pendingPlanKey; t.pendingPlanKey = null; }
+    t.subscriptionStatus = 'active';
+    Teachers.update(t);
+    notify(t.login, 'plan_activated', 'Pagamento confirmado! 🎉', `Seu plano ${getPlan(t.plan).label} está ativo.`);
+  } else if (event === 'PAYMENT_OVERDUE') {
+    t.subscriptionStatus = 'overdue';
+    Teachers.update(t);
+    notify(t.login, 'payment_overdue', 'Fatura em atraso', 'A fatura da sua assinatura BeBrave está atrasada. Regularize para manter seu plano.');
+  } else if (event === 'PAYMENT_CREATED' && payment.subscription && payment.billingType === 'PIX' && t.subscriptionStatus === 'active') {
+    // Pix não é débito automático: avisa o professor para pagar a fatura do mês.
+    notify(t.login, 'payment_due', 'Sua mensalidade do mês está disponível', `Pague via Pix para manter seu plano ${getPlan(t.plan).label} ativo.`, payment.invoiceUrl);
+  }
   res.json({ ok: true });
 });
 

@@ -1181,17 +1181,23 @@ async function loadTeacherPlan() {
         <p style="font-size:13px;color:${restricted.length ? '#dc2626' : 'var(--g500)'};margin:4px 0 12px">${toolsTxt}</p>
         ${isCurrent
           ? `<p style="font-size:12px;color:var(--g400)">${data.studentCount}${p.maxStudents==null?' alunos':' /'+p.maxStudents+' alunos'}</p>`
-          : `<button class="btn-primary" style="width:100%" onclick="requestPlanUpgrade('${key}')">Solicitar upgrade</button>`}
+          : `<button class="btn-primary" style="width:100%" onclick="requestPlanUpgrade('${key}')">${priceTxt ? 'Assinar agora' : 'Solicitar upgrade'}</button>`}
       </div>`;
     }).join('');
-    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">${cards}</div>`;
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">${cards}</div>
+      <p style="font-size:12.5px;color:var(--g400);margin-top:16px">💳 No cartão de crédito a cobrança é automática todo mês. No Pix, você recebe um lembrete mensal com o link de pagamento (não é debitado sozinho).</p>`;
   } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
 }
 
 async function requestPlanUpgrade(planKey) {
   try {
-    await api('POST', '/api/teacher/plan/request-upgrade', { plan: planKey });
-    showToast('✅ Solicitação enviada! O administrador entrará em contato para liberar o upgrade.');
+    const r = await api('POST', '/api/teacher/plan/request-upgrade', { plan: planKey });
+    if (r.checkoutUrl) {
+      showToast('✅ Redirecionando para o pagamento...');
+      window.location.href = r.checkoutUrl;
+    } else {
+      showToast('✅ Solicitação enviada! O administrador entrará em contato para liberar o upgrade.');
+    }
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
@@ -4182,6 +4188,9 @@ const NOTIF_ICONS = {
   network_rejected: '❌',
   contract_pending: '✍️',
   contract_signed:  '✅',
+  plan_activated:   '🎉',
+  payment_overdue:  '⚠️',
+  payment_due:      '💰',
 };
 
 async function loadNotifications() {
@@ -4218,6 +4227,7 @@ async function loadNotificationsPage() {
       <div style="flex:1;min-width:0">
         <div style="font-weight:${n.read ? '500' : '700'};font-size:14px;line-height:1.4;margin-bottom:3px">${escHtml(n.title)}</div>
         <div style="font-size:13px;color:var(--g500);line-height:1.5">${escHtml(n.body)}</div>
+        ${n.link ? `<a href="${encodeURI(n.link)}" target="_blank" rel="noopener" class="btn-sm" style="display:inline-block;margin-top:8px;text-decoration:none">Pagar agora →</a>` : ''}
         <div style="font-size:12px;color:var(--g300);margin-top:6px">${fmtTimeAgo(n.createdAt)}</div>
       </div>
       ${!n.read ? '<div style="width:9px;height:9px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px"></div>' : ''}
