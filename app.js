@@ -15,13 +15,164 @@ const DAYS_PT      = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 // ── Init ──────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   try {
-    const r = await api('GET', '/api/auth/me');
-    ME = r;
+    const r = await fetch('/api/auth/me');
+    if (!r.ok) throw new Error('not authenticated');
+    ME = await r.json();
     bootRole(ME.role);
   } catch {
-    showPage('page-login');
+    showPage('page-landing');
+    setLandingAudience('teacher');
   }
 });
+
+const LP_TOOL_LABELS = { network: 'Network', forum: 'Fórum', files: 'Materiais', certificates: 'Certificados' };
+
+const LANDING_CONTENT = {
+  teacher: {
+    badge: 'Para professores',
+    title: 'A plataforma completa para professores de idiomas particular',
+    sub: 'Agenda, alunos, financeiro, contratos, certificados e chat — tudo em um só lugar, para você focar em dar aula.',
+    ctaHtml: `<button class="lp-btn-primary" onclick="showPage('page-login')">Entrar na plataforma</button>
+      <button class="lp-btn-outline" onclick="showPage('page-register')">Cadastre-se como professor</button>`,
+    featuresTitle: 'Tudo que você precisa para organizar suas aulas',
+    featuresCols: 4,
+    features: [
+      { ico: '📅', title: 'Agenda', desc: 'Organize suas aulas por aluno, com calendário e histórico completo.' },
+      { ico: '💰', title: 'Financeiro', desc: 'Controle de mensalidades, vencimentos e pagamentos de cada aluno.' },
+      { ico: '📋', title: 'Contratos', desc: 'Gere e assine contratos digitalmente, sem burocracia em papel.' },
+      { ico: '🎓', title: 'Certificados', desc: 'Emita certificados de conclusão de módulo com assinatura digital.' },
+      { ico: '🌐', title: 'Network', desc: 'Seja encontrado por novos alunos procurando professor de idiomas.' },
+      { ico: '👥', title: 'Fórum', desc: 'Publique avisos e converse com todos os seus alunos em grupo.' },
+      { ico: '📁', title: 'Materiais', desc: 'Envie e receba arquivos de aula direto pela plataforma.' },
+      { ico: '💬', title: 'Mensagens', desc: 'Converse individualmente com cada aluno, sem sair da plataforma.' },
+    ],
+    shots: [
+      { src: 'overview.png', title: 'Painel do professor', desc: 'Veja de relance seus alunos, próximas aulas e indicadores em um único painel.' },
+      { src: 'agenda.png', title: 'Agenda de aulas', desc: 'Organize seu calendário e acompanhe o histórico de cada aula.' },
+      { src: 'students.png', title: 'Gestão de alunos', desc: 'Cadastre alunos, acompanhe progresso e gerencie tudo em um só lugar.' },
+      { src: 'financeiro.png', title: 'Controle financeiro', desc: 'Acompanhe mensalidades pagas, pendentes e atrasadas de cada aluno.' },
+      { src: 'network-teacher.png', title: 'Perfil na Network', desc: 'Configure seu perfil público para ser encontrado por novos alunos.' },
+      { src: 'forum.png', title: 'Fórum da turma', desc: 'Publique avisos e interaja com todos os seus alunos em grupo.' },
+      { src: 'materiais.png', title: 'Envio de materiais', desc: 'Compartilhe arquivos e apostilas diretamente com seus alunos.' },
+      { src: 'contratos.png', title: 'Contratos digitais', desc: 'Gere e colha assinatura digital dos contratos de aula, sem papel.' },
+      { src: 'certificados.png', title: 'Certificados', desc: 'Emita certificados de conclusão de módulo com validação digital.' },
+      { src: 'mensagens.png', title: 'Caixa de mensagens', desc: 'Converse diretamente com cada aluno pela plataforma.' },
+    ],
+    showPricing: true,
+  },
+  student: {
+    badge: 'Para alunos · 100% grátis',
+    title: 'Encontre seu professor particular de idiomas ideal',
+    sub: 'Explore perfis de professores, compare valores e comece a estudar — a BeBrave é totalmente gratuita para alunos.',
+    ctaHtml: `<button class="lp-btn-primary" onclick="showPage('page-login')">Entrar na plataforma</button>
+      <button class="lp-btn-outline" onclick="showPage('page-login');setTimeout(openStudentRegister,50)">Criar conta de aluno grátis</button>`,
+    featuresTitle: 'Feito para você encontrar e estudar com seu professor',
+    featuresCols: 3,
+    features: [
+      { ico: '🌐', title: 'Network', desc: 'Explore perfis de professores e escolha o ideal para você.' },
+      { ico: '📅', title: 'Agenda', desc: 'Veja suas aulas agendadas e o histórico de aulas realizadas.' },
+      { ico: '📁', title: 'Materiais', desc: 'Receba e envie arquivos de aula direto pela plataforma.' },
+      { ico: '🎓', title: 'Certificados', desc: 'Acompanhe e baixe seus certificados de conclusão de módulo.' },
+      { ico: '👥', title: 'Fórum', desc: 'Participe do grupo da turma e tire dúvidas com o professor.' },
+      { ico: '💬', title: 'Chat', desc: 'Converse diretamente com seu professor, sem sair da plataforma.' },
+    ],
+    shots: [
+      { src: 'aluno-network.png', title: 'Encontre seu professor', desc: 'Veja perfis, valores e especialidades de professores disponíveis — e escolha o ideal para você.' },
+      { src: 'aluno-overview.png', title: 'Seu painel', desc: 'Acompanhe suas aulas, seu progresso e avalie seu professor.' },
+      { src: 'aluno-agenda.png', title: 'Sua agenda', desc: 'Veja todas as suas aulas agendadas e realizadas em um calendário simples.' },
+    ],
+    showPricing: false,
+  },
+};
+
+function toggleCreateAccMenu(ev) {
+  ev.stopPropagation();
+  document.getElementById('lp-createacc-menu').classList.toggle('hidden');
+}
+function chooseCreateAccount(type) {
+  document.getElementById('lp-createacc-menu').classList.add('hidden');
+  if (type === 'teacher') {
+    showPage('page-register');
+  } else {
+    showPage('page-login');
+    setTimeout(openStudentRegister, 50);
+  }
+}
+document.addEventListener('click', (ev) => {
+  const menu = document.getElementById('lp-createacc-menu');
+  const wrap = document.querySelector('.lp-createacc-wrap');
+  if (menu && !menu.classList.contains('hidden') && wrap && !wrap.contains(ev.target)) {
+    menu.classList.add('hidden');
+  }
+});
+
+let _landingAudience = 'teacher';
+function setLandingAudience(aud) {
+  _landingAudience = aud;
+  const c = LANDING_CONTENT[aud];
+  document.getElementById('lp-aud-teacher').classList.toggle('active', aud === 'teacher');
+  document.getElementById('lp-aud-student').classList.toggle('active', aud === 'student');
+
+  document.getElementById('lp-hero-badge').textContent = c.badge;
+  document.getElementById('lp-hero-title').textContent = c.title;
+  document.getElementById('lp-hero-sub').textContent = c.sub;
+  document.getElementById('lp-hero-cta').innerHTML = c.ctaHtml;
+
+  document.getElementById('lp-features-title').textContent = c.featuresTitle;
+  const featuresEl = document.getElementById('lp-features');
+  featuresEl.dataset.cols = c.featuresCols;
+  featuresEl.innerHTML = c.features.map(f => `<div class="lp-feature"><span class="lp-feature-ico">${f.ico}</span><h3>${escHtml(f.title)}</h3><p>${escHtml(f.desc)}</p></div>`).join('');
+
+  document.getElementById('lp-shots').innerHTML = c.shots.map(s => `
+    <figure class="lp-shot">
+      <div class="lp-shot-imgwrap" onclick="openLightbox('/assets/screenshots/${s.src}')"><img src="/assets/screenshots/${s.src}" alt="${escHtml(s.title)}" loading="lazy"></div>
+      <figcaption class="lp-shot-body"><h4>${escHtml(s.title)}</h4><p>${escHtml(s.desc)}</p></figcaption>
+    </figure>`).join('');
+
+  document.getElementById('lp-plans').closest('#lp-pricing-section').style.display = '';
+  if (c.showPricing) {
+    document.getElementById('lp-pricing-title').style.display = '';
+    document.getElementById('lp-pricing-sub').style.display = '';
+    document.getElementById('lp-plans').classList.remove('hidden');
+    document.getElementById('lp-free-banner').classList.add('hidden');
+    loadLandingPlans();
+  } else {
+    document.getElementById('lp-pricing-title').style.display = 'none';
+    document.getElementById('lp-pricing-sub').style.display = 'none';
+    document.getElementById('lp-plans').classList.add('hidden');
+    document.getElementById('lp-free-banner').classList.remove('hidden');
+  }
+}
+
+function openLightbox(src) {
+  document.getElementById('lp-lightbox-img').src = src;
+  document.getElementById('lp-lightbox').classList.remove('hidden');
+}
+function closeLightbox() {
+  document.getElementById('lp-lightbox').classList.add('hidden');
+}
+
+async function loadLandingPlans() {
+  const el = document.getElementById('lp-plans');
+  if (!el) return;
+  el.innerHTML = '<p class="empty">Carregando planos...</p>';
+  try {
+    const plans = await fetch('/api/plans/public').then(r => r.json());
+    el.innerHTML = plans.map(p => {
+      const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Até ${p.maxStudents} alunos`;
+      const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}<span>/mês</span>` : 'Sob consulta';
+      const restricted = (p.restrictedTools || []).map(t => LP_TOOL_LABELS[t] || t);
+      const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
+      return `<div class="lp-plan-card">
+        <h3>${escHtml(p.label)}</h3>
+        <div class="lp-plan-price">${priceTxt}</div>
+        <p class="lp-plan-limit">${limitTxt}</p>
+        <p class="lp-plan-tools" style="color:${restricted.length ? '#dc2626' : 'var(--g500)'}">${toolsTxt}</p>
+        <button class="lp-btn-outline-dark" style="width:100%" onclick="showPage('page-login')">Começar agora</button>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<p class="empty">Não foi possível carregar os planos agora.</p>'; }
+}
 
 function bootRole(role) {
   if (role === 'admin')   { showPage('page-admin');   loadAdmin(); }
@@ -150,14 +301,17 @@ async function loadAdminOverview() {
 }
 
 async function loadAdminTeachers() {
-  const teachers = await api('GET','/api/admin/teachers');
+  const [teachers, plans] = await Promise.all([
+    api('GET','/api/admin/teachers'),
+    api('GET','/api/admin/plans').catch(() => []),
+  ]);
   const el = document.getElementById('adm-teachers-list');
   if (!teachers.length) { el.innerHTML = '<p class="empty">Nenhum professor cadastrado ainda.</p>'; return; }
   const exportBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
     <button class="btn-sm" onclick="exportTeachersCsv()" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7;font-weight:600">📥 Exportar Excel (.csv)</button>
   </div>`;
   el.innerHTML = exportBtn + `<table class="list-table"><thead><tr>
-    <th>Professor</th><th>Login</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th>
+    <th>Professor</th><th>Login</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Plano</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th>
   </tr></thead><tbody>
     ${teachers.map(t=>{
       const termsHtml = t.termsAccepted
@@ -185,6 +339,9 @@ async function loadAdminTeachers() {
         <td>${pwHtml}</td>
         <td>${termsHtml}</td>
         <td>${t.studentCount} aluno${t.studentCount!==1?'s':''}</td>
+        <td><select onchange="changeTeacherPlan('${t.login}',this.value)" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--g200);border-radius:6px;font-family:'DM Sans',sans-serif;cursor:pointer">
+          ${plans.map(p=>`<option value="${p.key}"${(t.plan||'')===p.key?' selected':''}>${p.label}</option>`).join('')}
+        </select></td>
         <td>${fmtDate(t.createdAt)}</td>
         <td>${t.lastLogin ? fmtDate(t.lastLogin) : '<span style="color:var(--g400);font-size:12px">Nunca</span>'}</td>
         <td><div class="lt-actions">
@@ -195,6 +352,97 @@ async function loadAdminTeachers() {
       </tr>`;
     }).join('')}
   </tbody></table>`;
+}
+
+async function changeTeacherPlan(login, plan) {
+  try {
+    await api('PUT', `/api/admin/teachers/${login}/plan`, { plan });
+    showToast('✅ Plano atualizado!');
+    loadAdminTeachers();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+let _adminPlansCache = [];
+async function loadAdminPlans() {
+  const el = document.getElementById('adm-plans-list');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const plans = await api('GET', '/api/admin/plans');
+    _adminPlansCache = plans;
+    el.innerHTML = plans.map(p => {
+      const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Até ${p.maxStudents} alunos`;
+      const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}/mês` : 'Preço não definido';
+      const restricted = (p.restrictedTools || []).map(t => PLAN_TOOL_LABELS[t] || t);
+      const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
+      return `<div class="card" style="position:relative">
+        ${p.isDefault ? '<span style="position:absolute;top:-10px;left:16px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:10px">PADRÃO</span>' : ''}
+        <div class="ch"><h3>${escHtml(p.label)}</h3><span style="font-size:11px;color:var(--g400);font-family:monospace">${p.key}</span></div>
+        <p style="font-size:16px;font-weight:700;color:var(--navy);margin:4px 0">${priceTxt}</p>
+        <p style="font-size:14px;color:var(--g600);margin:4px 0">${limitTxt}</p>
+        <p style="font-size:13px;color:${restricted.length ? '#dc2626' : 'var(--g500)'};margin:4px 0 12px">${toolsTxt}</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn-secondary" style="flex:1" onclick="openPlanModalByKey('${p.key}')">✏️ Editar</button>
+          <button class="btn-icon danger" title="Excluir plano" onclick="deletePlan('${p.key}','${escJs(p.label)}')">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+function openPlanModalByKey(key) {
+  openPlanModal(_adminPlansCache.find(p => p.key === key));
+}
+
+function openPlanModal(plan) {
+  document.getElementById('plan-modal-title').textContent = plan ? 'Editar Plano' : 'Novo Plano';
+  document.getElementById('plan-key-original').value = plan ? plan.key : '';
+  document.getElementById('plan-key').value = plan ? plan.key : '';
+  document.getElementById('plan-key').disabled = !!plan;
+  document.getElementById('plan-label').value = plan ? plan.label : '';
+  document.getElementById('plan-max-students').value = (plan && plan.maxStudents != null) ? plan.maxStudents : '';
+  document.getElementById('plan-price').value = (plan && plan.price != null) ? plan.price : '';
+  document.getElementById('plan-is-default').checked = !!(plan && plan.isDefault);
+  const restricted = (plan && plan.restrictedTools) || [];
+  document.querySelectorAll('.plan-tool-cb').forEach(cb => { cb.checked = restricted.includes(cb.value); });
+  openModal('modal-plan');
+}
+
+async function savePlan() {
+  const originalKey = document.getElementById('plan-key-original').value;
+  const isEdit = !!originalKey;
+  const key = document.getElementById('plan-key').value.trim().toLowerCase();
+  const label = document.getElementById('plan-label').value.trim();
+  const maxStudentsRaw = document.getElementById('plan-max-students').value;
+  const priceRaw = document.getElementById('plan-price').value;
+  const isDefault = document.getElementById('plan-is-default').checked;
+  const restrictedTools = [...document.querySelectorAll('.plan-tool-cb:checked')].map(cb => cb.value);
+  if (!label) return showToast('⚠️ Informe o nome do plano');
+  const body = {
+    label,
+    maxStudents: maxStudentsRaw === '' ? null : parseInt(maxStudentsRaw),
+    price: priceRaw === '' ? null : parseFloat(priceRaw),
+    restrictedTools, isDefault,
+  };
+  try {
+    if (isEdit) {
+      await api('PUT', `/api/admin/plans/${originalKey}`, body);
+    } else {
+      if (!key) return showToast('⚠️ Informe a chave do plano');
+      await api('POST', '/api/admin/plans', { ...body, key });
+    }
+    closeModal('modal-plan');
+    showToast('✅ Plano salvo!');
+    loadAdminPlans();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function deletePlan(key, label) {
+  if (!confirm(`Excluir o plano "${label}"? Essa ação não pode ser desfeita.`)) return;
+  try {
+    await api('DELETE', `/api/admin/plans/${key}`);
+    showToast('✅ Plano excluído!');
+    loadAdminPlans();
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 let _adminStudentFilter = '';
@@ -493,6 +741,7 @@ async function loadTeacher() {
     const profile = await api('GET', '/api/profile');
     if (profile.photo) updateSidebarAvatar(profile.photo);
   } catch(e) {}
+  applyPlanLockUI();
   await refreshTeacherAll();
   checkPendingContracts('teacher');
   refreshInboxBadges();
@@ -530,7 +779,7 @@ function renderTeacherOverview(students, lessons) {
   ]);
   // student cards
   document.getElementById('t-student-cards').innerHTML = students.length
-    ? students.map(s=>`<div class="person-card" onclick="showTeacher('t-students',document.querySelector('#teacher-sidebar .nav-item:nth-child(2)'))">
+    ? students.map(s=>`<div class="person-card" onclick="showTeacher('t-students',document.querySelector('#teacher-sidebar .nav-item:nth-child(3)'))">
         <div class="pc-av" style="background:${s.bg};color:${s.color}">${s.initials}</div>
         <div><div class="pc-name">${s.name}</div><div class="pc-sub">Nível ${s.level}</div><div class="pc-cnt">${s.lessonsDone||0} aulas realizadas</div></div>
       </div>`).join('')
@@ -760,9 +1009,11 @@ async function uploadTeacherFile(ev) {
   if(!mat) { showToast('⚠️ Selecione um aluno primeiro'); ev.target.value=''; return; }
   const fd = new FormData(); fd.append('file',file); fd.append('studentMatricula',mat);
   try {
-    await fetch('/api/files',{method:'POST',body:fd});
+    const r = await fetch('/api/files',{method:'POST',body:fd});
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(json.error || 'Erro ao enviar arquivo');
     ev.target.value=''; refreshTeacherAll(); showToast('✅ Arquivo enviado!');
-  } catch { showToast('❌ Erro ao enviar arquivo'); }
+  } catch(e) { showToast('❌ ' + (e.message || 'Erro ao enviar arquivo')); }
 }
 
 function openLessonFor(mat) { pendingLessonStudent = mat; openModal('modal-add-lesson'); setTimeout(()=>{ const el=document.getElementById('al-student'); if(el) el.value=mat; },50); }
@@ -885,11 +1136,63 @@ async function saveEditStudent() {
 
 async function changeMonthT(dir) { calMonthT=addMonth(calMonthT,dir); const lessons=await api('GET','/api/lessons'); _calLessonsT=lessons; renderCal(calMonthT,'cal-t','cal-lbl-t',day=>showCalDayT(day),_calLessonsT,null); }
 
+const PLAN_RESTRICTED_SECTIONS = { 't-files':'files', 't-certs':'certificates', 't-forum':'forum', 't-network':'network', 't-requests':'network' };
 function showTeacher(sec, el) {
+  const tool = PLAN_RESTRICTED_SECTIONS[sec];
+  if (tool && ME?.plan === 'free') {
+    showToast('🔒 Esse recurso não está disponível no plano Free. Confira os planos disponíveis.');
+    sec = 't-plan'; el = document.getElementById('t-nav-plan');
+    loadTeacherPlan();
+  }
   document.querySelectorAll('#page-teacher .cs').forEach(s=>s.classList.remove('active'));
   document.getElementById(sec).classList.add('active');
   document.querySelectorAll('#teacher-sidebar .nav-item').forEach(n=>n.classList.remove('active'));
   if(el) el.classList.add('active');
+}
+
+function applyPlanLockUI() {
+  const locked = ME?.plan === 'free';
+  ['t-nav-files','t-nav-certs','t-nav-forum','t-nav-network'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('nav-locked', locked);
+  });
+}
+
+const PLAN_TOOL_LABELS = { network: 'Network', forum: 'Fórum', files: 'Materiais', certificates: 'Certificados' };
+async function loadTeacherPlan() {
+  const el = document.getElementById('t-plan-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const data = await api('GET', '/api/teacher/plan');
+    ME.plan = data.plan;
+    applyPlanLockUI();
+    const cards = data.plans.map(p => {
+      const key = p.key;
+      const isCurrent = key === data.plan;
+      const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Gestão de até ${p.maxStudents} alunos`;
+      const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}/mês` : '';
+      const restricted = p.restrictedTools.map(t => PLAN_TOOL_LABELS[t] || t);
+      const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
+      return `<div class="card" style="border:2px solid ${isCurrent ? 'var(--blue)' : 'var(--g100)'};position:relative">
+        ${isCurrent ? '<span style="position:absolute;top:-10px;left:16px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:10px">SEU PLANO</span>' : ''}
+        <div class="ch"><h3>${p.label}</h3></div>
+        ${priceTxt ? `<p style="font-size:18px;font-weight:700;color:var(--navy);margin:4px 0">${priceTxt}</p>` : ''}
+        <p style="font-size:14px;color:var(--g600);margin:4px 0">${limitTxt}</p>
+        <p style="font-size:13px;color:${restricted.length ? '#dc2626' : 'var(--g500)'};margin:4px 0 12px">${toolsTxt}</p>
+        ${isCurrent
+          ? `<p style="font-size:12px;color:var(--g400)">${data.studentCount}${p.maxStudents==null?' alunos':' /'+p.maxStudents+' alunos'}</p>`
+          : `<button class="btn-primary" style="width:100%" onclick="requestPlanUpgrade('${key}')">Solicitar upgrade</button>`}
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">${cards}</div>`;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function requestPlanUpgrade(planKey) {
+  try {
+    await api('POST', '/api/teacher/plan/request-upgrade', { plan: planKey });
+    showToast('✅ Solicitação enviada! O administrador entrará em contato para liberar o upgrade.');
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1050,9 +1353,11 @@ async function uploadStudentFile(ev) {
   const file = ev.target.files[0]; if(!file) return;
   const fd = new FormData(); fd.append('file',file);
   try {
-    await fetch('/api/files',{method:'POST',body:fd});
+    const r = await fetch('/api/files',{method:'POST',body:fd});
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(json.error || 'Erro ao enviar arquivo');
     ev.target.value=''; refreshStudentAll(); showToast('✅ Arquivo enviado ao professor!');
-  } catch { showToast('❌ Erro ao enviar arquivo'); }
+  } catch(e) { showToast('❌ ' + (e.message || 'Erro ao enviar arquivo')); }
 }
 
 async function changeMonthS(dir) { calMonthS=addMonth(calMonthS,dir); const lessons=await api('GET','/api/lessons'); _calLessonsS=lessons; renderCal(calMonthS,'cal-s','cal-lbl-s',day=>showCalDayS(day),_calLessonsS,null); }
@@ -1089,8 +1394,6 @@ function renderCal(month, gridId, labelId, onDayClick, lessons, studentFilter) {
     html+=`<div class="cd${isToday?' cd-today':''}${hasL?' cd-has':''}" onclick="selectCalDay('${gridId}','${iso}')"><span>${d}</span></div>`;
   }
   grid.innerHTML=html;
-  // trigger callback if provided
-  if(onDayClick) onDayClick(null);
 }
 
 function selectCalDay(gridId, iso) {

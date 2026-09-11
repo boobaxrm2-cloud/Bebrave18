@@ -26,7 +26,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -51,11 +51,17 @@ function dbReady() {
   Notifications    = db.getCollection('notifications')    || db.addCollection('notifications',    { indices: ['toLogin'] });
   Ratings          = db.getCollection('ratings')          || db.addCollection('ratings',          { indices: ['teacherLogin', 'studentLogin'] });
   ChatMessages     = db.getCollection('chatMessages')     || db.addCollection('chatMessages',     { indices: ['fromLogin', 'toLogin'] });
+  Plans            = db.getCollection('plans')            || db.addCollection('plans',            { indices: ['key'] });
+  seedPlansIfEmpty();
 
   if (!Users.findOne({ role: 'admin' })) {
     Users.insert({ login: 'ADMIN', password: bcrypt.hashSync('05012018', 10), role: 'admin', name: 'Administrador', createdAt: now() });
     console.log('✅ Admin criado: ADMIN / 05012018');
   }
+  // Migração: professores cadastrados antes do sistema de planos ficam em 'premium'
+  // (sem restrição), para não bloquear quem já usa a plataforma. Só professores
+  // novos a partir daqui nascem no plano 'free'.
+  Teachers.find().forEach(t => { if (!t.plan) { t.plan = 'premium'; Teachers.update(t); } });
   console.log(`📦 DB: ${Users.count()} usuários | ${Teachers.count()} professores | ${Students.count()} alunos`);
 }
 
@@ -95,6 +101,53 @@ const PALETTE = [
   { color: '#ef4444', bg: '#fee2e2' }, { color: '#84cc16', bg: '#f0fdf4' },
 ];
 function pickColor(idx) { return PALETTE[idx % PALETTE.length]; }
+
+// ── Plans ────────────────────────────────────────────────────
+// maxStudents: null = sem limite. restrictedTools: ferramentas bloqueadas nesse plano.
+// Os planos em si vivem na coleção Plans (editável pelo admin); isto aqui é só a
+// semente inicial e um fallback de segurança caso a coleção fique vazia.
+const FALLBACK_PLAN = { key: 'free', label: 'Free', maxStudents: 2, restrictedTools: ['network', 'forum', 'files', 'certificates'], price: 0, isDefault: true };
+function seedPlansIfEmpty() {
+  if (Plans.count() > 0) return;
+  [
+    { key: 'free',     label: 'Free',     maxStudents: 2,    restrictedTools: ['network', 'forum', 'files', 'certificates'], price: 0,    isDefault: true },
+    { key: 'basic',    label: 'Basic',    maxStudents: 10,   restrictedTools: [], price: null, isDefault: false },
+    { key: 'standard', label: 'Standard', maxStudents: 20,   restrictedTools: [], price: null, isDefault: false },
+    { key: 'premium',  label: 'Premium',  maxStudents: null, restrictedTools: [], price: null, isDefault: false },
+  ].forEach(p => Plans.insert(p));
+}
+function getPlan(key) {
+  return Plans.findOne({ key }) || FALLBACK_PLAN;
+}
+function getDefaultPlanKey() {
+  const d = Plans.findOne({ isDefault: true });
+  return d ? d.key : FALLBACK_PLAN.key;
+}
+function planKeyOf(teacherLogin) {
+  const t = Teachers.findOne({ login: teacherLogin });
+  if (t && t.plan && Plans.findOne({ key: t.plan })) return t.plan;
+  return getDefaultPlanKey();
+}
+function planAllows(teacherLogin, tool) {
+  const plan = getPlan(planKeyOf(teacherLogin));
+  return !plan.restrictedTools.includes(tool);
+}
+function activeStudentCount(teacherLogin) {
+  return Students.find({ teacherLogin, active: { '$ne': false } }).length;
+}
+function studentLimitReached(teacherLogin) {
+  const plan = getPlan(planKeyOf(teacherLogin));
+  if (plan.maxStudents == null) return false;
+  return activeStudentCount(teacherLogin) >= plan.maxStudents;
+}
+const requirePlanTool = (tool) => (req, res, next) => {
+  if (req.session.user.role !== 'teacher') return next();
+  if (!planAllows(req.session.user.login, tool)) {
+    const plan = getPlan(planKeyOf(req.session.user.login));
+    return res.status(403).json({ error: `Esse recurso não está disponível no plano ${plan.label}. Faça upgrade em "Meu Plano" para desbloquear.` });
+  }
+  next();
+};
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -167,6 +220,12 @@ const isAdminOrTeach = (req, res, next) => {
 // ════════════════════════════════════════════════════════════
 //  AUTH
 // ════════════════════════════════════════════════════════════
+// ── Public plans (for the landing page) ─────────────────────────
+app.get('/api/plans/public', (req, res) => {
+  res.json(Plans.find().sort((a, b) => (a.maxStudents ?? Infinity) - (b.maxStudents ?? Infinity))
+    .map(p => ({ key: p.key, label: p.label, maxStudents: p.maxStudents, restrictedTools: p.restrictedTools, price: p.price ?? null })));
+});
+
 // ── Teacher self-registration (public) ────────────────────────
 app.get('/api/check-login', (req, res) => {
   const login = (req.query.login || '').trim();
@@ -193,7 +252,7 @@ app.post('/api/auth/register-teacher', (req, res) => {
   const ini = initials(name);
   const { color, bg } = pickColor(Teachers.count());
   Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
-  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true });
+  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true, plan: getDefaultPlanKey() });
   res.json({ ok: true, login, name: name.trim() });
 });
 
@@ -217,7 +276,7 @@ app.post('/api/auth/login', (req, res) => {
   req.session.user = { id: user.$loki, login: user.login, role: user.role, name: user.name };
   if (user.role === 'teacher') {
     const t = Teachers.findOne({ login: user.login });
-    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false });
+    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free' });
   }
   if (user.role === 'student') {
     const s = Students.findOne({ matricula: user.login });
@@ -237,7 +296,7 @@ app.get('/api/auth/me', (req, res) => {
   }
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
-    return res.json({ ...u, termsAccepted: t?.termsAccepted || false });
+    return res.json({ ...u, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free' });
   }
   res.json(u);
 });
@@ -262,6 +321,74 @@ app.post('/api/teacher/accept-terms', auth, isTeach, (req, res) => {
   t.termsSignature = signature;
   Teachers.update(t);
   res.json({ ok: true, newLogin: currentLogin });
+});
+
+app.get('/api/teacher/plan', auth, isTeach, (req, res) => {
+  const login = req.session.user.login;
+  const planKey = planKeyOf(login);
+  res.json({
+    plan: planKey,
+    studentCount: activeStudentCount(login),
+    plans: Plans.find().sort((a, b) => (a.maxStudents ?? Infinity) - (b.maxStudents ?? Infinity))
+      .map(p => ({ key: p.key, label: p.label, maxStudents: p.maxStudents, restrictedTools: p.restrictedTools, price: p.price ?? null })),
+  });
+});
+
+app.post('/api/teacher/plan/request-upgrade', auth, isTeach, (req, res) => {
+  const { plan } = req.body;
+  const target = Plans.findOne({ key: plan });
+  if (!target || plan === planKeyOf(req.session.user.login)) return res.status(400).json({ error: 'Plano inválido' });
+  const u = req.session.user;
+  AdminMessages.insert({ fromLogin: u.login, fromName: u.name, fromRole: u.role, content: `Solicitou upgrade para o plano ${target.label}.`, createdAt: now(), read: false, adminReply: null, adminRepliedAt: null });
+  res.json({ ok: true });
+});
+
+// ── Plans (admin CRUD) ─────────────────────────────────────────
+app.get('/api/admin/plans', auth, isAdmin, (req, res) => {
+  res.json(Plans.find().sort((a, b) => (a.maxStudents ?? Infinity) - (b.maxStudents ?? Infinity)));
+});
+
+app.post('/api/admin/plans', auth, isAdmin, (req, res) => {
+  const { key, label, maxStudents, restrictedTools, price, isDefault } = req.body;
+  if (!key || !/^[a-z0-9_-]{2,30}$/.test(key)) return res.status(400).json({ error: 'Chave do plano inválida (use letras minúsculas, números, - ou _)' });
+  if (!label || !label.trim()) return res.status(400).json({ error: 'Nome do plano é obrigatório' });
+  if (Plans.findOne({ key })) return res.status(409).json({ error: 'Já existe um plano com essa chave' });
+  if (isDefault) Plans.find({ isDefault: true }).forEach(p => { p.isDefault = false; Plans.update(p); });
+  const plan = Plans.insert({
+    key, label: label.trim(),
+    maxStudents: (maxStudents === null || maxStudents === '' || maxStudents === undefined) ? null : Math.max(0, parseInt(maxStudents)),
+    restrictedTools: Array.isArray(restrictedTools) ? restrictedTools : [],
+    price: (price === null || price === '' || price === undefined) ? null : Math.max(0, parseFloat(price)),
+    isDefault: !!isDefault,
+  });
+  res.json({ ok: true, plan });
+});
+
+app.put('/api/admin/plans/:key', auth, isAdmin, (req, res) => {
+  const plan = Plans.findOne({ key: req.params.key });
+  if (!plan) return res.status(404).json({ error: 'Plano não encontrado' });
+  const { label, maxStudents, restrictedTools, price, isDefault } = req.body;
+  if (label !== undefined) { if (!label.trim()) return res.status(400).json({ error: 'Nome do plano é obrigatório' }); plan.label = label.trim(); }
+  if (maxStudents !== undefined) plan.maxStudents = (maxStudents === null || maxStudents === '') ? null : Math.max(0, parseInt(maxStudents));
+  if (restrictedTools !== undefined) plan.restrictedTools = Array.isArray(restrictedTools) ? restrictedTools : [];
+  if (price !== undefined) plan.price = (price === null || price === '') ? null : Math.max(0, parseFloat(price));
+  if (isDefault !== undefined) {
+    if (isDefault) Plans.find({ isDefault: true, key: { '$ne': plan.key } }).forEach(p => { p.isDefault = false; Plans.update(p); });
+    else if (plan.isDefault && !Plans.findOne({ isDefault: true, key: { '$ne': plan.key } })) return res.status(400).json({ error: 'Precisa haver ao menos um plano padrão. Marque outro plano como padrão antes de desmarcar este.' });
+    plan.isDefault = !!isDefault;
+  }
+  Plans.update(plan);
+  res.json({ ok: true, plan });
+});
+
+app.delete('/api/admin/plans/:key', auth, isAdmin, (req, res) => {
+  const plan = Plans.findOne({ key: req.params.key });
+  if (!plan) return res.status(404).json({ error: 'Plano não encontrado' });
+  if (plan.isDefault) return res.status(400).json({ error: 'Não é possível excluir o plano padrão. Marque outro plano como padrão primeiro.' });
+  const inUse = Teachers.find({ plan: plan.key }).length;
+  if (inUse > 0) return res.status(400).json({ error: `Esse plano está em uso por ${inUse} professor${inUse !== 1 ? 'es' : ''}. Mude o plano deles antes de excluir.` });
+  Plans.remove(plan);
+  res.json({ ok: true });
 });
 
 app.get('/api/teacher/my-terms', auth, isTeach, (req, res) => {
@@ -321,9 +448,21 @@ app.post('/api/auth/change-password', auth, (req, res) => {
 app.get('/api/admin/teachers', auth, isAdmin, (req, res) => {
   const teachers = Teachers.find().map(t => {
     const u = Users.findOne({ login: t.login });
-    return { ...t, studentCount: Students.find({ teacherLogin: t.login }).length, plainPassword: t.plainPassword || '', languages: t.languages || '', termsAccepted: t.termsAccepted || false, termsAcceptedAt: t.termsAcceptedAt || null, lastLogin: u?.lastLogin || null };
+    return { ...t, studentCount: Students.find({ teacherLogin: t.login }).length, plainPassword: t.plainPassword || '', languages: t.languages || '', termsAccepted: t.termsAccepted || false, termsAcceptedAt: t.termsAcceptedAt || null, lastLogin: u?.lastLogin || null, plan: t.plan || 'free' };
   });
   res.json(teachers);
+});
+
+app.put('/api/admin/teachers/:login/plan', auth, isAdmin, (req, res) => {
+  const { plan } = req.body;
+  const target = Plans.findOne({ key: plan });
+  if (!target) return res.status(400).json({ error: 'Plano inválido' });
+  const t = Teachers.findOne({ login: req.params.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  t.plan = plan;
+  Teachers.update(t);
+  notify(t.login, 'plan_changed', 'Seu plano foi atualizado', `Seu plano agora é ${target.label}.`);
+  res.json({ ok: true, plan });
 });
 
 app.post('/api/admin/teachers', auth, isAdmin, (req, res) => {
@@ -336,7 +475,7 @@ app.post('/api/admin/teachers', auth, isAdmin, (req, res) => {
   const { color, bg } = pickColor(Teachers.count());
   const { cpf: tCpf, whatsapp: tWa, socialname: tSocial } = req.body;
   Users.insert({ login, password: bcrypt.hashSync('1234', 10), role: 'teacher', name: name.trim(), createdAt: now() });
-  Teachers.insert({ login, name: name.trim(), socialname: tSocial||'', email: email || '', cpf: tCpf||'', whatsapp: tWa||'', initials: ini, color, bg, createdAt: now() });
+  Teachers.insert({ login, name: name.trim(), socialname: tSocial||'', email: email || '', cpf: tCpf||'', whatsapp: tWa||'', initials: ini, color, bg, createdAt: now(), plan: getDefaultPlanKey() });
   res.json({ ok: true, login, defaultPassword: '1234', name: name.trim() });
 });
 
@@ -370,9 +509,20 @@ app.delete('/api/admin/teachers/:login', auth, isAdmin, (req, res) => {
     Files.find({ studentMatricula: s.matricula }).forEach(f => { if(f.filename){ try{ fs.unlinkSync(path.join(UPLOADS_DIR,f.filename)); }catch(e){} } Files.remove(f); });
     Notes.find({ studentMatricula: s.matricula }).forEach(n => Notes.remove(n));
     Certificates.find({ studentMatricula: s.matricula }).forEach(c => { if(c.filename){ try{ fs.unlinkSync(path.join(CERT_DIR,c.filename)); }catch(e){} } Certificates.remove(c); });
+    Payments.find({ studentMatricula: s.matricula }).forEach(p => Payments.remove(p));
+    Contracts.find({ studentMatricula: s.matricula }).forEach(c => { if(c.filename){ try{ fs.unlinkSync(path.join(CONTRACTS_DIR,c.filename)); }catch(e){} } Contracts.remove(c); });
+    StudyPlans.find({ studentMatricula: s.matricula }).forEach(sp => StudyPlans.remove(sp));
+    Messages.find({ toLogin: s.matricula }).forEach(m => Messages.remove(m));
+    Messages.find({ fromLogin: s.matricula }).forEach(m => Messages.remove(m));
+    ChatMessages.find({ toLogin: s.matricula }).forEach(m => ChatMessages.remove(m));
+    ChatMessages.find({ fromLogin: s.matricula }).forEach(m => ChatMessages.remove(m));
+    NetworkRequests.find({ studentLogin: s.matricula }).forEach(r => NetworkRequests.remove(r));
     const su = Users.findOne({ login: s.matricula }); if (su) Users.remove(su);
     Students.remove(s);
   });
+  ForumPosts.find({ teacherLogin: login }).forEach(p => { ForumReplies.find({ postId: p.$loki }).forEach(r => ForumReplies.remove(r)); ForumPosts.remove(p); });
+  TeacherContracts.find({ teacherLogin: login }).forEach(c => { if(c.filename){ try{ fs.unlinkSync(path.join(CONTRACTS_DIR,c.filename)); }catch(e){} } TeacherContracts.remove(c); });
+  NetworkRequests.find({ teacherLogin: login }).forEach(r => NetworkRequests.remove(r));
   res.json({ ok: true });
 });
 
@@ -423,6 +573,10 @@ app.get('/api/students/inactive', auth, isTeach, (req, res) => {
 app.post('/api/students', auth, isTeach, (req, res) => {
   const { name, level } = req.body;
   if (!name || !level) return res.status(400).json({ error: 'Nome e nível são obrigatórios' });
+  if (studentLimitReached(req.session.user.login)) {
+    const plan = getPlan(planKeyOf(req.session.user.login));
+    return res.status(403).json({ error: `Você atingiu o limite de ${plan.maxStudents} alunos do plano ${plan.label}. Faça upgrade em "Meu Plano" para cadastrar mais alunos.` });
+  }
   const teacher = Teachers.findOne({ login: req.session.user.login });
   const matricula = genMatricula();
   const ini = initials(name);
@@ -554,7 +708,7 @@ app.get('/api/files', auth, (req, res) => {
   res.json(Files.find());
 });
 
-app.post('/api/files', auth, upload.single('file'), (req, res) => {
+app.post('/api/files', auth, requirePlanTool('files'), upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   const u = req.session.user;
   let studentMatricula, studentName, teacherLogin;
@@ -619,7 +773,7 @@ app.get('/api/certificates', auth, (req, res) => {
   res.json(Certificates.find());
 });
 
-app.post('/api/certificates/preview', auth, isTeach, async (req, res) => {
+app.post('/api/certificates/preview', auth, isTeach, requirePlanTool('certificates'), async (req, res) => {
   const data = req.body;
   if (!data.student_name || !data.module) return res.status(400).json({ error: 'Dados incompletos' });
   data.cert_id = 'PREVIEW';
@@ -629,7 +783,7 @@ app.post('/api/certificates/preview', auth, isTeach, async (req, res) => {
   } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar certificado' }); }
 });
 
-app.post('/api/certificates', auth, isTeach, async (req, res) => {
+app.post('/api/certificates', auth, isTeach, requirePlanTool('certificates'), async (req, res) => {
   const { studentMatricula, module, level, hours, period, location, teacher_signature } = req.body;
   if (!studentMatricula || !module) return res.status(400).json({ error: 'Dados incompletos' });
   const s = Students.findOne({ matricula: studentMatricula });
@@ -1096,6 +1250,10 @@ app.post('/api/forum', auth, (req, res) => {
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
     if (t?.blocked) return res.status(403).json({ error: 'TEACHER_BLOCKED' });
+    if (!planAllows(u.login, 'forum')) {
+      const plan = getPlan(planKeyOf(u.login));
+      return res.status(403).json({ error: `Fórum não está disponível no plano ${plan.label}. Faça upgrade em "Meu Plano" para desbloquear.` });
+    }
   }
   const tLogin = getTeacherLoginForUser(u);
   if (!tLogin) return res.status(400).json({ error: 'Grupo não encontrado' });
@@ -1485,6 +1643,7 @@ app.get('/api/network/teachers', (req, res) => {
   }
   const teachers = Teachers.find({ networkVisible: true });
   const result = teachers
+    .filter(t => planAllows(t.login, 'network'))
     .filter(t => {
       if (!excludeLangs.length) return true;
       const tLangs = t.networkLanguages || [];
@@ -1595,7 +1754,7 @@ app.get('/api/network/requests', auth, isTeach, (req, res) => {
   })));
 });
 
-app.put('/api/network/request/:id/accept', auth, isTeach, (req, res) => {
+app.put('/api/network/request/:id/accept', auth, isTeach, requirePlanTool('network'), (req, res) => {
   const r = NetworkRequests.get(parseInt(req.params.id));
   if (!r || r.teacherLogin !== req.session.user.login) return res.status(404).json({ error: 'Não encontrado' });
   r.status = 'accepted';
@@ -1613,9 +1772,13 @@ app.put('/api/network/request/:id/reject', auth, isTeach, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/network/complete-registration', auth, isTeach, (req, res) => {
+app.post('/api/network/complete-registration', auth, isTeach, requirePlanTool('network'), (req, res) => {
   const { studentLogin, price, payday } = req.body;
   if (!studentLogin || !price || !payday) return res.status(400).json({ error: 'Dados obrigatórios' });
+  if (studentLimitReached(req.session.user.login)) {
+    const plan = getPlan(planKeyOf(req.session.user.login));
+    return res.status(403).json({ error: `Você atingiu o limite de ${plan.maxStudents} alunos do plano ${plan.label}. Faça upgrade em "Meu Plano" para cadastrar mais alunos.` });
+  }
   const t = req.session.user;
   const s = Students.findOne({ matricula: studentLogin });
   if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
@@ -1644,7 +1807,7 @@ app.get('/api/network/teachers/:login', (req, res) => {
   });
 });
 
-app.put('/api/teacher/network-profile', auth, isTeach, (req, res) => {
+app.put('/api/teacher/network-profile', auth, isTeach, requirePlanTool('network'), (req, res) => {
   const t = Teachers.findOne({ login: req.session.user.login });
   if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
   const fields = ['networkVisible','networkBio','networkLanguages','networkRate','networkRateNegotiable','networkEmail','networkWhatsapp','networkInstagram'];
