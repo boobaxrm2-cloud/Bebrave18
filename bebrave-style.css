@@ -697,17 +697,41 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
 .lp-shot-body h4 { font-family: 'Poppins', sans-serif; font-size: 14.5px; font-weight: 600; color: var(--navy); margin-bottom: 5px; }
 .lp-shot-body p { font-size: 12.5px; color: var(--g500); line-height: 1.5; }
 
-.lp-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+.lp-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; align-items: stretch; }
 .lp-plan-card {
   background: #fff; border: 1.5px solid var(--g100); border-radius: var(--r); padding: 28px 22px;
-  text-align: center; transition: transform .2s, box-shadow .2s;
+  text-align: center; transition: transform .2s, box-shadow .2s; position: relative;
+  display: flex; flex-direction: column;
 }
 .lp-plan-card:hover { transform: translateY(-4px); box-shadow: var(--sh-md); }
+.lp-plan-card-popular { border-color: var(--blue); box-shadow: 0 8px 24px rgba(26,63,160,.14); }
+.lp-plan-card-popular:hover { box-shadow: 0 12px 30px rgba(26,63,160,.2); }
+.lp-plan-badge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--blue), #3f6ad1); color: #fff;
+  font-family: 'Poppins', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  padding: 4px 14px; border-radius: var(--r-full); box-shadow: 0 3px 8px rgba(26,63,160,.35);
+}
 .lp-plan-card h3 { font-family: 'Poppins', sans-serif; font-size: 17px; font-weight: 600; color: var(--navy); margin-bottom: 10px; }
 .lp-plan-price { font-size: 26px; font-weight: 700; color: var(--blue); margin-bottom: 8px; font-family: 'Poppins', sans-serif; }
 .lp-plan-price span { font-size: 13px; font-weight: 500; color: var(--g400); }
 .lp-plan-limit { font-size: 13.5px; color: var(--g600); margin-bottom: 6px; }
 .lp-plan-tools { font-size: 12.5px; margin-bottom: 18px; min-height: 32px; }
+
+.lp-plan-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: auto;
+  padding: 12px 18px; border-radius: var(--r-full); border: 1.5px solid var(--blue); background: transparent;
+  color: var(--blue); font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .18s;
+}
+.lp-plan-btn svg { transition: transform .18s; }
+.lp-plan-btn:hover { background: var(--blue-pale); }
+.lp-plan-btn:hover svg { transform: translateX(3px); }
+.lp-plan-btn-solid {
+  border-color: transparent; background: linear-gradient(135deg, var(--blue), #3f6ad1); color: #fff;
+  box-shadow: 0 4px 14px rgba(26,63,160,.35);
+}
+.lp-plan-btn-solid:hover { background: linear-gradient(135deg, #1846ad, var(--blue)); box-shadow: 0 6px 18px rgba(26,63,160,.45); }
 
 .lp-free-banner {
   max-width: 640px; margin: 0 auto; text-align: center; background: #fff; border-radius: var(--r);

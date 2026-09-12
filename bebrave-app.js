@@ -158,17 +158,24 @@ async function loadLandingPlans() {
   el.innerHTML = '<p class="empty">Carregando planos...</p>';
   try {
     const plans = await fetch('/api/plans/public').then(r => r.json());
+    const paidPlans = plans.filter(p => p.price);
+    const popularKey = paidPlans[0] && paidPlans[Math.min(1, paidPlans.length - 1)].key;
     el.innerHTML = plans.map(p => {
+      const isFree = !p.price;
+      const isPopular = p.key === popularKey;
       const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Até ${p.maxStudents} alunos`;
       const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}<span>/mês</span>` : 'Sob consulta';
       const restricted = (p.restrictedTools || []).map(t => LP_TOOL_LABELS[t] || t);
       const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
-      return `<div class="lp-plan-card">
+      const btnLabel = isFree ? 'Começar grátis' : 'Assinar plano';
+      const btnClass = isPopular ? 'lp-plan-btn lp-plan-btn-solid' : 'lp-plan-btn';
+      return `<div class="lp-plan-card${isPopular ? ' lp-plan-card-popular' : ''}">
+        ${isPopular ? '<span class="lp-plan-badge">Mais popular</span>' : ''}
         <h3>${escHtml(p.label)}</h3>
         <div class="lp-plan-price">${priceTxt}</div>
         <p class="lp-plan-limit">${limitTxt}</p>
         <p class="lp-plan-tools" style="color:${restricted.length ? '#dc2626' : 'var(--g500)'}">${toolsTxt}</p>
-        <button class="lp-btn-outline-dark" style="width:100%" onclick="showPage('page-login')">Começar agora</button>
+        <button class="${btnClass}" onclick="showPage('page-login')"><span>${btnLabel}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>`;
     }).join('');
   } catch(e) { el.innerHTML = '<p class="empty">Não foi possível carregar os planos agora.</p>'; }
