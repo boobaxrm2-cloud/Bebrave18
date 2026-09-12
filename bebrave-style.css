@@ -581,8 +581,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
 
 .lp-nav {
   display: flex; align-items: center;
-  padding: 10px 32px; background: rgba(255,255,255,.94); backdrop-filter: blur(8px);
+  padding: 10px 32px;
+  background: linear-gradient(180deg, rgba(248,250,255,.9) 0%, rgba(255,255,255,.82) 100%);
+  backdrop-filter: blur(8px);
   box-shadow: 0 1px 3px rgba(0,0,0,.06); position: relative; z-index: 20;
+}
+.lp-nav::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, var(--blue) 0%, var(--blue) 48%, #E8381E 52%, #E8381E 100%);
+  opacity: .85;
 }
 .lp-nav-spacer { flex: 1; min-width: 12px; }
 .lp-nav-logo { height: 130px; width: auto; flex-shrink: 0; }
