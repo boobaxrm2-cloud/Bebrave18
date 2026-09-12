@@ -580,7 +580,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
 .lp-nav, .lp-audience-bar, .lp-hero, .lp-footer { position: relative; z-index: 1; }
 
 .lp-nav {
-  display: flex; align-items: center; min-height: 132px;
+  display: flex; align-items: center; min-height: 58px;
   padding: 10px 32px;
   background-image:
     repeating-linear-gradient(100deg, rgba(255,255,255,.06) 0px, rgba(255,255,255,.06) 1px, transparent 1px, transparent 4px),
@@ -596,7 +596,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
 .lp-nav-spacer { flex: 1; min-width: 12px; }
 .lp-nav-logo {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  height: 108px; width: auto; display: block;
+  height: 46px; width: auto; display: block;
 }
 .lp-nav-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .lp-nav-btn, .lp-nav-btn-outline {
