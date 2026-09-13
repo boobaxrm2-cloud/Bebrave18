@@ -1,5 +1,7 @@
 'use strict';
 const PDFDocument = require('pdfkit');
+const path = require('path');
+const LOGO_PATH = path.join(__dirname, 'assets', 'logo.png');
 
 /**
  * generateContract(data) → Promise<Buffer>
@@ -23,12 +25,10 @@ function generateContract(data) {
 
     const NAVY    = '#0f1b35';
     const NAVY2   = '#1a2d52';
-    const BLUE    = '#3b6ef5';
     const GOLD    = '#c9a84c';
     const GOLD_LT = '#e8d5a3';
     const WHITE   = '#ffffff';
     const GRAY    = '#64748b';
-    const RED     = '#E8381E';
 
     const ML = 48;
     const CW = W - ML * 2;
@@ -56,11 +56,7 @@ function generateContract(data) {
     let y = 18;
 
     // ── Logo header ──────────────────────────────────────────────
-    doc.fontSize(22).font('Helvetica-Bold');
-    doc.fillColor(BLUE).text('Be', ML, y, { continued: true });
-    doc.fillColor(RED).text('Brave');
-    doc.fontSize(7).fillColor(GRAY).font('Helvetica')
-       .text('LANGUAGE TUTORING PLATFORM', ML, y + 26);
+    doc.image(LOGO_PATH, ML, y, { height: 34 });
 
     if (data.contract_id) {
       doc.fontSize(7).fillColor(GRAY).font('Helvetica')
@@ -198,12 +194,10 @@ function generateTeacherContract(data) {
 
     const NAVY    = '#0f1b35';
     const NAVY2   = '#1a2d52';
-    const BLUE    = '#3b6ef5';
     const GOLD    = '#c9a84c';
     const GOLD_LT = '#e8d5a3';
     const WHITE   = '#ffffff';
     const GRAY    = '#64748b';
-    const RED     = '#E8381E';
 
     const ML = 48;
     const CW = W - ML * 2;
@@ -226,11 +220,7 @@ function generateTeacherContract(data) {
     let y = 18;
 
     // Logo
-    doc.fontSize(22).font('Helvetica-Bold');
-    doc.fillColor(BLUE).text('Be', ML, y, { continued: true });
-    doc.fillColor(RED).text('Brave');
-    doc.fontSize(7).fillColor(GRAY).font('Helvetica')
-       .text('LANGUAGE TUTORING PLATFORM', ML, y + 26);
+    doc.image(LOGO_PATH, ML, y, { height: 34 });
     if (data.contract_id) {
       doc.fontSize(7).fillColor(GRAY).font('Helvetica')
          .text(`ID: ${data.contract_id}`, ML, y + 5, { width: CW, align: 'right' });

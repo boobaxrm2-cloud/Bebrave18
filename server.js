@@ -104,6 +104,91 @@ const PALETTE = [
 ];
 function pickColor(idx) { return PALETTE[idx % PALETTE.length]; }
 
+// ── Referral program ─────────────────────────────────────────
+const REFERRAL_ELIGIBLE_TARGET = 3;
+const REFERRAL_REWARD_PLAN = 'standard';
+const REFERRAL_WARN_WINDOW_DAYS = 15;
+const REFERRAL_WARN_INTERVAL_DAYS = 3;
+
+function genReferralCode(name) {
+  const base = (name || 'PROF')
+    .normalize('NFD').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 6) || 'PROF';
+  let code;
+  do { code = base + Math.floor(1000 + Math.random() * 9000); }
+  while (Teachers.findOne({ referralCode: code }));
+  return code;
+}
+
+// Concede a recompensa de indicação (3 meses grátis do plano Standard) a um professor.
+// Usada tanto automaticamente (ao atingir a meta) quanto manualmente (fallback do admin).
+function grantReferralReward(t, eligibleCount) {
+  const start = new Date();
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 3);
+  t.plan = REFERRAL_REWARD_PLAN;
+  t.referralRewardRedeemed = true;
+  t.referralRewardActive = true;
+  t.referralRewardStart = start.toISOString();
+  t.referralRewardEnd = end.toISOString();
+  t.referralLastWarnAt = null;
+  t.referralRewardPopupPending = true;
+  Teachers.update(t);
+  notify(t.login, 'referral_reward_granted', 'Parabéns! Você ganhou 3 meses grátis 🎉',
+    `Por indicar ${eligibleCount} professores que assinaram a plataforma, você ganhou o plano ${getPlan(REFERRAL_REWARD_PLAN).label} gratuito até ${end.toLocaleDateString('pt-BR')}.`);
+}
+
+// Chamado sempre que o plano de um professor muda para um plano pago.
+// Marca o professor como "indicado elegível" e, quando o indicador atinge
+// a meta de indicações elegíveis, libera a recompensa automaticamente.
+function checkReferralEligibility(t) {
+  if (!t.referredByLogin || t.referralEligible) return;
+  const plan = getPlan(t.plan);
+  if (!plan.price) return;
+  t.referralEligible = true;
+  t.referralEligibleAt = now();
+  Teachers.update(t);
+  const referrer = Teachers.findOne({ login: t.referredByLogin });
+  if (!referrer) return;
+  const eligibleCount = Teachers.find({ referredByLogin: referrer.login, referralEligible: true }).length;
+  if (eligibleCount >= REFERRAL_ELIGIBLE_TARGET && !referrer.referralRewardRedeemed) {
+    grantReferralReward(referrer, eligibleCount);
+    AdminMessages.insert({
+      fromLogin: referrer.login, fromName: referrer.name, fromRole: 'teacher',
+      content: `🎉 O professor ${referrer.name} atingiu ${eligibleCount} indicações elegíveis e recebeu automaticamente 3 meses grátis do plano Standard.`,
+      createdAt: now(), read: false, adminReply: null, adminRepliedAt: null,
+    });
+  }
+}
+
+// Verificação diária: alerta indicadores premiados perto do fim do prêmio,
+// e reverte quem já passou do prazo para o plano padrão.
+function checkReferralRewardsExpiring() {
+  if (!Teachers) return;
+  const active = Teachers.find({ referralRewardActive: true });
+  active.forEach(t => {
+    if (!t.referralRewardEnd) return;
+    const endMs = new Date(t.referralRewardEnd).getTime();
+    const daysLeft = Math.ceil((endMs - Date.now()) / 86400000);
+    if (daysLeft <= 0) {
+      t.referralRewardActive = false;
+      t.plan = getDefaultPlanKey();
+      Teachers.update(t);
+      notify(t.login, 'referral_reward_ended', 'Seu período grátis de indicação acabou',
+        `Seu plano Standard gratuito por indicação chegou ao fim. Você voltou para o plano ${getPlan(t.plan).label}. Assine um plano para continuar com acesso completo.`);
+      return;
+    }
+    if (daysLeft <= REFERRAL_WARN_WINDOW_DAYS) {
+      const daysSinceWarn = t.referralLastWarnAt ? (Date.now() - new Date(t.referralLastWarnAt).getTime()) / 86400000 : 999;
+      if (daysSinceWarn >= REFERRAL_WARN_INTERVAL_DAYS) {
+        t.referralLastWarnAt = now();
+        Teachers.update(t);
+        notify(t.login, 'referral_reward_ending', 'Seu prêmio está acabando ⏳',
+          `Faltam ${daysLeft} dia(s) para o fim do seu plano Standard gratuito por indicação. Se estiver gostando da plataforma, assine um plano em "Meu Plano" para continuar sem interrupções.`);
+      }
+    }
+  });
+}
+
 // ── Plans ────────────────────────────────────────────────────
 // maxStudents: null = sem limite. restrictedTools: ferramentas bloqueadas nesse plano.
 // Os planos em si vivem na coleção Plans (editável pelo admin); isto aqui é só a
@@ -245,16 +330,22 @@ app.get('/api/check-cpf', (req, res) => {
 });
 
 app.post('/api/auth/register-teacher', (req, res) => {
-  const { name, login: rawLogin, languages, email, whatsapp, password } = req.body;
+  const { name, login: rawLogin, languages, email, whatsapp, password, referralCode } = req.body;
   if (!name || !rawLogin || !email || !whatsapp || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
   if (password.length < 4) return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres' });
   const login = rawLogin.trim();
   if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) return res.status(400).json({ error: 'Login deve ter entre 4 e 20 caracteres (letras, números e _)' });
   if (Users.findOne({ login }) || Users.findOne({ login: login.toUpperCase() })) return res.status(409).json({ error: 'Este login já está em uso. Escolha outro.' });
+  let referredByLogin = null;
+  if (referralCode && referralCode.trim()) {
+    const referrer = Teachers.findOne({ referralCode: referralCode.trim().toUpperCase() });
+    if (!referrer) return res.status(400).json({ error: 'Código de indicação inválido. Verifique e tente novamente, ou deixe o campo em branco.' });
+    referredByLogin = referrer.login;
+  }
   const ini = initials(name);
   const { color, bg } = pickColor(Teachers.count());
   Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
-  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true, plan: getDefaultPlanKey() });
+  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true, plan: getDefaultPlanKey(), referredByLogin });
   res.json({ ok: true, login, name: name.trim() });
 });
 
@@ -278,7 +369,7 @@ app.post('/api/auth/login', (req, res) => {
   req.session.user = { id: user.$loki, login: user.login, role: user.role, name: user.name };
   if (user.role === 'teacher') {
     const t = Teachers.findOne({ login: user.login });
-    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free', restrictedTools: getPlan(planKeyOf(user.login)).restrictedTools });
+    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free', restrictedTools: getPlan(planKeyOf(user.login)).restrictedTools, referralRewardPopupPending: !!t?.referralRewardPopupPending });
   }
   if (user.role === 'student') {
     const s = Students.findOne({ matricula: user.login });
@@ -298,7 +389,7 @@ app.get('/api/auth/me', (req, res) => {
   }
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
-    return res.json({ ...u, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free', restrictedTools: getPlan(planKeyOf(u.login)).restrictedTools });
+    return res.json({ ...u, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free', restrictedTools: getPlan(planKeyOf(u.login)).restrictedTools, referralRewardPopupPending: !!t?.referralRewardPopupPending });
   }
   res.json(u);
 });
@@ -400,6 +491,74 @@ app.post('/api/teacher/plan/cancel-subscription', auth, isTeach, async (req, res
   res.json({ ok: true, plan: t.plan });
 });
 
+// ── Programa de indicação ────────────────────────────────────
+app.get('/api/teacher/referrals', auth, isTeach, (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  const referred = Teachers.find({ referredByLogin: t.login }).map(r => ({
+    name: r.name, plan: r.plan, planLabel: getPlan(r.plan).label,
+    eligible: !!r.referralEligible, joinedAt: r.createdAt,
+  })).sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt));
+  res.json({
+    code: t.referralCode || null,
+    termsAccepted: !!t.referralTermsAccepted,
+    referred,
+    eligibleCount: referred.filter(r => r.eligible).length,
+    eligibleTarget: REFERRAL_ELIGIBLE_TARGET,
+    rewardRedeemed: !!t.referralRewardRedeemed,
+    rewardActive: !!t.referralRewardActive,
+    rewardStart: t.referralRewardStart || null,
+    rewardEnd: t.referralRewardEnd || null,
+  });
+});
+
+app.post('/api/teacher/referrals/accept-terms', auth, isTeach, (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  if (!t.referralCode) {
+    t.referralCode = genReferralCode(t.name);
+  }
+  t.referralTermsAccepted = true;
+  t.referralTermsAcceptedAt = now();
+  Teachers.update(t);
+  res.json({ ok: true, code: t.referralCode });
+});
+
+// Popup de parabéns (uma única vez) quando o professor ganha a recompensa
+app.post('/api/teacher/referrals/ack-reward-popup', auth, isTeach, (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  if (t) { t.referralRewardPopupPending = false; Teachers.update(t); }
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/referrals', auth, isAdmin, (req, res) => {
+  const teachers = Teachers.find();
+  const rows = teachers.map(t => {
+    const referredCount = Teachers.find({ referredByLogin: t.login }).length;
+    const eligibleCount = Teachers.find({ referredByLogin: t.login, referralEligible: true }).length;
+    return {
+      login: t.login, name: t.name, referredCount, eligibleCount,
+      eligibleTarget: REFERRAL_ELIGIBLE_TARGET,
+      canGrantReward: eligibleCount >= REFERRAL_ELIGIBLE_TARGET && !t.referralRewardRedeemed && !t.referralRewardActive,
+      rewardRedeemed: !!t.referralRewardRedeemed,
+      rewardActive: !!t.referralRewardActive,
+      rewardStart: t.referralRewardStart || null,
+      rewardEnd: t.referralRewardEnd || null,
+    };
+  }).filter(r => r.referredCount > 0 || r.rewardActive || r.rewardRedeemed)
+    .sort((a, b) => b.eligibleCount - a.eligibleCount);
+  res.json(rows);
+});
+
+app.put('/api/admin/referrals/:login/grant-reward', auth, isAdmin, (req, res) => {
+  const t = Teachers.findOne({ login: req.params.login });
+  if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
+  const eligibleCount = Teachers.find({ referredByLogin: t.login, referralEligible: true }).length;
+  if (t.referralRewardRedeemed) return res.status(400).json({ error: 'Este professor já resgatou a recompensa de indicação (uma vez por CPF).' });
+  if (eligibleCount < REFERRAL_ELIGIBLE_TARGET) return res.status(400).json({ error: 'Este professor ainda não atingiu a meta de indicações elegíveis.' });
+  grantReferralReward(t, eligibleCount);
+  res.json({ ok: true, plan: t.plan, rewardEnd: t.referralRewardEnd });
+});
+
 // ── Asaas webhook (público — chamado pelo Asaas, não pelo navegador) ─────
 app.post('/api/webhooks/asaas', (req, res) => {
   if (req.headers['asaas-access-token'] !== process.env.ASAAS_WEBHOOK_TOKEN) {
@@ -418,6 +577,7 @@ app.post('/api/webhooks/asaas', (req, res) => {
     if (t.pendingPlanKey) { t.plan = t.pendingPlanKey; t.pendingPlanKey = null; }
     t.subscriptionStatus = 'active';
     Teachers.update(t);
+    checkReferralEligibility(t);
     notify(t.login, 'plan_activated', 'Pagamento confirmado! 🎉', `Seu plano ${getPlan(t.plan).label} está ativo.`);
   } else if (event === 'PAYMENT_OVERDUE') {
     t.subscriptionStatus = 'overdue';
@@ -548,6 +708,7 @@ app.put('/api/admin/teachers/:login/plan', auth, isAdmin, (req, res) => {
   if (!t) return res.status(404).json({ error: 'Professor não encontrado' });
   t.plan = plan;
   Teachers.update(t);
+  checkReferralEligibility(t);
   notify(t.login, 'plan_changed', 'Seu plano foi atualizado', `Seu plano agora é ${target.label}.`);
   res.json({ ok: true, plan });
 });
@@ -2081,5 +2242,8 @@ app.use((req, res) => {
     res.status(500).send('ERROR: index.html not found in: ' + __dirname);
   }
 });
+
+setInterval(checkReferralRewardsExpiring, 24 * 60 * 60 * 1000);
+setTimeout(checkReferralRewardsExpiring, 15000);
 
 app.listen(PORT, () => console.log(`\n🚀 BeBrave rodando em http://localhost:${PORT}\n   Admin: ADMIN / 05012018\n`));

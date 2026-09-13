@@ -64,15 +64,12 @@
   </svg>
 
   <div class="lp-nav">
-    <svg viewBox="0 0 900 220" class="lp-nav-logo" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="40" height="3" fill="#2A5FCC" opacity="0.9"/><rect x="0" y="0" width="3" height="40" fill="#2A5FCC" opacity="0.9"/>
-      <rect x="860" y="0" width="40" height="3" fill="#E8381E" opacity="0.9"/><rect x="897" y="0" width="3" height="40" fill="#E8381E" opacity="0.9"/>
-      <rect x="0" y="217" width="40" height="3" fill="#E8381E" opacity="0.9"/><rect x="0" y="180" width="3" height="40" fill="#E8381E" opacity="0.9"/>
-      <rect x="860" y="217" width="40" height="3" fill="#2A5FCC" opacity="0.9"/><rect x="897" y="180" width="3" height="40" fill="#2A5FCC" opacity="0.9"/>
-      <text x="450" y="118" font-family="'Helvetica Neue',Arial,sans-serif" font-size="100" font-weight="800" text-anchor="middle" letter-spacing="-4"><tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan></text>
-      <rect x="265" y="130" width="183" height="3" fill="#2A5FCC" rx="1.5"/><rect x="452" y="130" width="187" height="3" fill="#E8381E" rx="1.5"/>
-      <text x="450" y="158" font-family="'Helvetica Neue',Arial,sans-serif" font-size="14" font-weight="500" fill="#94a3b8" text-anchor="middle" letter-spacing="5">LANGUAGE TUTORING PLATFORM</text>
-    </svg>
+    <img src="/assets/logo.png" alt="BeBrave" class="lp-nav-logo">
+    <nav class="lp-nav-links">
+      <a onclick="scrollToLandingSection('lp-features-section')">Ferramentas</a>
+      <a onclick="scrollToLandingSection('lp-shots-section')">Como Funciona</a>
+      <a onclick="scrollToLandingSection('lp-pricing-section')">Começar a usar</a>
+    </nav>
     <div class="lp-nav-spacer"></div>
     <div class="lp-nav-actions">
       <button class="lp-nav-btn-outline" onclick="showPage('page-login')">Login</button>
@@ -86,6 +83,17 @@
     </div>
   </div>
 
+  <!-- Promo banner -->
+  <div class="lp-promo-bar">
+    <span class="lp-promo-text">🎁 Indique 3 professores e ganhe 3 meses grátis do plano Standard</span>
+    <button class="lp-promo-btn" onclick="showPage('page-login')">Começar hoje</button>
+  </div>
+
+  <!-- Free-for-students strip -->
+  <div class="lp-free-strip">
+    <span>🎓 Para alunos, a BeBrave é <strong>100% gratuita</strong>, sempre!</span>
+  </div>
+
   <!-- Audience toggle -->
   <div class="lp-audience-bar">
     <div class="lp-audience-toggle">
@@ -96,6 +104,57 @@
 
   <!-- Hero -->
   <section class="lp-hero">
+    <div class="lp-hero-words-bg" aria-hidden="true">
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="lpWordsHero" x="0" y="0" width="640" height="480" patternUnits="userSpaceOnUse">
+            <g fill="#fff" opacity=".14" font-family="'Poppins','Noto Sans JP','Noto Sans KR',sans-serif" font-weight="600">
+              <text x="50" y="70" font-size="30" transform="rotate(-8 50 70)">Hello</text>
+              <text x="280" y="55" font-size="34" transform="rotate(6 280 55)">Olá</text>
+              <text x="460" y="115" font-size="26" transform="rotate(-5 460 115)">Bonjour</text>
+              <text x="95" y="205" font-size="24" transform="rotate(4 95 205)">こんにちは</text>
+              <text x="360" y="235" font-size="30" transform="rotate(-10 360 235)">Ciao</text>
+              <text x="510" y="295" font-size="28" transform="rotate(7 510 295)">Hola</text>
+              <text x="175" y="345" font-size="26" transform="rotate(-4 175 345)">Hallo</text>
+              <text x="420" y="405" font-size="30" transform="rotate(5 420 405)">안녕</text>
+              <text x="30" y="435" font-size="22" transform="rotate(2 30 435)">Merhaba</text>
+            </g>
+            <g opacity=".16">
+              <g transform="translate(230,130) rotate(10)">
+                <rect width="42" height="27" rx="3" fill="#B22234"/>
+                <rect y="4" width="42" height="3.5" fill="#fff"/>
+                <rect y="11" width="42" height="3.5" fill="#fff"/>
+                <rect y="18" width="42" height="3.5" fill="#fff"/>
+                <rect width="17" height="15" fill="#3C3B6E"/>
+              </g>
+              <g transform="translate(500,45) rotate(-8)">
+                <rect width="42" height="27" rx="3" fill="#AA151B"/>
+                <rect y="6.75" width="42" height="13.5" fill="#F1BF00"/>
+              </g>
+              <g transform="translate(60,280) rotate(6)">
+                <rect width="42" height="27" rx="3" fill="#fff"/>
+                <rect width="14" height="27" fill="#009246"/>
+                <rect x="28" width="14" height="27" fill="#CE2B37"/>
+              </g>
+              <g transform="translate(420,300) rotate(-9)">
+                <rect width="42" height="27" rx="3" fill="#fff"/>
+                <circle cx="21" cy="13.5" r="7" fill="#BC002D"/>
+              </g>
+              <g transform="translate(220,400) rotate(7)">
+                <rect width="42" height="27" rx="3" fill="#fff"/>
+                <circle cx="21" cy="13.5" r="6" fill="#CD2E3A"/>
+                <path d="M21,7.5 A6,6 0 0,1 21,19.5 A3,3 0 0,1 21,13.5 A3,3 0 0,0 21,7.5 Z" fill="#0047A0"/>
+              </g>
+              <g transform="translate(560,180) rotate(-5)">
+                <rect width="42" height="27" rx="3" fill="#DE2910"/>
+                <path d="M8,5 L9.2,8.6 L13,8.6 L9.9,10.8 L11.1,14.4 L8,12.2 L4.9,14.4 L6.1,10.8 L3,8.6 L6.8,8.6 Z" fill="#FFDE00"/>
+              </g>
+            </g>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#lpWordsHero)"/>
+      </svg>
+    </div>
     <div class="lp-hero-content">
       <span class="lp-hero-badge" id="lp-hero-badge">Para professores</span>
       <h1 class="lp-hero-title" id="lp-hero-title"></h1>
@@ -105,13 +164,13 @@
   </section>
 
   <!-- Features -->
-  <section class="lp-section lp-mesh-bg">
+  <section class="lp-section lp-mesh-bg" id="lp-features-section">
     <h2 class="lp-section-title" id="lp-features-title"></h2>
     <div class="lp-features" id="lp-features"></div>
   </section>
 
   <!-- Screenshots -->
-  <section class="lp-section lp-section-alt lp-mesh-bg">
+  <section class="lp-section lp-section-alt lp-mesh-bg" id="lp-shots-section">
     <h2 class="lp-section-title">Veja a plataforma em ação</h2>
     <p class="lp-section-sub">Clique em qualquer imagem para ampliar.</p>
     <div class="lp-shots" id="lp-shots"></div>
@@ -205,26 +264,7 @@
 
       <!-- Logo LARGE -->
       <div class="lv2-logo-wrap">
-        <svg viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg" class="lv2-logo-svg">
-          <!-- Corner accents matching the uploaded logo style -->
-          <rect x="0" y="0" width="48" height="3" fill="#2A5FCC" opacity="0.9"/>
-          <rect x="0" y="0" width="3" height="48" fill="#2A5FCC" opacity="0.9"/>
-          <rect x="632" y="0" width="48" height="3" fill="#E8381E" opacity="0.9"/>
-          <rect x="677" y="0" width="3" height="48" fill="#E8381E" opacity="0.9"/>
-          <rect x="0" y="217" width="48" height="3" fill="#E8381E" opacity="0.9"/>
-          <rect x="0" y="172" width="3" height="48" fill="#E8381E" opacity="0.9"/>
-          <rect x="632" y="217" width="48" height="3" fill="#2A5FCC" opacity="0.9"/>
-          <rect x="677" y="172" width="3" height="48" fill="#2A5FCC" opacity="0.9"/>
-          <!-- Main wordmark (from uploaded logo) -->
-          <text x="340" y="128" font-family="'Helvetica Neue',Arial,sans-serif" font-size="100" font-weight="800" text-anchor="middle" letter-spacing="-4">
-            <tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan>
-          </text>
-          <!-- Underline bars (from uploaded logo) -->
-          <rect x="155" y="140" width="183" height="3" fill="#2A5FCC" rx="1.5"/>
-          <rect x="342" y="140" width="187" height="3" fill="#E8381E" rx="1.5"/>
-          <!-- Subtitle -->
-          <text x="340" y="185" font-family="'Helvetica Neue',Arial,sans-serif" font-size="14" font-weight="500" fill="#94a3b8" text-anchor="middle" letter-spacing="5">LANGUAGE TUTORING PLATFORM</text>
-        </svg>
+        <img src="/assets/logo.png" alt="BeBrave" class="lv2-logo-svg">
       </div>
 
       <!-- Divider -->
@@ -339,15 +379,7 @@
     </div>
     <div class="lv2-card" style="max-width:520px">
       <div class="lv2-logo-wrap">
-        <svg viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg" class="lv2-logo-svg">
-          <rect x="0" y="0" width="48" height="3" fill="#2A5FCC" opacity="0.9"/><rect x="0" y="0" width="3" height="48" fill="#2A5FCC" opacity="0.9"/>
-          <rect x="632" y="0" width="48" height="3" fill="#E8381E" opacity="0.9"/><rect x="677" y="0" width="3" height="48" fill="#E8381E" opacity="0.9"/>
-          <rect x="0" y="217" width="48" height="3" fill="#E8381E" opacity="0.9"/><rect x="0" y="172" width="3" height="48" fill="#E8381E" opacity="0.9"/>
-          <rect x="632" y="217" width="48" height="3" fill="#2A5FCC" opacity="0.9"/><rect x="677" y="172" width="3" height="48" fill="#2A5FCC" opacity="0.9"/>
-          <text x="340" y="128" font-family="'Helvetica Neue',Arial,sans-serif" font-size="100" font-weight="800" text-anchor="middle" letter-spacing="-4"><tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan></text>
-          <rect x="155" y="140" width="183" height="3" fill="#2A5FCC" rx="1.5"/><rect x="342" y="140" width="187" height="3" fill="#E8381E" rx="1.5"/>
-          <text x="340" y="185" font-family="'Helvetica Neue',Arial,sans-serif" font-size="14" font-weight="500" fill="#94a3b8" text-anchor="middle" letter-spacing="5">LANGUAGE TUTORING PLATFORM</text>
-        </svg>
+        <img src="/assets/logo.png" alt="BeBrave" class="lv2-logo-svg">
       </div>
       <div class="lv2-divider"><span class="lv2-divider-line lv2-dl-blue"></span><span class="lv2-divider-dot"></span><span class="lv2-divider-line lv2-dl-red"></span></div>
       <div class="lv2-form">
@@ -367,6 +399,7 @@
         <div class="lv2-field"><label class="lv2-label">E-mail *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg><input id="reg-email" type="email" class="lv2-input" placeholder="seu@email.com"></div></div>
         <div class="lv2-field"><label class="lv2-label">WhatsApp *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.63A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><input id="reg-whatsapp" type="text" class="lv2-input" placeholder="(21) 99999-9999"></div></div>
         <div class="lv2-field"><label class="lv2-label">Senha de acesso *</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input id="reg-password" type="password" class="lv2-input" placeholder="Mínimo 4 caracteres"><button type="button" class="lv2-eye" onclick="togglePw('reg-password',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <div class="lv2-field"><label class="lv2-label">Código de indicação (opcional)</label><div class="lv2-input-wrap"><svg class="lv2-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><input id="reg-referral-code" type="text" class="lv2-input" placeholder="Ex: MARIA4821" style="text-transform:uppercase"></div></div>
         <div style="margin:16px 0;padding:12px 14px;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px">
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#0c4a6e;line-height:1.5">
             <input type="checkbox" id="reg-lgpd" style="margin-top:2px;accent-color:#2A5FCC;flex-shrink:0">
@@ -385,29 +418,7 @@
   <div class="app-layout">
     <aside class="sidebar" id="admin-sidebar">
 <div class="sb-logo-wrap">
-  <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg" class="sb-logo-svg">
-    <!-- Corner accents - top left blue -->
-    <rect x="0" y="0" width="28" height="2" fill="#2A5FCC" opacity="0.8"/>
-    <rect x="0" y="0" width="2" height="28" fill="#2A5FCC" opacity="0.8"/>
-    <!-- Corner accents - top right red -->
-    <rect x="652" y="0" width="28" height="2" fill="#E8381E" opacity="0.8"/>
-    <rect x="678" y="0" width="2" height="28" fill="#E8381E" opacity="0.8"/>
-    <!-- Corner accents - bottom left red -->
-    <rect x="0" y="198" width="28" height="2" fill="#E8381E" opacity="0.8"/>
-    <rect x="0" y="170" width="2" height="28" fill="#E8381E" opacity="0.8"/>
-    <!-- Corner accents - bottom right blue -->
-    <rect x="652" y="198" width="28" height="2" fill="#2A5FCC" opacity="0.8"/>
-    <rect x="678" y="170" width="2" height="28" fill="#2A5FCC" opacity="0.8"/>
-    <!-- Wordmark -->
-    <text x="340" y="108" font-family="'Helvetica Neue',Arial,sans-serif" font-size="96" font-weight="800" text-anchor="middle" letter-spacing="-4">
-      <tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan>
-    </text>
-    <!-- Underline bars -->
-    <rect x="155" y="122" width="183" height="2.5" fill="#2A5FCC" rx="1.2"/>
-    <rect x="342" y="122" width="183" height="2.5" fill="#E8381E" rx="1.2"/>
-    <!-- Subtitle -->
-    <text x="340" y="162" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="500" fill="#64748b" text-anchor="middle" letter-spacing="3.5">LANGUAGE TUTORING PLATFORM</text>
-  </svg>
+  <img src="/assets/logo.png" alt="BeBrave" class="sb-logo-svg">
 </div>
       <div class="sb-user" onclick="openProfile()" style="cursor:pointer" title="Editar perfil">
         <div class="avatar adm-av" id="adm-avatar-img">AD</div>
@@ -418,6 +429,7 @@
         <a class="nav-item active" onclick="showAdmin('adm-overview',this)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Visão Geral</a>
         <a class="nav-item" onclick="showAdmin('adm-teachers',this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Professores</a>
         <a class="nav-item" onclick="showAdmin('adm-plans',this);loadAdminPlans()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l3 6 6.5 1-4.7 4.6L18 20l-6-3.4L6 20l1.2-6.4L2.5 9l6.5-1z"/></svg>Planos</a>
+        <a class="nav-item" onclick="showAdmin('adm-referrals',this);loadAdminReferrals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>Indicações</a>
         <a class="nav-item" onclick="showAdmin('adm-students',this)"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Alunos</a>
         <a class="nav-item" onclick="showAdmin('adm-passwords',this)"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Senhas</a>
         <a class="nav-item" onclick="showAdmin('adm-contracts',this);loadAdminContracts()"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Contratos</a>
@@ -448,6 +460,12 @@
       <section id="adm-plans" class="cs">
         <div class="sh"><div><h2>Planos</h2><p class="sub">Defina os planos disponíveis e o que cada um inclui</p></div><button class="btn-primary" onclick="openPlanModal()">+ Novo Plano</button></div>
         <div id="adm-plans-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px"></div>
+      </section>
+
+      <!-- Indicações Admin -->
+      <section id="adm-referrals" class="cs">
+        <div class="sh"><div><h2>Indicações</h2><p class="sub">A recompensa é liberada automaticamente ao atingir a meta. O interruptor abaixo é só um reforço manual, para casos excepcionais.</p></div></div>
+        <div id="adm-referrals-list"></div>
       </section>
 
       <!-- Alunos Admin -->
@@ -502,29 +520,7 @@
   <div class="app-layout">
     <aside class="sidebar" id="teacher-sidebar">
 <div class="sb-logo-wrap">
-  <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg" class="sb-logo-svg">
-    <!-- Corner accents - top left blue -->
-    <rect x="0" y="0" width="28" height="2" fill="#2A5FCC" opacity="0.8"/>
-    <rect x="0" y="0" width="2" height="28" fill="#2A5FCC" opacity="0.8"/>
-    <!-- Corner accents - top right red -->
-    <rect x="652" y="0" width="28" height="2" fill="#E8381E" opacity="0.8"/>
-    <rect x="678" y="0" width="2" height="28" fill="#E8381E" opacity="0.8"/>
-    <!-- Corner accents - bottom left red -->
-    <rect x="0" y="198" width="28" height="2" fill="#E8381E" opacity="0.8"/>
-    <rect x="0" y="170" width="2" height="28" fill="#E8381E" opacity="0.8"/>
-    <!-- Corner accents - bottom right blue -->
-    <rect x="652" y="198" width="28" height="2" fill="#2A5FCC" opacity="0.8"/>
-    <rect x="678" y="170" width="2" height="28" fill="#2A5FCC" opacity="0.8"/>
-    <!-- Wordmark -->
-    <text x="340" y="108" font-family="'Helvetica Neue',Arial,sans-serif" font-size="96" font-weight="800" text-anchor="middle" letter-spacing="-4">
-      <tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan>
-    </text>
-    <!-- Underline bars -->
-    <rect x="155" y="122" width="183" height="2.5" fill="#2A5FCC" rx="1.2"/>
-    <rect x="342" y="122" width="183" height="2.5" fill="#E8381E" rx="1.2"/>
-    <!-- Subtitle -->
-    <text x="340" y="162" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="500" fill="#64748b" text-anchor="middle" letter-spacing="3.5">LANGUAGE TUTORING PLATFORM</text>
-  </svg>
+  <img src="/assets/logo.png" alt="BeBrave" class="sb-logo-svg">
 </div>
       <div class="sb-user" onclick="openProfile()" style="cursor:pointer" title="Editar perfil">
         <div class="avatar teach-av" id="t-avatar">?</div>
@@ -533,6 +529,7 @@
       </div>
       <nav class="sb-nav">
         <a class="nav-item" id="t-nav-notifications" onclick="showTeacher('t-notifications',this);loadNotificationsPage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notificações<span id="t-notif-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
+        <a class="nav-item" id="t-nav-referrals" onclick="showTeacher('t-referrals',this);loadTeacherReferrals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>Indicações</a>
         <a class="nav-item active" onclick="showTeacher('t-overview',this)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Visão Geral</a>
         <a class="nav-item" id="t-nav-plan" onclick="showTeacher('t-plan',this);loadTeacherPlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l3 6 6.5 1-4.7 4.6L18 20l-6-3.4L6 20l1.2-6.4L2.5 9l6.5-1z"/></svg>Meu Plano</a>
         <a class="nav-item" id="t-nav-students" onclick="showTeacher('t-students',this)"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Meus Alunos</a>
@@ -706,6 +703,11 @@
         <div id="t-notif-list"></div>
       </section>
 
+      <section id="t-referrals" class="cs">
+        <div class="sh"><div><h2>Indicações</h2><p class="sub">Indique outros professores e ganhe recompensas</p></div></div>
+        <div id="t-referrals-content"></div>
+      </section>
+
     </main>
   </div>
 </div>
@@ -715,29 +717,7 @@
   <div class="app-layout">
     <aside class="sidebar" id="student-sidebar">
 <div class="sb-logo-wrap">
-  <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg" class="sb-logo-svg">
-    <!-- Corner accents - top left blue -->
-    <rect x="0" y="0" width="28" height="2" fill="#2A5FCC" opacity="0.8"/>
-    <rect x="0" y="0" width="2" height="28" fill="#2A5FCC" opacity="0.8"/>
-    <!-- Corner accents - top right red -->
-    <rect x="652" y="0" width="28" height="2" fill="#E8381E" opacity="0.8"/>
-    <rect x="678" y="0" width="2" height="28" fill="#E8381E" opacity="0.8"/>
-    <!-- Corner accents - bottom left red -->
-    <rect x="0" y="198" width="28" height="2" fill="#E8381E" opacity="0.8"/>
-    <rect x="0" y="170" width="2" height="28" fill="#E8381E" opacity="0.8"/>
-    <!-- Corner accents - bottom right blue -->
-    <rect x="652" y="198" width="28" height="2" fill="#2A5FCC" opacity="0.8"/>
-    <rect x="678" y="170" width="2" height="28" fill="#2A5FCC" opacity="0.8"/>
-    <!-- Wordmark -->
-    <text x="340" y="108" font-family="'Helvetica Neue',Arial,sans-serif" font-size="96" font-weight="800" text-anchor="middle" letter-spacing="-4">
-      <tspan fill="#2A5FCC">Be</tspan><tspan fill="#E8381E">Brave</tspan>
-    </text>
-    <!-- Underline bars -->
-    <rect x="155" y="122" width="183" height="2.5" fill="#2A5FCC" rx="1.2"/>
-    <rect x="342" y="122" width="183" height="2.5" fill="#E8381E" rx="1.2"/>
-    <!-- Subtitle -->
-    <text x="340" y="162" font-family="'Helvetica Neue',Arial,sans-serif" font-size="11" font-weight="500" fill="#64748b" text-anchor="middle" letter-spacing="3.5">LANGUAGE TUTORING PLATFORM</text>
-  </svg>
+  <img src="/assets/logo.png" alt="BeBrave" class="sb-logo-svg">
 </div>
       <div class="sb-user" onclick="openProfile()" style="cursor:pointer" title="Editar perfil">
         <div class="avatar stud-av" id="s-avatar">AL</div>
@@ -1284,6 +1264,40 @@
       <button class="btn-secondary" onclick="closeModal('modal-pending-contracts')">Ver depois</button>
       <button class="btn-primary" id="pending-contracts-btn" onclick="">Ir para Contratos</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════ Modal: Termos do Programa de Indicação ═══════ -->
+<div id="modal-referral-terms" class="modal-ov hidden" onclick="closeModalOv(event,'modal-referral-terms')">
+  <div class="modal-card" style="max-width:520px;width:95vw">
+    <div class="mh"><h3>🎁 Programa de Indicação</h3><button class="mc-close" onclick="closeModal('modal-referral-terms')">✕</button></div>
+    <div style="background:var(--g50);border-radius:var(--r-sm);padding:16px;font-size:13.5px;color:var(--g600);line-height:1.6;margin-bottom:16px">
+      <p style="margin-bottom:10px">Ao gerar seu código de indicação, você concorda com as seguintes regras:</p>
+      <ul style="padding-left:18px;margin:0">
+        <li>Cada professor que se cadastrar usando o seu código conta como um <strong>indicado</strong>.</li>
+        <li>Um indicado só se torna <strong>elegível</strong> quando assinar (pagar) ao menos o plano <strong>Basic</strong>.</li>
+        <li>Ao atingir <strong>3 indicados elegíveis</strong>, você ganha automaticamente <strong>3 meses grátis do plano Standard</strong>.</li>
+        <li>Essa recompensa é única — <strong>uma vez por professor (CPF)</strong>, para sempre.</li>
+      </ul>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:16px">
+      <input type="checkbox" id="referral-terms-check" style="margin-top:3px;width:auto;accent-color:#2A5FCC;flex-shrink:0">
+      <label for="referral-terms-check" style="margin:0;cursor:pointer;font-size:13.5px">Li e aceito os termos do programa de indicação</label>
+    </div>
+    <div class="mf">
+      <button class="btn-secondary" onclick="closeModal('modal-referral-terms')">Cancelar</button>
+      <button class="btn-primary" onclick="submitReferralTermsAccept()">Concordar e gerar código</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Modal: Recompensa de Indicação (parabéns) ═══════ -->
+<div id="modal-referral-reward" class="modal-ov hidden">
+  <div class="modal-card" style="max-width:440px;width:95vw;text-align:center">
+    <div style="font-size:56px;margin-bottom:12px">🎉</div>
+    <h3 style="margin-bottom:8px">Parabéns!</h3>
+    <p id="referral-reward-msg" style="color:var(--g600);font-size:14.5px;line-height:1.6;margin-bottom:24px"></p>
+    <button class="btn-primary" style="width:100%" onclick="ackReferralRewardPopup()">Muito obrigado!</button>
   </div>
 </div>
 

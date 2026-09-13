@@ -116,6 +116,10 @@ document.addEventListener('click', (ev) => {
   }
 });
 
+function scrollToLandingSection(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+}
+
 let _landingAudience = 'teacher';
 function setLandingAudience(aud) {
   _landingAudience = aud;
@@ -388,6 +392,52 @@ async function changeTeacherPlan(login, plan) {
     showToast('✅ Plano atualizado!');
     loadAdminTeachers();
   } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── Programa de indicação (admin) ────────────────────────────────
+function fmtCountdown(endIso) {
+  const daysLeft = Math.ceil((new Date(endIso).getTime() - Date.now()) / 86400000);
+  return daysLeft > 0 ? `⏳ ${daysLeft} dia(s) restante(s)` : '⏳ Encerrando';
+}
+
+async function loadAdminReferrals() {
+  const el = document.getElementById('adm-referrals-list');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const rows = await api('GET', '/api/admin/referrals');
+    if (!rows.length) { el.innerHTML = '<div class="card"><p class="empty">Nenhum professor com indicações ainda.</p></div>'; return; }
+    el.innerHTML = rows.map(r => `
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <h4 style="margin:0 0 4px;font-size:15px">${escHtml(r.name)}</h4>
+            <p style="margin:0;font-size:13px;color:var(--g500)">
+              ${r.referredCount} indicado(s) · ${r.eligibleCount}/${r.eligibleTarget} elegível(is)
+              ${r.rewardActive ? `· <strong style="color:var(--green)">${fmtCountdown(r.rewardEnd)}</strong>` : ''}
+              ${r.rewardRedeemed && !r.rewardActive ? '· <span style="color:var(--g400)">Recompensa já resgatada</span>' : ''}
+            </p>
+            ${r.rewardActive ? `<p style="margin:4px 0 0;font-size:12px;color:var(--g400)">De ${new Date(r.rewardStart).toLocaleDateString('pt-BR')} até ${new Date(r.rewardEnd).toLocaleDateString('pt-BR')}</p>` : ''}
+          </div>
+          <div>
+            ${r.canGrantReward ? `
+              <label class="tgl-switch" title="Liberar 3 meses grátis do plano Standard">
+                <input type="checkbox" onchange="grantReferralReward('${r.login}','${escJs(r.name)}',this)">
+                <span class="tgl-slider"></span>
+              </label>
+            ` : (r.rewardActive || r.rewardRedeemed ? '' : `<span style="font-size:12px;color:var(--g400)">Aguardando elegibilidade</span>`)}
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function grantReferralReward(login, name, checkboxEl) {
+  if (!confirm(`Liberar 3 meses grátis do plano Standard para ${name}?`)) { checkboxEl.checked = false; return; }
+  try {
+    await api('PUT', `/api/admin/referrals/${login}/grant-reward`);
+    showToast('✅ Recompensa liberada!');
+    loadAdminReferrals();
+  } catch(e) { showToast('❌ ' + e.message); checkboxEl.checked = false; }
 }
 
 let _adminPlansCache = [];
@@ -791,6 +841,7 @@ async function loadTeacher() {
   loadNotifications();
   setInterval(loadNotifications, 30000);
   checkTermsAccepted();
+  checkReferralRewardPopup();
 }
 
 async function refreshTeacherAll() {
@@ -1221,6 +1272,110 @@ function applyPlanLockUI() {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('nav-locked', restricted.includes(key));
   });
+}
+
+// ── Programa de indicação (professor) ────────────────────────────
+async function loadTeacherReferrals() {
+  const el = document.getElementById('t-referrals-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const data = await api('GET', '/api/teacher/referrals');
+    const termsBox = `
+      <div class="card" style="margin-bottom:16px;background:var(--g50)">
+        <h4 style="margin:0 0 8px;font-size:14px">📜 Como funciona</h4>
+        <ul style="padding-left:18px;margin:0;font-size:13px;color:var(--g600);line-height:1.7">
+          <li>Cada professor que se cadastrar com o seu código conta como um <strong>indicado</strong>.</li>
+          <li>Um indicado vira <strong>elegível</strong> quando assinar ao menos o plano <strong>Basic</strong>.</li>
+          <li>Ao atingir <strong>${data.eligibleTarget} indicados elegíveis</strong>, você ganha automaticamente <strong>3 meses grátis do plano Standard</strong>.</li>
+          <li>Recompensa única — <strong>uma vez por professor</strong>, para sempre.</li>
+        </ul>
+      </div>`;
+
+    let codeBox;
+    if (!data.code) {
+      codeBox = `<div class="card" style="text-align:center;margin-bottom:16px">
+        <p style="margin-bottom:14px;color:var(--g600)">Você ainda não gerou seu código de indicação.</p>
+        <button class="btn-primary" onclick="openReferralTermsModal()">🎁 Gerar meu código de indicação</button>
+      </div>`;
+    } else {
+      codeBox = `<div class="card" style="text-align:center;margin-bottom:16px">
+        <p style="color:var(--g500);font-size:13px;margin-bottom:6px">Seu código de indicação</p>
+        <div style="font-size:26px;font-weight:700;color:var(--blue);letter-spacing:2px;margin-bottom:10px;font-family:'Poppins',sans-serif">${data.code}</div>
+        <button class="btn-sm" onclick="copyReferralCode('${data.code}')">📋 Copiar código</button>
+      </div>`;
+    }
+
+    let rewardBox = '';
+    if (data.rewardActive) {
+      const end = new Date(data.rewardEnd);
+      rewardBox = `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--green)">
+        <h4 style="margin:0 0 6px;font-size:14px">🎉 Recompensa ativa!</h4>
+        <p style="font-size:13px;color:var(--g600);margin:0">Plano Standard grátis até <strong>${end.toLocaleDateString('pt-BR')}</strong>.</p>
+      </div>`;
+    } else if (data.rewardRedeemed) {
+      rewardBox = `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--g300)">
+        <p style="font-size:13px;color:var(--g500);margin:0">✅ Você já resgatou sua recompensa de indicação anteriormente.</p>
+      </div>`;
+    }
+
+    const referredRows = data.referred.length
+      ? data.referred.map(r => `
+        <div class="cert-card">
+          <div class="cert-icon">${r.eligible ? '✅' : '⏳'}</div>
+          <div class="cert-info">
+            <h4>${escHtml(r.name)}</h4>
+            <p>${r.eligible ? `Elegível · Plano ${escHtml(r.planLabel)}` : `Aguardando assinatura de plano pago · Plano atual: ${escHtml(r.planLabel)}`}</p>
+          </div>
+        </div>`).join('')
+      : '<p class="empty">Nenhum professor indicado ainda.</p>';
+
+    el.innerHTML = `
+      ${codeBox}
+      ${rewardBox}
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card bc-blue"><div class="stat-icon">👥</div><div><div class="stat-val">${data.referred.length}</div><div class="stat-lbl">Professores indicados</div></div></div>
+        <div class="stat-card bc-green"><div class="stat-icon">🏆</div><div><div class="stat-val">${data.eligibleCount}/${data.eligibleTarget}</div><div class="stat-lbl">Elegíveis para a recompensa</div></div></div>
+      </div>
+      ${termsBox}
+      <div class="card"><h4 style="margin:0 0 12px;font-size:14px">Professores indicados</h4>${referredRows}</div>
+    `;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+function openReferralTermsModal() {
+  document.getElementById('referral-terms-check').checked = false;
+  openModal('modal-referral-terms');
+}
+
+async function submitReferralTermsAccept() {
+  if (!document.getElementById('referral-terms-check').checked) { showToast('⚠️ Você precisa aceitar os termos para continuar'); return; }
+  try {
+    await api('POST', '/api/teacher/referrals/accept-terms');
+    closeModal('modal-referral-terms');
+    showToast('✅ Código de indicação gerado!');
+    loadTeacherReferrals();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+function copyReferralCode(code) {
+  navigator.clipboard?.writeText(code).then(() => showToast('📋 Código copiado!')).catch(() => showToast('Código: ' + code));
+}
+
+async function checkReferralRewardPopup() {
+  if (!ME?.referralRewardPopupPending) return;
+  try {
+    const data = await api('GET', '/api/teacher/referrals');
+    const end = data.rewardEnd ? new Date(data.rewardEnd).toLocaleDateString('pt-BR') : '';
+    document.getElementById('referral-reward-msg').textContent =
+      `Por indicar professores que assinaram a plataforma, você ganhou o plano Standard gratuito até ${end}. Obrigado por espalhar a BeBrave!`;
+    openModal('modal-referral-reward');
+  } catch(e) {}
+}
+
+async function ackReferralRewardPopup() {
+  closeModal('modal-referral-reward');
+  ME.referralRewardPopupPending = false;
+  api('POST', '/api/teacher/referrals/ack-reward-popup').catch(() => {});
 }
 
 async function loadTeacherPlan() {
@@ -4204,6 +4359,7 @@ async function submitTeacherRegistration() {
   const email    = document.getElementById('reg-email').value.trim();
   const whatsapp = document.getElementById('reg-whatsapp').value.trim();
   const password = document.getElementById('reg-password').value;
+  const referralCode = document.getElementById('reg-referral-code').value.trim();
 
   if (!name)               { showToast('⚠️ Informe o nome completo'); return; }
   if (!login)              { showToast('⚠️ Crie um login'); return; }
@@ -4214,7 +4370,7 @@ async function submitTeacherRegistration() {
   if (!document.getElementById('reg-lgpd')?.checked) { showToast('⚠️ Você precisa aceitar os Termos de Uso e a LGPD para continuar'); return; }
 
   try {
-    const r = await api('POST', '/api/auth/register-teacher', { name, login, email, whatsapp, password });
+    const r = await api('POST', '/api/auth/register-teacher', { name, login, email, whatsapp, password, referralCode });
     document.getElementById('reg-success-login').textContent    = r.login;
     document.getElementById('reg-success-password').textContent = password;
     openModal('modal-registration-success');
@@ -4223,6 +4379,7 @@ async function submitTeacherRegistration() {
     document.getElementById('reg-email').value = '';
     document.getElementById('reg-whatsapp').value = '';
     document.getElementById('reg-password').value = '';
+    document.getElementById('reg-referral-code').value = '';
     const ls = document.getElementById('reg-login-status'); if(ls) ls.textContent = '';
   } catch(e) { showToast('❌ ' + e.message); }
 }
@@ -4271,6 +4428,9 @@ const NOTIF_ICONS = {
   plan_activated:   '🎉',
   payment_overdue:  '⚠️',
   payment_due:      '💰',
+  referral_reward_granted: '🎁',
+  referral_reward_ending:  '⏳',
+  referral_reward_ended:   '📅',
 };
 
 async function loadNotifications() {
@@ -4305,6 +4465,9 @@ function notifDestination(n) {
     plan_changed:   () => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
     payment_due:    () => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
     payment_overdue:() => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
+    referral_reward_granted: () => { showTeacher('t-referrals', byId('t-nav-referrals')); loadTeacherReferrals(); },
+    referral_reward_ending:  () => { showTeacher('t-referrals', byId('t-nav-referrals')); loadTeacherReferrals(); },
+    referral_reward_ended:   () => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
   };
   return map[n.type] || null;
 }
