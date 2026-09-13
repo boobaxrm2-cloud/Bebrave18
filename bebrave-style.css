@@ -725,10 +725,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
   padding: 4px 14px; border-radius: var(--r-full); box-shadow: 0 3px 8px rgba(26,63,160,.35);
 }
 .lp-plan-card h3 { font-family: 'Poppins', sans-serif; font-size: 17px; font-weight: 600; color: var(--navy); margin-bottom: 10px; }
+.lp-plan-price-was { font-size: 13px; color: var(--g400); margin-bottom: 2px; }
+.lp-plan-price-was s { text-decoration: line-through; color: var(--g500); font-weight: 600; }
 .lp-plan-price { font-size: 26px; font-weight: 700; color: var(--blue); margin-bottom: 8px; font-family: 'Poppins', sans-serif; }
 .lp-plan-price span { font-size: 13px; font-weight: 500; color: var(--g400); }
 .lp-plan-limit { font-size: 13.5px; color: var(--g600); margin-bottom: 6px; }
-.lp-plan-tools { font-size: 12.5px; margin-bottom: 18px; min-height: 32px; }
+.lp-plan-features { list-style: none; margin: 10px 0 18px; padding: 0; text-align: left; flex: 1; }
+.lp-plan-features li { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 12.5px; line-height: 1.4; }
+.lp-plan-features li svg { flex-shrink: 0; width: 14px; height: 14px; margin-top: 2px; }
+.lp-plan-features li.included { color: var(--navy); font-weight: 600; }
+.lp-plan-features li.included svg { color: var(--blue); }
+.lp-plan-features li.excluded { color: var(--g400); font-weight: 400; }
+.lp-plan-features li.excluded svg { color: var(--g300); }
+
+/* Toggle switch (plan tool editor) */
+.plan-tool-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--g100); font-size: 13.5px; }
+.plan-tool-row:last-child { border-bottom: none; }
+.tgl-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.tgl-switch input { opacity: 0; width: 0; height: 0; }
+.tgl-switch .tgl-slider { position: absolute; inset: 0; background: var(--g300); transition: .18s; border-radius: 999px; }
+.tgl-switch .tgl-slider::before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; transition: .18s; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.tgl-switch input:checked + .tgl-slider { background: var(--blue); }
+.tgl-switch input:checked + .tgl-slider::before { transform: translateX(16px); }
+.tgl-switch input:disabled + .tgl-slider { opacity: .55; cursor: not-allowed; }
 
 .lp-plan-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: auto;

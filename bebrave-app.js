@@ -25,7 +25,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-const LP_TOOL_LABELS = { network: 'Network', forum: 'Fórum', files: 'Materiais', certificates: 'Certificados' };
+const LP_ALL_FEATURES = [
+  { key: 'students',     label: 'Gestão de Alunos' },
+  { key: 'agenda',       label: 'Agenda de Aulas' },
+  { key: 'messages',     label: 'Mensagens' },
+  { key: 'payments',     label: 'Financeiro' },
+  { key: 'contracts',    label: 'Contratos Digitais' },
+  { key: 'files',        label: 'Materiais Didáticos' },
+  { key: 'certificates', label: 'Certificados' },
+  { key: 'forum',        label: 'Fórum da Comunidade' },
+  { key: 'network',      label: 'Network (busca de alunos)' },
+];
 
 const LANDING_CONTENT = {
   teacher: {
@@ -152,6 +162,8 @@ function closeLightbox() {
   document.getElementById('lp-lightbox').classList.add('hidden');
 }
 
+const LP_WAS_PRICE = { basic: 15.99, standard: 24.99, premium: 59.99 };
+
 async function loadLandingPlans() {
   const el = document.getElementById('lp-plans');
   if (!el) return;
@@ -164,17 +176,26 @@ async function loadLandingPlans() {
       const isFree = !p.price;
       const isPopular = p.key === popularKey;
       const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Até ${p.maxStudents} alunos`;
+      const wasPrice = LP_WAS_PRICE[p.key];
+      const wasPriceTxt = wasPrice ? `<div class="lp-plan-price-was">De <s>R$ ${wasPrice.toFixed(2).replace('.', ',')}</s> por</div>` : '';
       const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}<span>/mês</span>` : 'Sob consulta';
-      const restricted = (p.restrictedTools || []).map(t => LP_TOOL_LABELS[t] || t);
-      const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
+      const restrictedKeys = p.restrictedTools || [];
+      const featuresHtml = LP_ALL_FEATURES.map(f => {
+        const excluded = f.key && restrictedKeys.includes(f.key);
+        const icon = excluded
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        return `<li class="${excluded ? 'excluded' : 'included'}">${icon}<span>${f.label}</span></li>`;
+      }).join('');
       const btnLabel = isFree ? 'Começar grátis' : 'Assinar plano';
       const btnClass = isPopular ? 'lp-plan-btn lp-plan-btn-solid' : 'lp-plan-btn';
       return `<div class="lp-plan-card${isPopular ? ' lp-plan-card-popular' : ''}">
         ${isPopular ? '<span class="lp-plan-badge">Mais popular</span>' : ''}
         <h3>${escHtml(p.label)}</h3>
+        ${wasPriceTxt}
         <div class="lp-plan-price">${priceTxt}</div>
         <p class="lp-plan-limit">${limitTxt}</p>
-        <p class="lp-plan-tools" style="color:${restricted.length ? '#dc2626' : 'var(--g500)'}">${toolsTxt}</p>
+        <ul class="lp-plan-features">${featuresHtml}</ul>
         <button class="${btnClass}" onclick="showPage('page-login')"><span>${btnLabel}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>`;
     }).join('');
@@ -379,14 +400,20 @@ async function loadAdminPlans() {
     el.innerHTML = plans.map(p => {
       const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Até ${p.maxStudents} alunos`;
       const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}/mês` : 'Preço não definido';
-      const restricted = (p.restrictedTools || []).map(t => PLAN_TOOL_LABELS[t] || t);
-      const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
+      const restrictedKeys = p.restrictedTools || [];
+      const featuresHtml = LP_ALL_FEATURES.map(f => {
+        const excluded = f.key && restrictedKeys.includes(f.key);
+        const icon = excluded
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        return `<li class="${excluded ? 'excluded' : 'included'}">${icon}<span>${f.label}</span></li>`;
+      }).join('');
       return `<div class="card" style="position:relative">
         ${p.isDefault ? '<span style="position:absolute;top:-10px;left:16px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:10px">PADRÃO</span>' : ''}
         <div class="ch"><h3>${escHtml(p.label)}</h3><span style="font-size:11px;color:var(--g400);font-family:monospace">${p.key}</span></div>
         <p style="font-size:16px;font-weight:700;color:var(--navy);margin:4px 0">${priceTxt}</p>
-        <p style="font-size:14px;color:var(--g600);margin:4px 0">${limitTxt}</p>
-        <p style="font-size:13px;color:${restricted.length ? '#dc2626' : 'var(--g500)'};margin:4px 0 12px">${toolsTxt}</p>
+        <p style="font-size:14px;color:var(--g600);margin:4px 0 10px">${limitTxt}</p>
+        <ul class="lp-plan-features" style="margin:0 0 14px">${featuresHtml}</ul>
         <div style="display:flex;gap:8px">
           <button class="btn-secondary" style="flex:1" onclick="openPlanModalByKey('${p.key}')">✏️ Editar</button>
           <button class="btn-icon danger" title="Excluir plano" onclick="deletePlan('${p.key}','${escJs(p.label)}')">🗑</button>
@@ -410,7 +437,16 @@ function openPlanModal(plan) {
   document.getElementById('plan-price').value = (plan && plan.price != null) ? plan.price : '';
   document.getElementById('plan-is-default').checked = !!(plan && plan.isDefault);
   const restricted = (plan && plan.restrictedTools) || [];
-  document.querySelectorAll('.plan-tool-cb').forEach(cb => { cb.checked = restricted.includes(cb.value); });
+  document.getElementById('plan-tools-list').innerHTML = LP_ALL_FEATURES.map(f => {
+    const included = !restricted.includes(f.key);
+    return `<div class="plan-tool-row">
+      <span>${f.label}</span>
+      <label class="tgl-switch">
+        <input type="checkbox" class="plan-tool-cb" value="${f.key}"${included ? ' checked' : ''}>
+        <span class="tgl-slider"></span>
+      </label>
+    </div>`;
+  }).join('');
   openModal('modal-plan');
 }
 
@@ -422,7 +458,7 @@ async function savePlan() {
   const maxStudentsRaw = document.getElementById('plan-max-students').value;
   const priceRaw = document.getElementById('plan-price').value;
   const isDefault = document.getElementById('plan-is-default').checked;
-  const restrictedTools = [...document.querySelectorAll('.plan-tool-cb:checked')].map(cb => cb.value);
+  const restrictedTools = [...document.querySelectorAll('.plan-tool-cb')].filter(cb => !cb.checked).map(cb => cb.value);
   if (!label) return showToast('⚠️ Informe o nome do plano');
   const body = {
     label,
@@ -856,6 +892,7 @@ function renderTeacherStudents(students, lessons, plans = []) {
           <button class="btn-sm" style="font-size:12px;padding:6px 11px" onclick="openPaymentPlanModal('${s.matricula}','${escJs(s.name)}',${s.price||0},${s.payday||0})">💰 Mensalidade</button>
           <button class="btn-sm" style="font-size:12px;padding:6px 11px" onclick="openReportModal('${s.matricula}','${escJs(s.name)}')">📄 Relatório</button>
           <button class="btn-sm" style="font-size:12px;padding:6px 11px" onclick="openStudyPlan('${s.matricula}','${escJs(s.name)}')">📋 Plano</button>
+          <button class="btn-sm" style="font-size:12px;padding:6px 11px;color:#b91c1c" onclick="confirmUnlinkStudent('${s.matricula}','${escJs(s.name)}')">🔗 Desvincular</button>
         </div>
       </div>
     </div>`;
@@ -1039,6 +1076,19 @@ function confirmInactivateStudent(mat, name) {
   openModal('modal-confirm');
 }
 
+function confirmUnlinkStudent(mat, name) {
+  document.getElementById('confirm-msg').innerHTML = `Deseja desvincular o aluno <strong>${name}</strong>?<br><br>Esta ação encerra o vínculo imediatamente, <strong>sem multa de rescisão</strong>. O aluno ficará sem professor vinculado na plataforma.`;
+  document.getElementById('confirm-btn').onclick = async () => {
+    try {
+      await api('PUT', `/api/students/${mat}/unlink`);
+      closeModal('modal-confirm');
+      showToast('✅ Aluno desvinculado.');
+      refreshTeacherAll();
+    } catch(e) { showToast('❌ ' + e.message); }
+  };
+  openModal('modal-confirm');
+}
+
 function showStudentsTab(tab) {
   const activePanel  = document.getElementById('t-students-active-panel');
   const inactiveList = document.getElementById('t-student-inactive-list');
@@ -1143,11 +1193,14 @@ async function saveEditStudent() {
 
 async function changeMonthT(dir) { calMonthT=addMonth(calMonthT,dir); const lessons=await api('GET','/api/lessons'); _calLessonsT=lessons; renderCal(calMonthT,'cal-t','cal-lbl-t',day=>showCalDayT(day),_calLessonsT,null); }
 
-const PLAN_RESTRICTED_SECTIONS = { 't-files':'files', 't-certs':'certificates', 't-forum':'forum', 't-network':'network', 't-requests':'network' };
+const PLAN_RESTRICTED_SECTIONS = {
+  't-students':'students', 't-calendar':'agenda', 't-messages':'messages', 't-payments':'payments', 't-contracts':'contracts',
+  't-files':'files', 't-certs':'certificates', 't-forum':'forum', 't-network':'network', 't-requests':'network',
+};
 function showTeacher(sec, el) {
   const tool = PLAN_RESTRICTED_SECTIONS[sec];
-  if (tool && ME?.plan === 'free') {
-    showToast('🔒 Esse recurso não está disponível no plano Free. Confira os planos disponíveis.');
+  if (tool && (ME?.restrictedTools || []).includes(tool)) {
+    showToast('🔒 Esse recurso não está disponível no seu plano atual. Confira os planos disponíveis.');
     sec = 't-plan'; el = document.getElementById('t-nav-plan');
     loadTeacherPlan();
   }
@@ -1157,15 +1210,19 @@ function showTeacher(sec, el) {
   if(el) el.classList.add('active');
 }
 
+const PLAN_NAV_IDS = {
+  students: 't-nav-students', agenda: 't-nav-agenda', messages: 't-nav-messages',
+  payments: 't-nav-payments', contracts: 't-nav-contracts',
+  files: 't-nav-files', certificates: 't-nav-certs', forum: 't-nav-forum', network: 't-nav-network',
+};
 function applyPlanLockUI() {
-  const locked = ME?.plan === 'free';
-  ['t-nav-files','t-nav-certs','t-nav-forum','t-nav-network'].forEach(id => {
+  const restricted = ME?.restrictedTools || [];
+  Object.entries(PLAN_NAV_IDS).forEach(([key, id]) => {
     const el = document.getElementById(id);
-    if (el) el.classList.toggle('nav-locked', locked);
+    if (el) el.classList.toggle('nav-locked', restricted.includes(key));
   });
 }
 
-const PLAN_TOOL_LABELS = { network: 'Network', forum: 'Fórum', files: 'Materiais', certificates: 'Certificados' };
 async function loadTeacherPlan() {
   const el = document.getElementById('t-plan-content');
   el.innerHTML = '<p class="empty">Carregando...</p>';
@@ -1178,14 +1235,20 @@ async function loadTeacherPlan() {
       const isCurrent = key === data.plan;
       const limitTxt = p.maxStudents == null ? 'Sem limite de alunos' : `Gestão de até ${p.maxStudents} alunos`;
       const priceTxt = p.price != null ? `R$ ${Number(p.price).toFixed(2).replace('.', ',')}/mês` : '';
-      const restricted = p.restrictedTools.map(t => PLAN_TOOL_LABELS[t] || t);
-      const toolsTxt = restricted.length ? `Sem acesso a: ${restricted.join(', ')}` : 'Acesso a todas as ferramentas';
+      const restrictedKeys = p.restrictedTools || [];
+      const featuresHtml = LP_ALL_FEATURES.map(f => {
+        const excluded = restrictedKeys.includes(f.key);
+        const icon = excluded
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        return `<li class="${excluded ? 'excluded' : 'included'}">${icon}<span>${f.label}</span></li>`;
+      }).join('');
       return `<div class="card" style="border:2px solid ${isCurrent ? 'var(--blue)' : 'var(--g100)'};position:relative">
         ${isCurrent ? '<span style="position:absolute;top:-10px;left:16px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:10px">SEU PLANO</span>' : ''}
         <div class="ch"><h3>${p.label}</h3></div>
         ${priceTxt ? `<p style="font-size:18px;font-weight:700;color:var(--navy);margin:4px 0">${priceTxt}</p>` : ''}
-        <p style="font-size:14px;color:var(--g600);margin:4px 0">${limitTxt}</p>
-        <p style="font-size:13px;color:${restricted.length ? '#dc2626' : 'var(--g500)'};margin:4px 0 12px">${toolsTxt}</p>
+        <p style="font-size:14px;color:var(--g600);margin:4px 0 10px">${limitTxt}</p>
+        <ul class="lp-plan-features" style="margin:0 0 12px">${featuresHtml}</ul>
         ${isCurrent
           ? `<p style="font-size:12px;color:var(--g400)">${data.studentCount}${p.maxStudents==null?' alunos':' /'+p.maxStudents+' alunos'}</p>`
           : `<button class="btn-primary" style="width:100%" onclick="requestPlanUpgrade('${key}')">${priceTxt ? 'Assinar agora' : 'Solicitar upgrade'}</button>`}
@@ -4223,12 +4286,43 @@ async function loadNotifications() {
   } catch(e) {}
 }
 
+let _notifList = [];
+
+function notifDestination(n) {
+  const role = ME?.role;
+  const byId = id => document.getElementById(id);
+  const map = {
+    network_request:  () => { showTeacher('t-requests', byId('t-nav-network')); loadTeacherRequests(); },
+    new_message:      () => role === 'teacher'
+      ? (showTeacher('t-messages', byId('t-nav-messages')), loadTeacherMessages())
+      : (showStudent('s-messages', byId('s-nav-messages')), loadStudentMessages()),
+    contract_pending:       () => showStudent('s-contracts', byId('s-nav-contracts')),
+    student_unlinked:       () => showStudent('s-dashboard', document.querySelector('#student-sidebar .nav-item')),
+    contract_signed:        () => { showTeacher('t-contracts', byId('t-nav-contracts')); showTeacherContractTab('students'); },
+    network_accepted: () => { showStudent('s-network', byId('s-nav-network-btn')); loadStudentNetwork(); },
+    network_rejected: () => { showStudent('s-network', byId('s-nav-network-btn')); loadStudentNetwork(); },
+    plan_activated: () => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
+    plan_changed:   () => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
+    payment_due:    () => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
+    payment_overdue:() => { showTeacher('t-plan', byId('t-nav-plan')); loadTeacherPlan(); },
+  };
+  return map[n.type] || null;
+}
+
+function goToNotification(idx) {
+  const n = _notifList[idx];
+  if (!n) return;
+  const dest = notifDestination(n);
+  if (dest) dest();
+}
+
 async function loadNotificationsPage() {
   const listId = ME?.role === 'teacher' ? 't-notif-list' : 's-notif-list';
   const el = document.getElementById(listId);
   if (!el) return;
   el.innerHTML = '<p class="empty">Carregando...</p>';
   const notifs = await api('GET', '/api/notifications').catch(() => []);
+  _notifList = notifs;
   api('PUT', '/api/notifications/read-all').catch(() => {});
   ['t-notif-badge', 's-notif-badge'].forEach(id => {
     const b = document.getElementById(id);
@@ -4238,17 +4332,20 @@ async function loadNotificationsPage() {
     el.innerHTML = '<div class="card"><p class="empty">Nenhuma notificação ainda.</p></div>';
     return;
   }
-  el.innerHTML = notifs.map(n => `
-    <div class="card" style="margin-bottom:10px;display:flex;gap:16px;align-items:flex-start;${!n.read ? 'border-left:4px solid var(--blue);background:#f8faff' : ''}">
+  el.innerHTML = notifs.map((n, i) => {
+    const clickable = !!notifDestination(n);
+    return `
+    <div class="card" style="margin-bottom:10px;display:flex;gap:16px;align-items:flex-start;${clickable ? 'cursor:pointer' : ''}${!n.read ? ';border-left:4px solid var(--blue);background:#f8faff' : ''}"${clickable ? ` onclick="goToNotification(${i})"` : ''}>
       <div style="font-size:26px;flex-shrink:0;line-height:1;margin-top:2px">${NOTIF_ICONS[n.type] || '🔔'}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:${n.read ? '500' : '700'};font-size:14px;line-height:1.4;margin-bottom:3px">${escHtml(n.title)}</div>
         <div style="font-size:13px;color:var(--g500);line-height:1.5">${escHtml(n.body)}</div>
-        ${n.link ? `<a href="${encodeURI(n.link)}" target="_blank" rel="noopener" class="btn-sm" style="display:inline-block;margin-top:8px;text-decoration:none">Pagar agora →</a>` : ''}
+        ${n.link ? `<a href="${encodeURI(n.link)}" target="_blank" rel="noopener" class="btn-sm" style="display:inline-block;margin-top:8px;text-decoration:none" onclick="event.stopPropagation()">Pagar agora →</a>` : ''}
         <div style="font-size:12px;color:var(--g300);margin-top:6px">${fmtTimeAgo(n.createdAt)}</div>
       </div>
       ${!n.read ? '<div style="width:9px;height:9px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px"></div>' : ''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function markAllNotifsRead() {

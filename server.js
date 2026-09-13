@@ -278,7 +278,7 @@ app.post('/api/auth/login', (req, res) => {
   req.session.user = { id: user.$loki, login: user.login, role: user.role, name: user.name };
   if (user.role === 'teacher') {
     const t = Teachers.findOne({ login: user.login });
-    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free' });
+    return res.json({ role: user.role, name: user.name, login: user.login, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free', restrictedTools: getPlan(planKeyOf(user.login)).restrictedTools });
   }
   if (user.role === 'student') {
     const s = Students.findOne({ matricula: user.login });
@@ -298,7 +298,7 @@ app.get('/api/auth/me', (req, res) => {
   }
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
-    return res.json({ ...u, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free' });
+    return res.json({ ...u, termsAccepted: t?.termsAccepted || false, plan: t?.plan || 'free', restrictedTools: getPlan(planKeyOf(u.login)).restrictedTools });
   }
   res.json(u);
 });
@@ -669,7 +669,7 @@ app.get('/api/students/inactive', auth, isTeach, (req, res) => {
   })));
 });
 
-app.post('/api/students', auth, isTeach, (req, res) => {
+app.post('/api/students', auth, isTeach, requirePlanTool('students'), (req, res) => {
   const { name, level } = req.body;
   if (!name || !level) return res.status(400).json({ error: 'Nome e nível são obrigatórios' });
   if (studentLimitReached(req.session.user.login)) {
@@ -744,6 +744,19 @@ app.put('/api/students/:matricula/inactivate', auth, isTeach, (req, res) => {
   res.json({ ok: true });
 });
 
+// Desvincular aluno — ação simplificada e imediata do professor, sem multa de rescisão
+app.put('/api/students/:matricula/unlink', auth, isTeach, (req, res) => {
+  const s = Students.findOne({ matricula: req.params.matricula });
+  if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
+  if (s.teacherLogin !== req.session.user.login) return res.status(403).json({ error: 'Sem permissão' });
+  const teacherName = s.teacherName;
+  s.teacherLogin = '';
+  s.teacherName  = '';
+  Students.update(s);
+  notify(s.matricula, 'student_unlinked', 'Vínculo com professor encerrado', `${teacherName || 'Seu professor'} encerrou o vínculo com você na plataforma.`);
+  res.json({ ok: true });
+});
+
 app.put('/api/students/:matricula/reactivate-teacher', auth, isAdmin, (req, res) => {
   const s = Students.findOne({ matricula: req.params.matricula });
   if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
@@ -766,7 +779,7 @@ app.get('/api/lessons', auth, (req, res) => {
   res.json(lessons.sort((a, b) => a.date.localeCompare(b.date)));
 });
 
-app.post('/api/lessons', auth, isTeach, (req, res) => {
+app.post('/api/lessons', auth, isTeach, requirePlanTool('agenda'), (req, res) => {
   const { studentMatricula, date, time, topic, duration, meetLink, subject } = req.body;
   if (!studentMatricula || !date || !time || !topic) return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
   const s = Students.findOne({ matricula: studentMatricula });
@@ -948,7 +961,7 @@ app.get('/api/contracts', auth, (req, res) => {
   res.json(Contracts.find());
 });
 
-app.post('/api/contracts/preview', auth, isTeach, async (req, res) => {
+app.post('/api/contracts/preview', auth, isTeach, requirePlanTool('contracts'), async (req, res) => {
   const data = { ...req.body, contract_id: 'PREVIEW' };
   if (!data.student_name) return res.status(400).json({ error: 'Dados incompletos' });
   try {
@@ -957,7 +970,7 @@ app.post('/api/contracts/preview', auth, isTeach, async (req, res) => {
   } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao gerar contrato' }); }
 });
 
-app.post('/api/contracts', auth, isTeach, async (req, res) => {
+app.post('/api/contracts', auth, isTeach, requirePlanTool('contracts'), async (req, res) => {
   const { studentMatricula, course, months, hours_per_week, price, payday,
           start_date, teacher_cpf, teacher_signature } = req.body;
   if (!studentMatricula) return res.status(400).json({ error: 'Aluno obrigatório' });
@@ -1478,7 +1491,7 @@ function ensureMonthlyPayments(teacherLogin, month) {
   Students.find({ teacherLogin }).forEach(s => ensurePaymentForStudent(s, month));
 }
 
-app.get('/api/payments', auth, isTeach, (req, res) => {
+app.get('/api/payments', auth, isTeach, requirePlanTool('payments'), (req, res) => {
   const tLogin = req.session.user.login;
   const month  = req.query.month || new Date().toISOString().slice(0, 7);
   ensureMonthlyPayments(tLogin, month);
@@ -1550,7 +1563,7 @@ app.put('/api/students/:matricula/payment-plan', auth, isTeach, (req, res) => {
 // ════════════════════════════════════════════════════════════
 //  MESSAGES (student ↔ teacher)
 // ════════════════════════════════════════════════════════════
-app.post('/api/messages', auth, (req, res) => {
+app.post('/api/messages', auth, requirePlanTool('messages'), (req, res) => {
   const { content, toLogin } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
   const u = req.session.user;
