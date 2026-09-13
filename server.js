@@ -96,6 +96,16 @@ function genContractId() {
 function initials(name) {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
+function computeAge(dob) {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return null;
+  const d = new Date();
+  let age = d.getFullYear() - birth.getFullYear();
+  const m = d.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && d.getDate() < birth.getDate())) age--;
+  return age;
+}
 const PALETTE = [
   { color: '#3b6ef5', bg: '#e8eeff' }, { color: '#10b981', bg: '#d1fae5' },
   { color: '#8b5cf6', bg: '#ede9fe' }, { color: '#f59e0b', bg: '#fef3c7' },
@@ -1744,10 +1754,11 @@ app.post('/api/messages', auth, requirePlanTool('messages'), (req, res) => {
   } else if (u.role === 'teacher') {
     const student = Students.findOne({ matricula: toLogin });
     if (!student) return res.status(404).json({ error: 'Aluno não encontrado' });
-    // Allow reply if formally linked OR if there's an existing message thread (Network contact)
+    // Allow reply if formally linked, existing thread (Network contact), or student visible/unmatched on Network
     const isLinked = student.teacherLogin === u.login;
     const hasThread = Messages.find({ teacherLogin: u.login }).some(m => m.fromLogin === toLogin || m.toLogin === toLogin);
-    if (!isLinked && !hasThread) return res.status(403).json({ error: 'Sem permissão' });
+    const isNetworkAvailable = !!student.networkVisible && !student.teacherLogin;
+    if (!isLinked && !hasThread && !isNetworkAvailable) return res.status(403).json({ error: 'Sem permissão' });
     toUser = Users.findOne({ login: toLogin });
     teacherLogin = u.login;
   } else {
@@ -1938,6 +1949,50 @@ app.get('/api/network/teachers', (req, res) => {
   res.json(result);
 });
 
+// Professores navegando alunos sem professor, visíveis na network
+app.get('/api/network/students', auth, isTeach, requirePlanTool('network'), (req, res) => {
+  const students = Students.find({ networkVisible: true })
+    .filter(s => !s.teacherLogin);
+  const result = students.map(s => {
+    const u = Users.findOne({ login: s.matricula });
+    return {
+      matricula: s.matricula, name: s.name, photo: u?.photo || null,
+      age: computeAge(s.dob), languageWanted: s.networkLanguageWanted || (s.languages || [])[0] || '',
+      level: s.level || '',
+    };
+  });
+  res.json(result);
+});
+
+// ── Perfil de aluno na Network ─────────────────────────────────
+app.get('/api/student/network-profile', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos' });
+  const s = Students.findOne({ matricula: u.login });
+  if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
+  res.json({
+    visible: !!s.networkVisible,
+    languageWanted: s.networkLanguageWanted || '',
+    age: computeAge(s.dob),
+    locked: !!s.teacherLogin,
+  });
+});
+
+app.put('/api/student/network-profile', auth, (req, res) => {
+  const u = req.session.user;
+  if (u.role !== 'student') return res.status(403).json({ error: 'Apenas alunos' });
+  const s = Students.findOne({ matricula: u.login });
+  if (!s) return res.status(404).json({ error: 'Aluno não encontrado' });
+  const { visible, languageWanted } = req.body;
+  if (visible && s.teacherLogin) {
+    return res.status(400).json({ error: 'Você já tem um professor vinculado — não é possível ficar visível na Network.' });
+  }
+  s.networkVisible = !!visible;
+  if (languageWanted !== undefined) s.networkLanguageWanted = String(languageWanted).trim();
+  Students.update(s);
+  res.json({ ok: true, visible: s.networkVisible, languageWanted: s.networkLanguageWanted || '' });
+});
+
 // ── Notifications ─────────────────────────────────────────────────────────────
 app.get('/api/notifications', auth, (req, res) => {
   const all = Notifications.find({ toLogin: req.session.user.login })
@@ -2059,6 +2114,7 @@ app.post('/api/network/complete-registration', auth, isTeach, requirePlanTool('n
   s.teacherName  = t.name;
   s.price        = String(price);
   s.payday       = String(payday);
+  s.networkVisible = false;
   Students.update(s);
   // Mark any accepted/pending request as contracted
   const r = NetworkRequests.findOne({ studentLogin, teacherLogin: t.login });

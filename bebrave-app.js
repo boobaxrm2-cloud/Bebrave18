@@ -1247,6 +1247,7 @@ async function changeMonthT(dir) { calMonthT=addMonth(calMonthT,dir); const less
 const PLAN_RESTRICTED_SECTIONS = {
   't-students':'students', 't-calendar':'agenda', 't-messages':'messages', 't-payments':'payments', 't-contracts':'contracts',
   't-files':'files', 't-certs':'certificates', 't-forum':'forum', 't-network':'network', 't-requests':'network',
+  't-available-students':'network',
 };
 function showTeacher(sec, el) {
   const tool = PLAN_RESTRICTED_SECTIONS[sec];
@@ -3158,21 +3159,21 @@ async function requestTeacher(teacherLogin, teacherName) {
   try {
     await api('POST', '/api/network/request', { teacherLogin });
     renderNetworkRequestButton(teacherLogin, teacherName, { status: 'pending', teacherLogin });
-    toast('Solicitação enviada! O professor será notificado.');
+    showToast('Solicitação enviada! O professor será notificado.');
     renderNetworkPage();
-  } catch(e) { toast('Erro: ' + e.message); }
+  } catch(e) { showToast('Erro: ' + e.message); }
 }
 
 async function cancelNetworkRequest() {
   try {
     await api('DELETE', '/api/network/request');
-    toast('Solicitação cancelada.');
+    showToast('Solicitação cancelada.');
     renderNetworkPage();
     if (_studentActiveConv) {
       const reqStatus = await api('GET', '/api/network/my-request');
       renderNetworkRequestButton(_studentActiveConv, '', reqStatus);
     }
-  } catch(e) { toast('Erro: ' + e.message); }
+  } catch(e) { showToast('Erro: ' + e.message); }
 }
 
 function declineNetworkTeacher(teacherLogin) {
@@ -3180,15 +3181,132 @@ function declineNetworkTeacher(teacherLogin) {
   if (area) area.innerHTML = `<p style="font-size:13px;color:var(--g400);text-align:center;padding:8px 0">Tudo bem! Você pode continuar conversando ou encontrar outro professor em <strong>Network</strong>.</p>`;
 }
 
+// ── Teacher: alunos sem professor na Network ──────────────────────────────
+async function loadAvailableStudents() {
+  const el = document.getElementById('t-available-students-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const students = await api('GET', '/api/network/students');
+    if (!students.length) { el.innerHTML = '<div class="card"><p class="empty" style="text-align:center;padding:32px 0">Nenhum aluno disponível na Network no momento.</p></div>'; return; }
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px">` +
+      students.map(s => {
+        const photoHTML = s.photo
+          ? `<img src="${s.photo}" style="width:56px;height:56px;border-radius:50%;object-fit:cover">`
+          : `<div style="width:56px;height:56px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700">${s.name.charAt(0).toUpperCase()}</div>`;
+        return `<div class="card" style="text-align:center">
+          <div style="display:flex;justify-content:center;margin-bottom:10px">${photoHTML}</div>
+          <h4 style="margin:0 0 4px;font-size:15px">${escHtml(s.name)}</h4>
+          <p style="margin:0 0 10px;font-size:12.5px;color:var(--g500)">${s.age ? s.age + ' anos · ' : ''}${LANG_LABELS[s.languageWanted] || s.languageWanted || 'Idioma não informado'} ${s.level ? '· ' + s.level : ''}</p>
+          <button class="btn-sm" style="width:100%" onclick="viewStudentProfile('${s.matricula}')">💬 Ver perfil e mandar mensagem</button>
+        </div>`;
+      }).join('') + `</div>`;
+  } catch(e) { el.innerHTML = `<div class="card"><p class="empty">Erro: ${e.message}</p></div>`; }
+}
+
+async function viewStudentProfile(matricula) {
+  const el = document.getElementById('student-profile-view-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  openModal('modal-student-profile-view');
+  try {
+    const students = await api('GET', '/api/network/students');
+    const s = students.find(x => x.matricula === matricula);
+    if (!s) { el.innerHTML = '<p class="empty">Aluno não encontrado.</p>'; return; }
+    const photoHTML = s.photo
+      ? `<img src="${s.photo}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--blue);display:block;margin:0 auto 10px">`
+      : `<div style="width:80px;height:80px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;margin:0 auto 10px">${s.name.charAt(0).toUpperCase()}</div>`;
+    el.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px">
+        ${photoHTML}
+        <h3 style="font-size:18px;color:var(--navy);margin:0 0 6px">${escHtml(s.name)}</h3>
+        <p style="font-size:13px;color:var(--g500);margin:0">${s.age ? s.age + ' anos' : 'Idade não informada'}${s.level ? ' · Nível ' + s.level : ''}</p>
+        <p style="font-size:13px;color:var(--g500);margin:4px 0 0">Idioma pretendido: <strong>${LANG_LABELS[s.languageWanted] || s.languageWanted || 'Não informado'}</strong></p>
+      </div>
+      <div style="background:var(--g50);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:14px">
+        <p style="font-size:12.5px;color:var(--g500);margin:0">A decisão de vincular um professor é sempre do aluno. Use a mensagem abaixo para se apresentar.</p>
+      </div>
+      <textarea id="student-msg-text" rows="3" placeholder="Escreva uma mensagem se apresentando..." style="width:100%;box-sizing:border-box;border:1px solid var(--g200);border-radius:var(--r-sm);padding:9px 12px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
+      <button class="btn-primary" style="width:100%;margin-top:8px" onclick="sendStudentNetworkMessage('${escHtml(s.matricula)}')">✉️ Enviar mensagem</button>
+      <div id="student-msg-area"></div>
+    `;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function sendStudentNetworkMessage(matricula) {
+  const textarea = document.getElementById('student-msg-text');
+  const content = textarea?.value.trim();
+  if (!content) { showToast('Escreva uma mensagem antes de enviar.'); return; }
+  try {
+    await api('POST', '/api/messages', { content, toLogin: matricula });
+    const area = document.getElementById('student-msg-area');
+    if (area) area.innerHTML = '<p style="text-align:center;color:#065f46;background:#d1fae5;padding:12px;border-radius:var(--r-sm);font-size:14px;margin-top:10px">✅ Mensagem enviada!</p>';
+  } catch(e) { showToast('Erro ao enviar mensagem: ' + e.message); }
+}
+
+// ── Student: meu perfil na Network ────────────────────────────────────────
+async function loadStudentNetworkProfile() {
+  const el = document.getElementById('s-network-profile-content');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const p = await api('GET', '/api/student/network-profile');
+    const langOptions = Object.entries(LANG_LABELS).map(([code, label]) =>
+      `<option value="${code}" ${p.languageWanted === code ? 'selected' : ''}>${label}</option>`).join('');
+    el.innerHTML = `
+      ${p.locked ? `<div class="card" style="margin-bottom:16px;background:#fef3c7;border-color:#fde68a">
+        <p style="margin:0;font-size:13.5px;color:#92400e">🔒 Você já tem um professor vinculado, então seu perfil fica invisível na Network automaticamente.</p>
+      </div>` : ''}
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch" style="flex-wrap:wrap;gap:12px">
+          <div>
+            <h3>Visibilidade na Network</h3>
+            <p class="sub">Quando ativo, professores podem encontrar seu perfil e mandar mensagem</p>
+          </div>
+          <label class="tgl-switch" style="${p.locked ? 'opacity:.5;pointer-events:none' : ''}">
+            <input type="checkbox" id="snp-visible" ${p.visible ? 'checked' : ''} ${p.locked ? 'disabled' : ''}>
+            <span class="tgl-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>Informações do perfil</h3></div>
+        <div style="display:grid;gap:14px;max-width:360px">
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Idade</label>
+            <input type="text" value="${p.age != null ? p.age + ' anos' : 'Não informado'}" disabled style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);background:var(--g50);color:var(--g500);font-family:'DM Sans',sans-serif;font-size:14px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--g500);display:block;margin-bottom:6px">Idioma pretendido</label>
+            <select id="snp-language" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--g200);border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px">
+              <option value="">Selecione...</option>
+              ${langOptions}
+            </select>
+          </div>
+          <button class="btn-primary" onclick="saveStudentNetworkProfile()">Salvar</button>
+        </div>
+      </div>
+    `;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function saveStudentNetworkProfile() {
+  const visibleEl = document.getElementById('snp-visible');
+  const visible = visibleEl && !visibleEl.disabled ? visibleEl.checked : undefined;
+  const languageWanted = document.getElementById('snp-language').value;
+  try {
+    await api('PUT', '/api/student/network-profile', { visible, languageWanted });
+    showToast('✅ Perfil atualizado!');
+    loadStudentNetworkProfile();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
 async function sendNetworkMessage(teacherLogin) {
   const textarea = document.getElementById('network-msg-text');
   const content = textarea?.value.trim();
-  if (!content) { toast('Escreva uma mensagem antes de enviar.'); return; }
+  if (!content) { showToast('Escreva uma mensagem antes de enviar.'); return; }
   try {
     await api('POST', '/api/messages', { content, toLogin: teacherLogin });
     const area = document.getElementById('network-msg-area');
     if (area) area.innerHTML = '<p style="text-align:center;color:#065f46;background:#d1fae5;padding:12px;border-radius:var(--r-sm);font-size:14px">✅ Mensagem enviada! O professor irá respondê-la em breve.</p>';
-  } catch(e) { toast('Erro ao enviar mensagem: ' + e.message); }
+  } catch(e) { showToast('Erro ao enviar mensagem: ' + e.message); }
 }
 
 // ── Teacher: Network Requests ─────────────────────────────────────────────────
@@ -3232,9 +3350,9 @@ async function acceptNetworkRequest(id, studentName, studentLogin) {
 async function rejectNetworkRequest(id) {
   try {
     await api('PUT', `/api/network/request/${id}/reject`);
-    toast('Solicitação recusada.');
+    showToast('Solicitação recusada.');
     loadTeacherRequests();
-  } catch(e) { toast('Erro: ' + e.message); }
+  } catch(e) { showToast('Erro: ' + e.message); }
 }
 
 function openCompleteNetworkReg(studentLogin, studentName, requestId) {
@@ -3290,7 +3408,7 @@ async function submitCompleteNetworkReg() {
       teacher_signature: teacherSig,
     });
     closeModal('modal-complete-network-reg');
-    toast('✅ Contrato gerado! Aguardando assinatura do aluno.');
+    showToast('✅ Contrato gerado! Aguardando assinatura do aluno.');
     loadStudents();
     loadTeacherRequests();
     // Navigate to Contratos tab and reload
