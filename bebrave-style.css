@@ -585,7 +585,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
   background-image:
     repeating-linear-gradient(100deg, rgba(255,255,255,.06) 0px, rgba(255,255,255,.06) 1px, transparent 1px, transparent 4px),
     linear-gradient(115deg, transparent 30%, rgba(255,255,255,.14) 48%, transparent 66%),
-    linear-gradient(100deg, #08122c 0%, #142759 16%, #1A3FA0 34%, #3f6ad1 48%, #1A3FA0 62%, #142759 80%, #08122c 100%);
+    linear-gradient(100deg, #E8381E 0%, #E8381E 48%, #2A5FCC 52%, #2A5FCC 100%);
   box-shadow: 0 1px 3px rgba(0,0,0,.2); position: relative; z-index: 20;
 }
 .lp-nav::after {
