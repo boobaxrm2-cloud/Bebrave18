@@ -211,7 +211,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
 
 /* ── MODAL ──────────────────────────────────────────────────── */
 .modal-ov{position:fixed;inset:0;background:rgba(15,27,53,.55);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
-.modal-card{background:var(--white);border-radius:var(--r);padding:28px;width:100%;max-width:460px;box-shadow:var(--sh-lg);animation:min .2s ease}
+.modal-card{background:var(--white);border-radius:var(--r);padding:28px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:var(--sh-lg);animation:min .2s ease}
 .modal-wide{max-width:580px}
 @keyframes min{from{opacity:0;transform:scale(.95) translateY(-8px)}to{opacity:1;transform:none}}
 .mh{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}.mh h3{font-family:'DM Serif Display',serif;font-size:20px;color:var(--g900)}
