@@ -19,8 +19,6 @@ const DATA_DIR    = process.env.DATA_DIR    || path.join(__dirname, 'data');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 const CERT_DIR      = path.join(UPLOADS_DIR, 'certs');
 const CONTRACTS_DIR = path.join(UPLOADS_DIR, 'contracts');
-console.log('🔍 DATA_DIR resolvido para:', DATA_DIR);
-console.log('🔍 UPLOADS_DIR resolvido para:', UPLOADS_DIR);
 [DATA_DIR, UPLOADS_DIR, CERT_DIR, CONTRACTS_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 // ── Database ─────────────────────────────────────────────────
