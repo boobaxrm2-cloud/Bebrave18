@@ -8,6 +8,23 @@ let calMonthT = new Date(); calMonthT.setDate(1);
 let calMonthS = new Date(); calMonthS.setDate(1);
 let pendingLessonStudent = null;
 
+// ── Background polling registry ──────────────────────────────
+// Every setInterval used for background polling (notifications, lessons,
+// chat) must be created via trackInterval() so it gets cleared on logout
+// or when the session expires — otherwise it keeps firing forever and
+// re-triggers "sessão expirada" on every tick.
+let _activeIntervals = [];
+let _sessionExpiredHandled = false;
+function trackInterval(fn, ms) {
+  const id = setInterval(fn, ms);
+  _activeIntervals.push(id);
+  return id;
+}
+function clearAllIntervals() {
+  _activeIntervals.forEach(id => clearInterval(id));
+  _activeIntervals = [];
+}
+
 const MONTHS_PT    = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const DAYS_PT      = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -18,6 +35,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const r = await fetch('/api/auth/me');
     if (!r.ok) throw new Error('not authenticated');
     ME = await r.json();
+    _sessionExpiredHandled = false;
     bootRole(ME.role);
   } catch {
     showPage('page-landing');
@@ -31,7 +49,7 @@ const LP_ALL_FEATURES = [
   { key: 'messages',     label: 'Mensagens' },
   { key: 'payments',     label: 'Financeiro' },
   { key: 'contracts',    label: 'Contratos Digitais' },
-  { key: 'files',        label: 'Materiais Didáticos' },
+  { key: 'files',        label: 'Envio de Materiais' },
   { key: 'certificates', label: 'Certificados' },
   { key: 'forum',        label: 'Fórum da Comunidade' },
   { key: 'network',      label: 'Network (busca de alunos)' },
@@ -217,7 +235,7 @@ let _lessonAlertShown = new Set();
 
 function lessonAlertInit() {
   checkUpcomingLesson();
-  setInterval(checkUpcomingLesson, 30000);
+  trackInterval(checkUpcomingLesson, 30000);
 }
 
 async function checkUpcomingLesson() {
@@ -264,6 +282,7 @@ async function doLogin() {
     const json = await r.json();
     if (!r.ok) { err.textContent = json.error || 'Login ou senha incorretos.'; err.classList.remove('hidden'); return; }
     ME = json;
+    _sessionExpiredHandled = false;
     bootRole(ME.role);
   } catch(e) {
     err.textContent = 'Erro de conexão. Tente novamente.';
@@ -276,6 +295,7 @@ document.addEventListener('keydown', e => {
 
 async function doLogout() {
   try { await api('POST', '/api/auth/logout'); } catch(e) {}
+  clearAllIntervals();
   ME = null;
   const ov = document.getElementById('teacher-blocked-overlay');
   if (ov) ov.style.display = 'none';
@@ -839,7 +859,7 @@ async function loadTeacher() {
   checkPendingContracts('teacher');
   refreshInboxBadges();
   loadNotifications();
-  setInterval(loadNotifications, 30000);
+  trackInterval(loadNotifications, 30000);
   checkTermsAccepted();
   checkReferralRewardPopup();
 }
@@ -1465,7 +1485,7 @@ async function loadStudent() {
   refreshInboxBadges();
   loadNotifications();
   loadStudentRating();
-  setInterval(loadNotifications, 30000);
+  trackInterval(loadNotifications, 30000);
   checkStudentWelcome();
 }
 
@@ -1704,9 +1724,13 @@ async function api(method, url, body) {
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
   if (r.status === 401) {
+    clearAllIntervals();
     ME = null;
-    showPage('page-login');
-    showToast('⚠️ Sua sessão expirou. Faça login novamente.');
+    if (!_sessionExpiredHandled) {
+      _sessionExpiredHandled = true;
+      showPage('page-login');
+      showToast('⚠️ Sua sessão expirou. Faça login novamente.');
+    }
     throw new Error('Sessão expirada');
   }
   const json = await r.json();
@@ -3954,11 +3978,16 @@ async function refreshInboxBadges() {
       } catch(e) {}
       return;
     }
-    const badgeId = 's-inbox-badge';
-    const badge = document.getElementById(badgeId);
-    if (!badge) return;
-    if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'inline-block'; }
-    else { badge.style.display = 'none'; }
+    const badge = document.getElementById('s-inbox-badge');
+    if (badge) {
+      if (msgCount > 0) { badge.textContent = msgCount > 99 ? '99+' : msgCount; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
+    }
+    const sb = document.getElementById('s-sugg-badge');
+    if (sb) {
+      if (suggCount > 0) { sb.textContent = suggCount > 99 ? '99+' : suggCount; sb.style.display = 'inline-block'; }
+      else { sb.style.display = 'none'; }
+    }
   } catch(e) {}
 }
 
@@ -4161,6 +4190,50 @@ async function loadTeacherSuggestions() {
   refreshInboxBadges();
 }
 
+// ══════════════════════════════════════════════════════════════
+//  SUGGESTIONS — STUDENT VIEW (with admin replies)
+// ══════════════════════════════════════════════════════════════
+async function loadStudentSuggestions() {
+  await api('PUT', '/api/suggestions/mark-replies-read').catch(() => {});
+  const mine = await api('GET', '/api/student/suggestions').catch(() => []);
+  const el = document.getElementById('s-suggestions-list');
+  if (!el) return;
+  if (!mine.length) {
+    el.innerHTML = '<div class="card"><p class="empty">Você ainda não enviou nenhuma sugestão.</p></div>';
+    refreshInboxBadges();
+    return;
+  }
+  el.innerHTML = `<div class="ch" style="margin-bottom:12px"><h3>Minhas Sugestões</h3></div>` +
+    mine.map(s => `
+    <div class="card" style="margin-bottom:12px;border-left:4px solid ${s.adminReply ? '#2A5FCC' : 'var(--g200)'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)}</span>
+        ${s.adminReply
+          ? `<span style="font-size:11px;font-weight:700;color:#2A5FCC;background:#eff6ff;padding:2px 10px;border-radius:99px">✉️ Respondida</span>`
+          : `<span style="font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;padding:2px 10px;border-radius:99px">⏳ Aguardando</span>`}
+      </div>
+      <p style="margin:0 0 12px;font-size:14px;color:var(--g700);white-space:pre-wrap;line-height:1.6">${escHtml(s.content)}</p>
+      ${s.adminReply ? `
+        <div style="background:#eff6ff;border-radius:var(--r-sm);padding:12px 16px;border-left:3px solid #2A5FCC">
+          <div style="font-size:11px;font-weight:700;color:#2A5FCC;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">✉️ Resposta do Administrador · ${fmtTimeAgo(s.adminRepliedAt)}</div>
+          <p style="margin:0;font-size:14px;color:var(--g800);white-space:pre-wrap;line-height:1.6">${escHtml(s.adminReply)}</p>
+        </div>` : ''}
+    </div>`).join('');
+  refreshInboxBadges();
+}
+
+async function submitStudentSuggestion() {
+  const el = document.getElementById('s-suggestion-input');
+  const content = el.value.trim();
+  if (!content) { showToast('⚠️ Escreva sua sugestão antes de enviar'); return; }
+  try {
+    await api('POST', '/api/suggestions', { content });
+    el.value = '';
+    showToast('✅ Sugestão enviada com sucesso!');
+    loadStudentSuggestions();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
 async function checkPaymentAlert() {
   try {
     const r = await api('GET', '/api/payments/student/alert');
@@ -4356,7 +4429,7 @@ async function loadAdminSuggestions(tab) {
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <div style="width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${(s.teacherName||'?').charAt(0)}</div>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)}</div>
+          <div style="font-weight:600;font-size:14px">${escHtml(s.teacherName)} <span style="font-weight:500;font-size:11px;color:${s.role === 'student' ? '#2563eb' : '#c2410c'};background:${s.role === 'student' ? '#eff6ff' : '#fff7ed'};padding:1px 8px;border-radius:99px">${s.role === 'student' ? '🎓 Aluno' : '👩‍🏫 Professor'}</span></div>
           <div style="font-size:12px;color:var(--g400)">${fmtTimeAgo(s.createdAt)} · ${s.adminReply ? '<span style="color:#16a34a;font-weight:600">✅ Respondida</span>' : s.read ? 'Lida' : '<strong style="color:var(--navy)">Nova</strong>'}</div>
         </div>
       </div>
@@ -4712,13 +4785,13 @@ function chatInit() {
   const widget = document.getElementById('chat-widget');
   if (widget) widget.classList.remove('hidden');
   // heartbeat a cada 20s
-  _chatHeartbeatInterval = setInterval(() => {
+  _chatHeartbeatInterval = trackInterval(() => {
     fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
   }, 20000);
   fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
   // badge de não lidas a cada 10s
   chatUpdateBadge();
-  setInterval(chatUpdateBadge, 10000);
+  trackInterval(chatUpdateBadge, 10000);
 }
 
 async function chatUpdateBadge() {
@@ -4820,7 +4893,7 @@ async function chatOpenConv(login, name, online) {
   document.getElementById('chat-input').focus();
   // polling a cada 4s para novas mensagens
   if (_chatPollInterval) clearInterval(_chatPollInterval);
-  _chatPollInterval = setInterval(() => { if (_chatConvLogin) chatLoadMessages(); }, 4000);
+  _chatPollInterval = trackInterval(() => { if (_chatConvLogin) chatLoadMessages(); }, 4000);
   chatUpdateBadge();
 }
 

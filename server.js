@@ -1615,11 +1615,12 @@ app.put('/api/admin/messages/:id/reply', auth, isAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/suggestions', auth, isTeach, (req, res) => {
+app.post('/api/suggestions', auth, (req, res) => {
+  if (!['teacher', 'student'].includes(req.session.user.role)) return res.status(403).json({ error: 'Acesso negado' });
   const { content } = req.body;
   if (!content || !content.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
   const u = req.session.user;
-  Suggestions.insert({ teacherLogin: u.login, teacherName: u.name, content: content.trim(), createdAt: Date.now(), read: false });
+  Suggestions.insert({ teacherLogin: u.login, teacherName: u.name, role: u.role, content: content.trim(), createdAt: Date.now(), read: false });
   res.json({ ok: true });
 });
 
@@ -1834,6 +1835,14 @@ app.get('/api/teacher/suggestions', auth, isTeach, (req, res) => {
   res.json(mine);
 });
 
+// Student: get own suggestions (with admin replies)
+app.get('/api/student/suggestions', auth, (req, res) => {
+  if (req.session.user.role !== 'student') return res.status(403).json({ error: 'Acesso negado' });
+  const mine = Suggestions.find({ teacherLogin: req.session.user.login })
+    .sort((a, b) => b.createdAt - a.createdAt);
+  res.json(mine);
+});
+
 app.put('/api/suggestions/mark-replies-read', auth, (req, res) => {
   const u = req.session.user;
   Suggestions.find({ teacherLogin: u.login }).forEach(s => {
@@ -1846,8 +1855,9 @@ app.put('/api/suggestions/mark-replies-read', auth, (req, res) => {
 app.get('/api/unread-count', auth, (req, res) => {
   const u = req.session.user;
   if (u.role === 'student') {
-    const count = Messages.find({ toLogin: u.login, read: false }).length;
-    return res.json({ count, msgCount: count, suggCount: 0 });
+    const msgCount  = Messages.find({ toLogin: u.login, read: false }).length;
+    const suggCount = Suggestions.find({ teacherLogin: u.login }).filter(s => s.adminReply && !s.teacherRead).length;
+    return res.json({ count: msgCount + suggCount, msgCount, suggCount });
   }
   if (u.role === 'teacher') {
     const msgCount  = Messages.find({ toLogin: u.login, read: false }).length;
