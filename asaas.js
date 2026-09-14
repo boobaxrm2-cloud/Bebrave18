@@ -53,4 +53,8 @@ async function cancelSubscription(subscriptionId) {
   return asaasRequest('DELETE', `/subscriptions/${subscriptionId}`);
 }
 
-module.exports = { findOrCreateCustomer, createSubscription, getSubscriptionInvoiceUrl, cancelSubscription };
+async function updateSubscriptionValue(subscriptionId, value) {
+  return asaasRequest('PUT', `/subscriptions/${subscriptionId}`, { value });
+}
+
+module.exports = { findOrCreateCustomer, createSubscription, getSubscriptionInvoiceUrl, cancelSubscription, updateSubscriptionValue };

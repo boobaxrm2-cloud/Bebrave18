@@ -558,6 +558,92 @@ async function deletePlan(key, label) {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  PROMOÇÕES / CUPONS (ADMIN)
+// ══════════════════════════════════════════════════════════════
+
+async function loadAdminCoupons() {
+  const el = document.getElementById('adm-coupons-list');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    if (!_adminPlansCache.length) _adminPlansCache = await api('GET', '/api/admin/plans');
+    const coupons = await api('GET', '/api/admin/coupons');
+    if (!coupons.length) { el.innerHTML = '<p class="empty">Nenhum cupom criado ainda.</p>'; return; }
+    el.innerHTML = `<div class="card"><div style="display:flex;flex-direction:column;gap:10px">` + coupons.map(c => {
+      const benefit = c.type === 'trial'
+        ? `${c.months} mês(es) grátis do plano <strong>${escHtml((_adminPlansCache.find(p=>p.key===c.planKey)||{}).label || c.planKey)}</strong>`
+        : `<strong>${c.discountPercent}%</strong> de desconto (${c.discountDuration === 'recurring' ? 'recorrente' : 'só 1ª cobrança'})`;
+      const usesTxt = c.maxUses != null ? `${c.usedCount || 0}/${c.maxUses} usos` : `${c.usedCount || 0} usos (ilimitado)`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--g50);border-radius:10px;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-family:monospace;font-size:14px">${escHtml(c.code)} ${c.active ? '' : '<span style="color:var(--g400);font-weight:400">(inativo)</span>'}</div>
+          <div style="font-size:13px;color:var(--g600);margin-top:2px">${benefit} · ${usesTxt}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label class="tgl-switch"><input type="checkbox" ${c.active ? 'checked' : ''} onchange="toggleCouponActive('${c.code}')"><span class="tgl-slider"></span></label>
+          <button class="btn-icon danger" title="Excluir cupom" onclick="deleteCoupon('${c.code}')">🗑</button>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+function toggleCouponType() {
+  const type = document.querySelector('input[name="coupon-type"]:checked').value;
+  document.getElementById('coupon-trial-fields').classList.toggle('hidden', type !== 'trial');
+  document.getElementById('coupon-discount-fields').classList.toggle('hidden', type !== 'discount');
+}
+
+function openCouponModal() {
+  document.getElementById('coupon-code').value = '';
+  document.querySelector('input[name="coupon-type"][value="trial"]').checked = true;
+  document.getElementById('coupon-months').value = 1;
+  document.getElementById('coupon-percent').value = '';
+  document.getElementById('coupon-duration').value = 'first';
+  document.getElementById('coupon-max-uses').value = '';
+  const sel = document.getElementById('coupon-plan');
+  sel.innerHTML = (_adminPlansCache || []).map(p => `<option value="${p.key}">${escHtml(p.label)}</option>`).join('');
+  toggleCouponType();
+  openModal('modal-coupon');
+}
+
+async function saveCoupon() {
+  const code = document.getElementById('coupon-code').value.trim().toUpperCase();
+  const type = document.querySelector('input[name="coupon-type"]:checked').value;
+  const maxUsesRaw = document.getElementById('coupon-max-uses').value;
+  if (!code) return showToast('⚠️ Informe o código do cupom');
+  const body = { code, type, maxUses: maxUsesRaw === '' ? null : parseInt(maxUsesRaw) };
+  if (type === 'trial') {
+    body.planKey = document.getElementById('coupon-plan').value;
+    body.months = parseInt(document.getElementById('coupon-months').value);
+  } else {
+    body.discountPercent = parseInt(document.getElementById('coupon-percent').value);
+    body.discountDuration = document.getElementById('coupon-duration').value;
+  }
+  try {
+    await api('POST', '/api/admin/coupons', body);
+    closeModal('modal-coupon');
+    showToast('✅ Cupom criado!');
+    loadAdminCoupons();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function toggleCouponActive(code) {
+  try {
+    await api('PUT', `/api/admin/coupons/${code}/toggle`);
+    loadAdminCoupons();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function deleteCoupon(code) {
+  if (!confirm(`Excluir o cupom "${code}"? Essa ação não pode ser desfeita.`)) return;
+  try {
+    await api('DELETE', `/api/admin/coupons/${code}`);
+    showToast('✅ Cupom excluído!');
+    loadAdminCoupons();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
 let _adminStudentFilter = '';
 let _adminShowDeleted = false;
 
@@ -3482,8 +3568,10 @@ async function submitStudentRegister() {
 
   try {
     const r = await api('POST', '/api/register/student', { name, login, cpf, dob, languages, email, whatsapp, password });
-    document.getElementById('student-reg-success-login').textContent = r.login;
-    openModal('modal-register-success');
+    ME = r;
+    _sessionExpiredHandled = false;
+    showToast('🎉 Bem-vindo(a) à BeBrave, ' + r.name.split(' ')[0] + '!');
+    bootRole(ME.role);
   } catch(e) { showErr('❌ ' + e.message); }
 }
 
@@ -4562,16 +4650,10 @@ async function submitTeacherRegistration() {
 
   try {
     const r = await api('POST', '/api/auth/register-teacher', { name, login, email, whatsapp, password, referralCode });
-    document.getElementById('reg-success-login').textContent    = r.login;
-    document.getElementById('reg-success-password').textContent = password;
-    openModal('modal-registration-success');
-    document.getElementById('reg-name').value = '';
-    document.getElementById('reg-login').value = '';
-    document.getElementById('reg-email').value = '';
-    document.getElementById('reg-whatsapp').value = '';
-    document.getElementById('reg-password').value = '';
-    document.getElementById('reg-referral-code').value = '';
-    const ls = document.getElementById('reg-login-status'); if(ls) ls.textContent = '';
+    ME = r;
+    _sessionExpiredHandled = false;
+    showToast('🎉 Bem-vindo(a) à BeBrave, ' + r.name.split(' ')[0] + '!');
+    bootRole(ME.role);
   } catch(e) { showToast('❌ ' + e.message); }
 }
 

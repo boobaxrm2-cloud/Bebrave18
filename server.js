@@ -28,7 +28,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -54,6 +54,7 @@ function dbReady() {
   Ratings          = db.getCollection('ratings')          || db.addCollection('ratings',          { indices: ['teacherLogin', 'studentLogin'] });
   ChatMessages     = db.getCollection('chatMessages')     || db.addCollection('chatMessages',     { indices: ['fromLogin', 'toLogin'] });
   Plans            = db.getCollection('plans')            || db.addCollection('plans',            { indices: ['key'] });
+  Coupons          = db.getCollection('coupons')          || db.addCollection('coupons',          { indices: ['code'] });
   seedPlansIfEmpty();
 
   if (!Users.findOne({ role: 'admin' })) {
@@ -196,6 +197,60 @@ function checkReferralRewardsExpiring() {
           `Faltam ${daysLeft} dia(s) para o fim do seu plano Standard gratuito por indicação. Se estiver gostando da plataforma, assine um plano em "Meu Plano" para continuar sem interrupções.`);
       }
     }
+  });
+
+  // Mesma lógica para cupons promocionais do tipo "mês(es) grátis"
+  const activeCoupons = Teachers.find({ couponRewardActive: true });
+  activeCoupons.forEach(t => {
+    if (!t.couponRewardEnd) return;
+    const endMs = new Date(t.couponRewardEnd).getTime();
+    const daysLeft = Math.ceil((endMs - Date.now()) / 86400000);
+    if (daysLeft <= 0) {
+      t.couponRewardActive = false;
+      t.plan = getDefaultPlanKey();
+      Teachers.update(t);
+      notify(t.login, 'coupon_reward_ended', 'Seu período promocional acabou',
+        `Seu período grátis do cupom ${t.couponCode || ''} chegou ao fim. Você voltou para o plano ${getPlan(t.plan).label}. Assine um plano para continuar com acesso completo.`);
+      return;
+    }
+    if (daysLeft <= REFERRAL_WARN_WINDOW_DAYS) {
+      const daysSinceWarn = t.couponLastWarnAt ? (Date.now() - new Date(t.couponLastWarnAt).getTime()) / 86400000 : 999;
+      if (daysSinceWarn >= REFERRAL_WARN_INTERVAL_DAYS) {
+        t.couponLastWarnAt = now();
+        Teachers.update(t);
+        notify(t.login, 'coupon_reward_ending', 'Seu período promocional está acabando ⏳',
+          `Faltam ${daysLeft} dia(s) para o fim do seu período grátis promocional. Assine um plano em "Meu Plano" para continuar sem interrupções.`);
+      }
+    }
+  });
+}
+
+// Aplica um cupom promocional (tipo "mês(es) grátis" ou "desconto") a um professor recém-cadastrado.
+function applyCouponToTeacher(t, coupon) {
+  coupon.usedCount = (coupon.usedCount || 0) + 1;
+  Coupons.update(coupon);
+  t.couponCode = coupon.code;
+  if (coupon.type === 'trial') {
+    const end = new Date();
+    end.setMonth(end.getMonth() + (coupon.months || 1));
+    t.plan = coupon.planKey;
+    t.couponRewardActive = true;
+    t.couponRewardEnd = end.toISOString();
+    Teachers.update(t);
+    notify(t.login, 'coupon_reward_started', 'Cupom aplicado! 🎉',
+      `Você ganhou ${coupon.months || 1} mês(es) grátis do plano ${getPlan(coupon.planKey).label}.`);
+  } else if (coupon.type === 'discount') {
+    t.couponDiscountPercent = coupon.discountPercent;
+    t.couponDiscountDuration = coupon.discountDuration || 'first';
+    t.couponDiscountUsed = false;
+    Teachers.update(t);
+    notify(t.login, 'coupon_discount_applied', 'Cupom de desconto aplicado! 🎉',
+      `Você tem ${coupon.discountPercent}% de desconto ${coupon.discountDuration === 'recurring' ? 'em todas as mensalidades' : 'na primeira mensalidade'} ao assinar um plano.`);
+  }
+  AdminMessages.insert({
+    fromLogin: t.login, fromName: t.name, fromRole: 'teacher',
+    content: `Usou o cupom promocional "${coupon.code}" no cadastro.`,
+    createdAt: now(), read: false, adminReply: null, adminRepliedAt: null,
   });
 }
 
@@ -347,16 +402,24 @@ app.post('/api/auth/register-teacher', (req, res) => {
   if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) return res.status(400).json({ error: 'Login deve ter entre 4 e 20 caracteres (letras, números e _)' });
   if (Users.findOne({ login }) || Users.findOne({ login: login.toUpperCase() })) return res.status(409).json({ error: 'Este login já está em uso. Escolha outro.' });
   let referredByLogin = null;
-  if (referralCode && referralCode.trim()) {
-    const referrer = Teachers.findOne({ referralCode: referralCode.trim().toUpperCase() });
-    if (!referrer) return res.status(400).json({ error: 'Código de indicação inválido. Verifique e tente novamente, ou deixe o campo em branco.' });
-    referredByLogin = referrer.login;
+  let coupon = null;
+  const code = referralCode && referralCode.trim() ? referralCode.trim().toUpperCase() : null;
+  if (code) {
+    coupon = Coupons.findOne({ code, active: true });
+    if (coupon && coupon.maxUses != null && (coupon.usedCount || 0) >= coupon.maxUses) coupon = null;
+    if (!coupon) {
+      const referrer = Teachers.findOne({ referralCode: code });
+      if (!referrer) return res.status(400).json({ error: 'Código inválido. Verifique e tente novamente, ou deixe o campo em branco.' });
+      referredByLogin = referrer.login;
+    }
   }
   const ini = initials(name);
   const { color, bg } = pickColor(Teachers.count());
-  Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
-  Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true, plan: getDefaultPlanKey(), referredByLogin });
-  res.json({ ok: true, login, name: name.trim() });
+  const u = Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'teacher', name: name.trim(), createdAt: now() });
+  const t = Teachers.insert({ login, name: name.trim(), socialname: '', email: email.trim(), cpf: '', whatsapp: whatsapp.trim(), languages: languages || [], initials: ini, color, bg, createdAt: now(), plainPassword: password, termsAccepted: false, selfRegistered: true, plan: getDefaultPlanKey(), referredByLogin });
+  if (coupon) applyCouponToTeacher(t, coupon);
+  req.session.user = { id: u.$loki, login: u.login, role: 'teacher', name: u.name };
+  res.json({ role: 'teacher', name: u.name, login: u.login, termsAccepted: false, plan: t.plan, restrictedTools: getPlan(planKeyOf(u.login)).restrictedTools, referralRewardPopupPending: false });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -464,11 +527,17 @@ app.post('/api/teacher/plan/request-upgrade', auth, isTeach, async (req, res) =>
       email: t.email || undefined,
       mobilePhone: (t.whatsapp || '').replace(/\D/g, '') || undefined,
     });
+    let value = target.price;
+    let discountApplied = false;
+    if (t.couponDiscountPercent && !t.couponDiscountUsed) {
+      value = Math.round(target.price * (1 - t.couponDiscountPercent / 100) * 100) / 100;
+      discountApplied = true;
+    }
     const subscription = await asaas.createSubscription({
       customerId: customer.id,
-      value: target.price,
+      value,
       nextDueDate: todayBR(),
-      description: `Assinatura BeBrave — Plano ${target.label}`,
+      description: `Assinatura BeBrave — Plano ${target.label}${discountApplied ? ` (com ${t.couponDiscountPercent}% de desconto)` : ''}`,
       externalReference: t.login,
     });
     const checkoutUrl = await asaas.getSubscriptionInvoiceUrl(subscription.id);
@@ -476,6 +545,10 @@ app.post('/api/teacher/plan/request-upgrade', auth, isTeach, async (req, res) =>
     t.asaasSubscriptionId = subscription.id;
     t.pendingPlanKey = target.key;
     t.subscriptionStatus = 'pending';
+    if (discountApplied) {
+      t.couponDiscountUsed = true;
+      t.couponDiscountFullValue = t.couponDiscountDuration === 'first' ? target.price : null;
+    }
     Teachers.update(t);
     res.json({ ok: true, checkoutUrl });
   } catch (e) {
@@ -569,6 +642,50 @@ app.put('/api/admin/referrals/:login/grant-reward', auth, isAdmin, (req, res) =>
   res.json({ ok: true, plan: t.plan, rewardEnd: t.referralRewardEnd });
 });
 
+// ── Cupons promocionais (admin) ─────────────────────────────────
+app.get('/api/admin/coupons', auth, isAdmin, (req, res) => {
+  res.json(Coupons.find().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+});
+
+app.post('/api/admin/coupons', auth, isAdmin, (req, res) => {
+  const { code: rawCode, type, planKey, months, discountPercent, discountDuration, maxUses } = req.body;
+  const code = (rawCode || '').trim().toUpperCase();
+  if (!code || !/^[A-Z0-9_-]{3,30}$/.test(code)) return res.status(400).json({ error: 'Código inválido (use letras, números, - ou _, entre 3 e 30 caracteres)' });
+  if (Coupons.findOne({ code })) return res.status(409).json({ error: 'Já existe um cupom com esse código' });
+  if (Teachers.findOne({ referralCode: code })) return res.status(409).json({ error: 'Esse código já é usado como código de indicação de um professor. Escolha outro.' });
+  if (!['trial', 'discount'].includes(type)) return res.status(400).json({ error: 'Tipo de cupom inválido' });
+  const coupon = { code, type, active: true, usedCount: 0, maxUses: maxUses ? Number(maxUses) : null, createdAt: now() };
+  if (type === 'trial') {
+    const plan = Plans.findOne({ key: planKey });
+    if (!plan) return res.status(400).json({ error: 'Selecione um plano válido' });
+    if (!months || months < 1) return res.status(400).json({ error: 'Informe a quantidade de meses grátis' });
+    coupon.planKey = planKey;
+    coupon.months = Number(months);
+  } else {
+    if (!discountPercent || discountPercent < 1 || discountPercent > 99) return res.status(400).json({ error: 'Informe um desconto entre 1% e 99%' });
+    if (!['first', 'recurring'].includes(discountDuration)) return res.status(400).json({ error: 'Selecione a duração do desconto' });
+    coupon.discountPercent = Number(discountPercent);
+    coupon.discountDuration = discountDuration;
+  }
+  Coupons.insert(coupon);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/coupons/:code/toggle', auth, isAdmin, (req, res) => {
+  const coupon = Coupons.findOne({ code: req.params.code });
+  if (!coupon) return res.status(404).json({ error: 'Cupom não encontrado' });
+  coupon.active = !coupon.active;
+  Coupons.update(coupon);
+  res.json({ ok: true, active: coupon.active });
+});
+
+app.delete('/api/admin/coupons/:code', auth, isAdmin, (req, res) => {
+  const coupon = Coupons.findOne({ code: req.params.code });
+  if (!coupon) return res.status(404).json({ error: 'Cupom não encontrado' });
+  Coupons.remove(coupon);
+  res.json({ ok: true });
+});
+
 // ── Asaas webhook (público — chamado pelo Asaas, não pelo navegador) ─────
 app.post('/api/webhooks/asaas', (req, res) => {
   if (req.headers['asaas-access-token'] !== process.env.ASAAS_WEBHOOK_TOKEN) {
@@ -586,6 +703,10 @@ app.post('/api/webhooks/asaas', (req, res) => {
   if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
     if (t.pendingPlanKey) { t.plan = t.pendingPlanKey; t.pendingPlanKey = null; }
     t.subscriptionStatus = 'active';
+    if (t.couponDiscountFullValue && t.asaasSubscriptionId) {
+      asaas.updateSubscriptionValue(t.asaasSubscriptionId, t.couponDiscountFullValue).catch(e => console.error('Erro ao restaurar valor da assinatura:', e.message));
+      t.couponDiscountFullValue = null;
+    }
     Teachers.update(t);
     checkReferralEligibility(t);
     notify(t.login, 'plan_activated', 'Pagamento confirmado! 🎉', `Seu plano ${getPlan(t.plan).label} está ativo.`);
@@ -2191,7 +2312,7 @@ app.post('/api/register/student', (req, res) => {
   if (cpfUsed) return res.status(409).json({ error: 'Este CPF já está cadastrado na plataforma.' });
   const ini = initials(name);
   const { color, bg } = pickColor(Students.count());
-  Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'student', name: name.trim(), createdAt: now() });
+  const u = Users.insert({ login, password: bcrypt.hashSync(password, 10), role: 'student', name: name.trim(), createdAt: now() });
   Students.insert({
     matricula: login, name: name.trim(), socialname: '', initials: ini, level: 'A1', color, bg,
     teacherLogin: null, teacherName: null,
@@ -2199,7 +2320,8 @@ app.post('/api/register/student', (req, res) => {
     languages: Array.isArray(languages) ? languages : [languages],
     selfRegistered: true, createdAt: now(), active: true,
   });
-  res.json({ ok: true, login, name: name.trim() });
+  req.session.user = { id: u.$loki, login: u.login, role: 'student', name: u.name };
+  res.json({ role: 'student', name: u.name, login: u.login, teacherLogin: '', teacherName: '' });
 });
 
 // ── AVISO DE AULA PRÓXIMA ────────────────────────────────────────
