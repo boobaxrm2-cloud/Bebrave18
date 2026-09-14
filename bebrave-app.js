@@ -40,8 +40,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   } catch {
     showPage('page-landing');
     setLandingAudience('teacher');
+    trackVisit();
   }
 });
+
+function trackVisit() {
+  try {
+    let vid = localStorage.getItem('bebrave_vid');
+    if (!vid) {
+      vid = (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)));
+      localStorage.setItem('bebrave_vid', vid);
+    }
+    fetch('/api/track-visit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vid }) }).catch(() => {});
+  } catch (e) {}
+}
 
 const LP_ALL_FEATURES = [
   { key: 'students',     label: 'Gestão de Alunos' },
@@ -350,6 +362,34 @@ async function loadAdminOverview() {
         <div><div class="pc-name">${t.name}</div><div class="pc-sub">Login: ${t.login}</div><div class="pc-cnt">${t.studentCount} aluno${t.studentCount!==1?'s':''}</div></div>
       </div>`).join('')
     : '<p class="empty">Nenhum professor cadastrado ainda.</p>';
+  loadAdminVisits();
+}
+
+async function loadAdminVisits() {
+  const box = document.getElementById('adm-visits-box');
+  if (!box) return;
+  try {
+    const v = await api('GET', '/api/admin/visits');
+    const week = v.last7.reduce((s, d) => s + d.count, 0);
+    const maxCount = Math.max(1, ...v.last7.map(d => d.count));
+    const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    box.innerHTML = `
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
+        <div><div style="font-size:26px;font-weight:700;color:var(--navy)">${v.total}</div><div style="font-size:12px;color:var(--g500)">Total de visitas</div></div>
+        <div><div style="font-size:26px;font-weight:700;color:var(--navy)">${v.today}</div><div style="font-size:12px;color:var(--g500)">Hoje</div></div>
+        <div><div style="font-size:26px;font-weight:700;color:var(--navy)">${week}</div><div style="font-size:12px;color:var(--g500)">Últimos 7 dias</div></div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:70px">
+        ${v.last7.map(d => {
+          const h = Math.max(4, Math.round((d.count / maxCount) * 60));
+          const dow = days[new Date(d.date + 'T12:00:00').getDay()];
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px" title="${d.date}: ${d.count} visita(s)">
+            <div style="width:100%;max-width:28px;height:${h}px;background:var(--blue);border-radius:4px 4px 0 0"></div>
+            <div style="font-size:10px;color:var(--g400)">${dow}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch (e) { box.innerHTML = `<p class="empty">Erro ao carregar visitas: ${e.message}</p>`; }
 }
 
 async function loadAdminTeachers() {

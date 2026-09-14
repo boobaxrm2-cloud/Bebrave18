@@ -28,7 +28,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons, PageViews;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -55,6 +55,7 @@ function dbReady() {
   ChatMessages     = db.getCollection('chatMessages')     || db.addCollection('chatMessages',     { indices: ['fromLogin', 'toLogin'] });
   Plans            = db.getCollection('plans')            || db.addCollection('plans',            { indices: ['key'] });
   Coupons          = db.getCollection('coupons')          || db.addCollection('coupons',          { indices: ['code'] });
+  PageViews        = db.getCollection('pageViews')        || db.addCollection('pageViews',        { indices: ['vid', 'date'] });
   seedPlansIfEmpty();
 
   if (!Users.findOne({ role: 'admin' })) {
@@ -452,6 +453,29 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
+
+// ── Contador de visitas (público — chamado ao carregar a landing page) ──
+app.post('/api/track-visit', (req, res) => {
+  const vid = (req.body && req.body.vid || '').trim();
+  if (!vid || vid.length > 64 || !/^[a-zA-Z0-9-]+$/.test(vid)) return res.json({ ok: true });
+  const date = todayBR();
+  if (!PageViews.findOne({ vid, date })) PageViews.insert({ vid, date, createdAt: now() });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/visits', auth, isAdmin, (req, res) => {
+  const todayStr = todayBR();
+  const last7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() + BR_OFFSET_MS - i * 86400000).toISOString().slice(0, 10);
+    last7.push({ date: d, count: PageViews.count({ date: d }) });
+  }
+  res.json({
+    total: PageViews.count(),
+    today: PageViews.count({ date: todayStr }),
+    last7,
+  });
+});
 
 app.get('/api/auth/me', (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: 'Não autenticado' });
