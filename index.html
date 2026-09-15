@@ -202,7 +202,9 @@
         <a onclick="scrollToLandingSection('lp-pricing-section')">Planos</a>
       </div>
       <div class="lp-footer-col">
-        <h4>Contato</h4>
+        <h4>Legal</h4>
+        <a onclick="openModal('modal-public-terms')">Termos de Uso</a>
+        <a onclick="openModal('modal-public-privacy')">Política de Privacidade</a>
         <a onclick="openModal('modal-contact-footer')">Fale conosco</a>
       </div>
     </div>
@@ -220,6 +222,82 @@
     <div class="field-group"><label>E-mail *</label><input id="contact-email" type="email" placeholder="seu@email.com"></div>
     <div class="field-group"><label>Mensagem *</label><textarea id="contact-message" rows="4" placeholder="Como podemos ajudar?"></textarea></div>
     <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-contact-footer')">Cancelar</button><button class="btn-primary" onclick="submitContactForm()">Enviar</button></div>
+  </div>
+</div>
+
+<div id="modal-public-terms" class="modal-ov hidden" onclick="closeModalOv(event,'modal-public-terms')">
+  <div class="modal-card modal-wide">
+    <div class="mh"><h3>📋 Termos de Uso — BeBrave</h3><button class="mc-close" onclick="closeModal('modal-public-terms')">✕</button></div>
+    <div style="font-size:13.5px;color:var(--g700);line-height:1.7">
+      <p style="color:var(--g500);font-size:12px">Última atualização: setembro de 2026</p><br>
+      <p>Estes Termos de Uso regulam o acesso e a utilização da plataforma BeBrave por professores particulares de idiomas ("professores") e seus alunos ("alunos"). Ao criar uma conta, você concorda com as condições abaixo.</p><br>
+
+      <p><strong>1. O que é a BeBrave</strong></p>
+      <p>A BeBrave é uma plataforma de gestão para professores particulares de idiomas: agenda de aulas, cadastro de alunos, contratos digitais, cobrança de mensalidades, certificados, materiais e um espaço (Network) para professores e alunos se encontrarem.</p><br>
+
+      <p><strong>2. Papel da BeBrave na relação entre professor e aluno</strong></p>
+      <p>A BeBrave é uma ferramenta de gestão e, no caso da Network, um espaço de conexão. A decisão de contratar, manter ou encerrar aulas particulares é sempre entre professor e aluno — a BeBrave não é parte do contrato de ensino, não garante resultados pedagógicos e não se responsabiliza pela qualidade das aulas ministradas.</p><br>
+
+      <p><strong>3. Cadastro e conta</strong></p>
+      <p>Você deve fornecer informações verdadeiras no cadastro e é responsável por manter sua senha em sigilo. Contas podem ser suspensas em caso de uso indevido, fraude ou violação destes termos.</p><br>
+
+      <p><strong>4. Planos e pagamentos</strong></p>
+      <p>A plataforma é sempre gratuita para alunos. Professores podem usar o plano Free ou assinar planos pagos (Basic, Standard, Premium), com cobrança recorrente processada pelo Asaas, nossa plataforma de pagamentos parceira. O cancelamento pode ser feito a qualquer momento em "Meu Plano". Cupons e programas promocionais (indicação, cupons de desconto) seguem as condições específicas informadas no momento da oferta.</p><br>
+
+      <p><strong>5. Conteúdo enviado pelos usuários</strong></p>
+      <p>Materiais didáticos, mensagens, avaliações e demais conteúdos enviados por professores e alunos são de responsabilidade de quem os envia. A BeBrave não se responsabiliza pelo conteúdo trocado entre as partes, podendo removê-lo caso viole a lei ou estes termos.</p><br>
+
+      <p><strong>6. Uso aceitável</strong></p>
+      <p>É proibido usar a plataforma para fins ilegais, assediar outros usuários, enviar spam, tentar burlar os planos/limites do sistema ou acessar contas de terceiros sem autorização.</p><br>
+
+      <p><strong>7. Encerramento de conta</strong></p>
+      <p>Você pode encerrar sua conta a qualquer momento entrando em contato conosco. A BeBrave pode suspender ou encerrar contas que violem estes termos, mediante aviso quando possível.</p><br>
+
+      <p><strong>8. Alterações</strong></p>
+      <p>Estes termos podem ser atualizados periodicamente. Mudanças relevantes serão comunicadas na plataforma. O uso continuado após a atualização representa concordância com os novos termos.</p><br>
+
+      <p><strong>9. Legislação aplicável</strong></p>
+      <p>Estes termos são regidos pelas leis brasileiras. Dúvidas podem ser enviadas pelo canal "Fale conosco" no rodapé do site.</p>
+    </div>
+    <div class="mf"><button class="btn-primary" onclick="closeModal('modal-public-terms')">Fechar</button></div>
+  </div>
+</div>
+
+<div id="modal-public-privacy" class="modal-ov hidden" onclick="closeModalOv(event,'modal-public-privacy')">
+  <div class="modal-card modal-wide">
+    <div class="mh"><h3>🔒 Política de Privacidade — BeBrave</h3><button class="mc-close" onclick="closeModal('modal-public-privacy')">✕</button></div>
+    <div style="font-size:13.5px;color:var(--g700);line-height:1.7">
+      <p style="color:var(--g500);font-size:12px">Última atualização: setembro de 2026</p><br>
+      <p>Esta política explica quais dados a BeBrave coleta, para que servem e quais são os seus direitos, em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).</p><br>
+
+      <p><strong>1. Dados que coletamos</strong></p>
+      <p>Nome, login, e-mail, WhatsApp, senha (armazenada de forma criptografada), CPF e data de nascimento (quando exigidos no cadastro), idiomas de interesse, além de dados de uso da plataforma: aulas agendadas, mensagens trocadas, contratos e certificados gerados, e sugestões/relatos enviados. Também registramos um identificador anônimo de visita (salvo no seu navegador) para contar visitantes do site, sem coletar dados pessoais nesse processo.</p><br>
+
+      <p><strong>2. Para que usamos seus dados</strong></p>
+      <p>Para viabilizar o funcionamento da plataforma (agenda, contratos, cobrança, certificados), processar pagamentos de assinatura através do Asaas, conectar professores e alunos na Network, enviar notificações relevantes sobre sua conta, e melhorar a plataforma.</p><br>
+
+      <p><strong>3. Compartilhamento com terceiros</strong></p>
+      <p>Não vendemos seus dados. Compartilhamos apenas o necessário com o Asaas para processar cobranças e pagamentos de assinatura. Dados de alunos e aulas cadastrados por um professor ficam visíveis para esse professor, pois são necessários à gestão pedagógica.</p><br>
+
+      <p><strong>4. Seus direitos (LGPD)</strong></p>
+      <p>Você pode solicitar a qualquer momento: acesso aos seus dados, correção de informações incorretas, exclusão da sua conta e dados, portabilidade dos dados, e revogação de consentimentos dados anteriormente. Basta entrar em contato pelo canal "Fale conosco" no rodapé do site.</p><br>
+
+      <p><strong>5. Armazenamento e segurança</strong></p>
+      <p>Seus dados ficam armazenados em nossos servidores com controles de acesso restritos à equipe da BeBrave. Senhas nunca são armazenadas em texto puro. Dados de pagamento (cartão, Pix) são processados diretamente pelo Asaas — a BeBrave não armazena esses dados.</p><br>
+
+      <p><strong>6. Cookies e armazenamento local</strong></p>
+      <p>Usamos um cookie de sessão para manter você conectado após o login, e o armazenamento local do navegador (localStorage) para lembrar preferências e contar visitas anônimas ao site. Você pode limpar esses dados a qualquer momento nas configurações do seu navegador.</p><br>
+
+      <p><strong>7. Retenção</strong></p>
+      <p>Mantemos seus dados enquanto sua conta estiver ativa. Após a exclusão da conta, os dados são removidos ou anonimizados, exceto quando a lei exigir retenção por período maior (ex: dados fiscais de pagamentos).</p><br>
+
+      <p><strong>8. Alterações desta política</strong></p>
+      <p>Podemos atualizar esta política periodicamente. Mudanças relevantes serão comunicadas na plataforma.</p><br>
+
+      <p><strong>9. Contato</strong></p>
+      <p>Para exercer seus direitos ou tirar dúvidas sobre o uso dos seus dados, use o formulário "Fale conosco" no rodapé do site.</p>
+    </div>
+    <div class="mf"><button class="btn-primary" onclick="closeModal('modal-public-privacy')">Fechar</button></div>
   </div>
 </div>
 
