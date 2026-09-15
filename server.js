@@ -28,7 +28,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons, PageViews;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons, PageViews, ContactMessages;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -56,6 +56,7 @@ function dbReady() {
   Plans            = db.getCollection('plans')            || db.addCollection('plans',            { indices: ['key'] });
   Coupons          = db.getCollection('coupons')          || db.addCollection('coupons',          { indices: ['code'] });
   PageViews        = db.getCollection('pageViews')        || db.addCollection('pageViews',        { indices: ['vid', 'date'] });
+  ContactMessages  = db.getCollection('contactMessages')  || db.addCollection('contactMessages',  {});
   seedPlansIfEmpty();
 
   if (!Users.findOne({ role: 'admin' })) {
@@ -460,6 +461,35 @@ app.post('/api/track-visit', (req, res) => {
   if (!vid || vid.length > 64 || !/^[a-zA-Z0-9-]+$/.test(vid)) return res.json({ ok: true });
   const date = todayBR();
   if (!PageViews.findOne({ vid, date })) PageViews.insert({ vid, date, createdAt: now() });
+  res.json({ ok: true });
+});
+
+// ── Contato do site (público — landing page) ─────────────────
+app.post('/api/contact', (req, res) => {
+  const { name, email, message } = req.body || {};
+  if (!name?.trim())    return res.status(400).json({ error: 'Nome é obrigatório' });
+  if (!email?.trim() || !email.includes('@')) return res.status(400).json({ error: 'Informe um e-mail válido' });
+  if (!message?.trim()) return res.status(400).json({ error: 'Escreva uma mensagem' });
+  ContactMessages.insert({ name: name.trim(), email: email.trim(), message: message.trim(), createdAt: now(), read: false });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/contact-messages', auth, isAdmin, (req, res) => {
+  res.json(ContactMessages.find().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+});
+
+app.put('/api/admin/contact-messages/:id/read', auth, isAdmin, (req, res) => {
+  const msg = ContactMessages.get(parseInt(req.params.id));
+  if (!msg) return res.status(404).json({ error: 'Mensagem não encontrada' });
+  msg.read = true;
+  ContactMessages.update(msg);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/contact-messages/:id', auth, isAdmin, (req, res) => {
+  const msg = ContactMessages.get(parseInt(req.params.id));
+  if (!msg) return res.status(404).json({ error: 'Mensagem não encontrada' });
+  ContactMessages.remove(msg);
   res.json({ ok: true });
 });
 

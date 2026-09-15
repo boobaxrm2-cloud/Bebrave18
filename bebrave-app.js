@@ -684,6 +684,66 @@ async function deleteCoupon(code) {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  CONTATO DO SITE (landing page → admin)
+// ══════════════════════════════════════════════════════════════
+
+async function submitContactForm() {
+  const name    = document.getElementById('contact-name').value.trim();
+  const email   = document.getElementById('contact-email').value.trim();
+  const message = document.getElementById('contact-message').value.trim();
+  if (!name)    return showToast('⚠️ Informe seu nome');
+  if (!email || !email.includes('@')) return showToast('⚠️ Informe um e-mail válido');
+  if (!message) return showToast('⚠️ Escreva sua mensagem');
+  try {
+    await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, message }) });
+    closeModal('modal-contact-footer');
+    document.getElementById('contact-name').value = '';
+    document.getElementById('contact-email').value = '';
+    document.getElementById('contact-message').value = '';
+    showToast('✅ Mensagem enviada! Vamos responder em breve.');
+  } catch(e) { showToast('❌ Erro ao enviar. Tente novamente.'); }
+}
+
+async function loadAdminContactMessages() {
+  const el = document.getElementById('adm-contact-list');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const msgs = await api('GET', '/api/admin/contact-messages');
+    if (!msgs.length) { el.innerHTML = '<p class="empty">Nenhuma mensagem recebida ainda.</p>'; return; }
+    el.innerHTML = `<div class="card"><div style="display:flex;flex-direction:column;gap:10px">` + msgs.map(m => `
+      <div style="padding:14px;background:${m.read ? 'var(--g50)' : '#f0f9ff'};border-radius:10px;border:1px solid ${m.read ? 'var(--g200)' : '#bae6fd'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:700;font-size:14px">${escHtml(m.name)} ${m.read ? '' : '<span style="color:#2A5FCC;font-weight:700;font-size:11px">● NOVO</span>'}</div>
+            <a href="mailto:${escHtml(m.email)}" style="font-size:13px;color:var(--blue)">${escHtml(m.email)}</a>
+          </div>
+          <span style="font-size:11px;color:var(--g400)">${new Date(m.createdAt).toLocaleString('pt-BR')}</span>
+        </div>
+        <p style="margin:10px 0 8px;font-size:14px;color:var(--g700);white-space:pre-wrap">${escHtml(m.message)}</p>
+        <div style="display:flex;gap:8px">
+          ${!m.read ? `<button class="btn-sm" onclick="markContactRead(${m.$loki})">Marcar como lida</button>` : ''}
+          <button class="btn-icon danger" title="Excluir" onclick="deleteContactMessage(${m.$loki})">🗑</button>
+        </div>
+      </div>`).join('') + `</div></div>`;
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function markContactRead(id) {
+  try {
+    await api('PUT', `/api/admin/contact-messages/${id}/read`);
+    loadAdminContactMessages();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function deleteContactMessage(id) {
+  if (!confirm('Excluir esta mensagem?')) return;
+  try {
+    await api('DELETE', `/api/admin/contact-messages/${id}`);
+    loadAdminContactMessages();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
 let _adminStudentFilter = '';
 let _adminShowDeleted = false;
 
@@ -4102,6 +4162,15 @@ async function refreshInboxBadges() {
         if (msgBadge) {
           if (unread > 0) { msgBadge.textContent = unread > 99 ? '99+' : unread; msgBadge.style.display = 'inline-block'; }
           else { msgBadge.style.display = 'none'; }
+        }
+      } catch(e) {}
+      try {
+        const contactMsgs = await api('GET', '/api/admin/contact-messages');
+        const unreadContact = contactMsgs.filter(m => !m.read).length;
+        const contactBadge = document.getElementById('adm-contact-badge');
+        if (contactBadge) {
+          if (unreadContact > 0) { contactBadge.textContent = unreadContact > 99 ? '99+' : unreadContact; contactBadge.style.display = 'inline-block'; }
+          else { contactBadge.style.display = 'none'; }
         }
       } catch(e) {}
       return;

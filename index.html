@@ -190,9 +190,37 @@
   </section>
 
   <footer class="lp-footer">
-    <p>© 2026 BeBrave — Language Tutoring Platform</p>
-    <button class="lp-btn-primary" onclick="showPage('page-login')">Entrar na plataforma</button>
+    <div class="lp-footer-top">
+      <div class="lp-footer-brand">
+        <img src="/assets/logo.png" alt="BeBrave" class="lp-footer-logo">
+        <p>A plataforma completa para professores particulares de idiomas organizarem alunos, aulas, contratos e pagamentos — 100% grátis para os alunos, sempre.</p>
+      </div>
+      <div class="lp-footer-col">
+        <h4>Plataforma</h4>
+        <a onclick="scrollToLandingSection('lp-features-section')">Ferramentas</a>
+        <a onclick="scrollToLandingSection('lp-shots-section')">Como Funciona</a>
+        <a onclick="scrollToLandingSection('lp-pricing-section')">Planos</a>
+      </div>
+      <div class="lp-footer-col">
+        <h4>Contato</h4>
+        <a onclick="openModal('modal-contact-footer')">Fale conosco</a>
+      </div>
+    </div>
+    <div class="lp-footer-bottom">
+      <p>© 2026 BeBrave — Language Tutoring Plataform</p>
+      <button class="lp-btn-primary" onclick="showPage('page-login')">Entrar na plataforma</button>
+    </div>
   </footer>
+</div>
+
+<div id="modal-contact-footer" class="modal-ov hidden" onclick="closeModalOv(event,'modal-contact-footer')">
+  <div class="modal-card">
+    <div class="mh"><h3>Fale conosco</h3><button class="mc-close" onclick="closeModal('modal-contact-footer')">✕</button></div>
+    <div class="field-group"><label>Nome completo *</label><input id="contact-name" type="text" placeholder="Seu nome"></div>
+    <div class="field-group"><label>E-mail *</label><input id="contact-email" type="email" placeholder="seu@email.com"></div>
+    <div class="field-group"><label>Mensagem *</label><textarea id="contact-message" rows="4" placeholder="Como podemos ajudar?"></textarea></div>
+    <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-contact-footer')">Cancelar</button><button class="btn-primary" onclick="submitContactForm()">Enviar</button></div>
+  </div>
 </div>
 
 <!-- Lightbox for screenshot preview -->
@@ -436,6 +464,7 @@
         <a class="nav-item" onclick="showAdmin('adm-contracts',this);loadAdminContracts()"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Contratos</a>
         <a class="nav-item" id="adm-nav-messages" onclick="showAdmin('adm-messages',this);loadAdminMessages()"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>Mensagens<span id="adm-msg-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
         <a class="nav-item" id="adm-nav-suggestions" onclick="showAdmin('adm-suggestions',this);loadAdminSuggestions()"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Sugestões<span id="adm-inbox-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
+        <a class="nav-item" onclick="showAdmin('adm-contact',this);loadAdminContactMessages()"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>Contato do Site<span id="adm-contact-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:18px;text-align:center"></span></a>
       </nav>
       <button class="btn-logout" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sair</button>
     </aside>
@@ -471,6 +500,12 @@
       <section id="adm-referrals" class="cs">
         <div class="sh"><div><h2>Indicações</h2><p class="sub">A recompensa é liberada automaticamente ao atingir a meta. O interruptor abaixo é só um reforço manual, para casos excepcionais.</p></div></div>
         <div id="adm-referrals-list"></div>
+      </section>
+
+      <!-- Contato do Site Admin -->
+      <section id="adm-contact" class="cs">
+        <div class="sh"><div><h2>Contato do Site</h2><p class="sub">Mensagens enviadas pelo formulário "Fale conosco" da landing page</p></div></div>
+        <div id="adm-contact-list"></div>
       </section>
 
       <!-- Promoções Admin -->
