@@ -508,7 +508,7 @@ async function loadAdminTeachers() {
         ? `<span style="font-size:13px;color:var(--g700)">${langsList.join(', ')}</span>`
         : '<span style="color:var(--g400);font-size:12px">—</span>';
       return `<tr>
-        <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'}">${t.initials}</div><div><div>${t.name}</div>${t.blocked?'<span style="font-size:11px;color:#ef4444;font-weight:600">● Bloqueado</span>':''}</div></div></td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'};overflow:hidden">${t.photo ? `<img src="${t.photo}" style="width:100%;height:100%;object-fit:cover">` : t.initials}</div><div><div>${t.name}</div>${t.blocked?'<span style="font-size:11px;color:#ef4444;font-weight:600">● Bloqueado</span>':''}</div></div></td>
         <td><span class="mat-badge" style="background:var(--navy2)">${t.login}</span></td>
         <td>${t.email ? `<a href="mailto:${escHtml(t.email)}" style="font-size:13px;color:var(--blue)">${escHtml(t.email)}</a>` : '<span style="color:var(--g400);font-size:12px">—</span>'}</td>
         <td>${langsHtml}</td>
@@ -942,8 +942,15 @@ async function deleteMaterial(id, title) {
 function renderMaterialCards(materials, containerId, cardId) {
   const card = document.getElementById(cardId);
   const list = document.getElementById(containerId);
-  if (!materials.length) { card.style.display = 'none'; return; }
   card.style.display = '';
+  if (!materials.length) {
+    list.style.display = '';
+    list.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:28px 16px;color:var(--g500)">
+      <div style="font-size:32px;margin-bottom:8px">📚</div>
+      <p style="font-size:14px;margin:0">Em breve, esta seção vai trazer livros e materiais para ajudar professores e alunos!</p>
+    </div>`;
+    return;
+  }
   list.innerHTML = materials.map(m => `
     <div class="mat-card">
       <div class="mat-cover"><img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}"></div>
@@ -1013,7 +1020,7 @@ async function loadAdminStudents(teacherFilter) {
   const inactiveStudents = allFiltered.filter(s => s.active === false);
 
   const activeRows = filtered.map(s=>`<tr>
-    <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${s.bg||'#e8eeff'};color:${s.color||'#3b6ef5'}">${s.initials}</div>${s.name}</div></td>
+    <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${s.bg||'#e8eeff'};color:${s.color||'#3b6ef5'};overflow:hidden">${s.photo ? `<img src="${s.photo}" style="width:100%;height:100%;object-fit:cover">` : s.initials}</div>${s.name}</div></td>
     <td><span class="mat-badge">${s.matricula}</span></td>
     <td><span class="badge b-sched">${s.level}</span></td>
     <td>${s.teacherName||'—'}</td>
