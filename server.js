@@ -482,7 +482,7 @@ app.post('/api/contact', (req, res) => {
 // Vitrine pública de professores (landing page) — só quem optou por aparecer
 app.get('/api/public/showcase-teachers', (req, res) => {
   const teachers = Teachers.find({ showcaseOptIn: true, blocked: { '$ne': true } })
-    .map(t => ({ name: t.name, socialname: t.socialname || '', photo: t.photo || '', languages: t.languages || [], initials: t.initials, color: t.color, bg: t.bg }));
+    .map(t => ({ login: t.login, name: t.name, socialname: t.socialname || '', photo: t.photo || '', languages: t.languages || [], initials: t.initials, color: t.color, bg: t.bg }));
   res.json(teachers);
 });
 

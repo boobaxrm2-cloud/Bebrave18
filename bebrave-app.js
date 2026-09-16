@@ -45,34 +45,77 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+let _landingTeachersCache = [];
+
 async function loadLandingTeachersShowcase() {
   const section = document.getElementById('lp-teachers-section');
   const navLink = document.getElementById('lp-nav-teachers-link');
   try {
     const teachers = await fetch('/api/public/showcase-teachers').then(r => r.json());
     if (!Array.isArray(teachers) || !teachers.length) return;
+    _landingTeachersCache = teachers;
     const row = document.getElementById('lp-teachers-row');
     row.innerHTML = teachers.map(t => {
       const displayName = t.socialname || t.name;
-      const langsTxt = (t.languages || []).slice(0, 2).map(l => LANG_LABELS[l] || l).join(' · ') || '🌐 Idiomas';
+      const langsHtml = (t.languages || []).slice(0, 2).map(l => `<span class="lp-teacher-lang-pill">${LANG_LABELS[l] || l}</span>`).join('')
+        || `<span class="lp-teacher-lang-pill">🌐 Idiomas</span>`;
       const photoHtml = t.photo
         ? `<img src="${t.photo}" alt="${escHtml(displayName)}">`
         : `${escHtml(t.initials || '')}`;
       const photoStyle = t.photo ? '' : `background:${t.bg||'#2A5FCC'};color:${t.color||'#fff'}`;
       return `<div class="lp-teacher-card">
-        <div class="lp-teacher-photo" style="${photoStyle}">
-          <span class="lp-teacher-badge">${langsTxt}</span>
-          ${photoHtml}
-        </div>
-        <div class="lp-teacher-info">
-          <div class="lp-teacher-name">${escHtml(displayName)}</div>
-          <button class="lp-teacher-cta" onclick="openStudentRegister()">Estudar comigo →</button>
-        </div>
+        <div class="lp-teacher-photo" style="${photoStyle}" onclick="viewPublicTeacherProfile('${t.login}')" title="Ver perfil de ${escHtml(displayName)}">${photoHtml}</div>
+        <div class="lp-teacher-name" onclick="viewPublicTeacherProfile('${t.login}')">${escHtml(displayName)}</div>
+        <div class="lp-teacher-langs">${langsHtml}</div>
+        <button class="lp-teacher-cta" onclick="openStudentRegister()">Estudar comigo →</button>
       </div>`;
     }).join('');
     section.classList.remove('hidden');
     if (navLink) navLink.classList.remove('hidden');
   } catch (e) {}
+}
+
+async function viewPublicTeacherProfile(login) {
+  const el = document.getElementById('public-teacher-view-content');
+  el.innerHTML = '<p class="empty" style="padding:32px">Carregando...</p>';
+  openModal('modal-public-teacher-view');
+  const cached = _landingTeachersCache.find(t => t.login === login) || {};
+  let t = null, ratingData = { avg: 0, count: 0 };
+  try {
+    t = await fetch(`/api/network/teachers/${login}`).then(r => r.ok ? r.json() : null);
+    ratingData = await fetch(`/api/ratings/${login}`).then(r => r.json()).catch(() => ratingData);
+  } catch(e) {}
+
+  const displayName = cached.socialname || (t && t.name) || cached.name;
+  const photo = (t && t.photo) || cached.photo;
+  const langs = (t && t.languages && t.languages.length) ? t.languages : (cached.languages || []);
+  const bio = t && t.bio ? t.bio : '';
+  const rateStr = t && t.rateNegotiable ? '<span style="background:#d1fae5;color:#065f46;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">💬 Vamos Combinar</span>'
+    : (t && t.rate ? `<span style="background:#fef3c7;color:#92400e;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/hora</span>` : '');
+
+  const photoHTML = photo
+    ? `<img src="${photo}" style="width:88px;height:88px;border-radius:50%;object-fit:cover;border:3px solid var(--blue);display:block;margin:0 auto 12px">`
+    : `<div style="width:88px;height:88px;border-radius:50%;background:${cached.bg||'var(--blue)'};color:${cached.color||'white'};display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;margin:0 auto 12px">${escHtml((cached.initials || displayName || '?').charAt(0).toUpperCase())}</div>`;
+  const langsHtml = langs.map(l => `<span class="lang-badge-en" style="font-size:11px">${LANG_LABELS[l]||l}</span>`).join(' ');
+  const ratingHtml = ratingData.count > 0
+    ? `<div style="display:flex;align-items:center;gap:6px;justify-content:center;font-size:13px;color:var(--g500);margin-top:6px">
+        <span style="color:#f59e0b">${'⭐'.repeat(Math.round(ratingData.avg))}</span>
+        <span style="font-weight:600;color:var(--g700)">${ratingData.avg.toFixed(1)}</span>
+        <span>(${ratingData.count} avaliação${ratingData.count > 1 ? 'ões' : ''})</span>
+      </div>` : '';
+
+  el.innerHTML = `
+    <div style="text-align:center">
+      ${photoHTML}
+      <h3 style="font-size:18px;color:var(--navy);margin:0 0 6px">${escHtml(displayName)}</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-bottom:6px">${langsHtml}</div>
+      ${rateStr}
+      ${ratingHtml}
+    </div>
+    <div style="background:var(--g50);border-radius:var(--r-sm);padding:12px 14px;margin-top:14px">
+      <p style="font-size:13px;color:var(--g600);line-height:1.6;margin:0">${bio ? escHtml(bio) : 'Este professor ainda não escreveu uma descrição na Network.'}</p>
+    </div>
+    <button class="btn-primary" style="width:100%;margin-top:16px" onclick="closeModal('modal-public-teacher-view');openStudentRegister()">Criar minha conta grátis e estudar com ${escHtml((displayName||'').split(' ')[0])} →</button>`;
 }
 
 function copyCredentials(loginId, pwId) {
