@@ -3277,8 +3277,8 @@ function renderNetworkPage() {
     ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">` +
         filtered.map(t => {
           const photoHTML = t.photo
-            ? `<img src="${t.photo}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">`
-            : `<div style="width:72px;height:72px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15)">${t.name.charAt(0).toUpperCase()}</div>`;
+            ? `<img src="${t.photo}" onclick="viewTeacherProfile('${t.login}')" title="Ver perfil de ${escHtml(t.name)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer">`
+            : `<div onclick="viewTeacherProfile('${t.login}')" title="Ver perfil de ${escHtml(t.name)}" style="width:72px;height:72px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer">${t.name.charAt(0).toUpperCase()}</div>`;
           const langs = (t.languages||[]).map(l => `<span style="font-size:11px;background:#e8eeff;color:var(--blue);padding:2px 8px;border-radius:20px">${LANG_LABELS[l]||l}</span>`).join('');
           const rateStr = t.rateNegotiable ? '<span style="font-size:12px;background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:20px">💬 Vamos Combinar</span>'
             : (t.rate ? `<span style="font-size:12px;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px">R$ ${parseFloat(t.rate).toFixed(2).replace('.',',')}/h</span>` : '');
