@@ -411,7 +411,7 @@ async function loadAdminTeachers() {
   const exportBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
     <button class="btn-sm" onclick="exportTeachersCsv()" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7;font-weight:600">📥 Exportar Excel (.csv)</button>
   </div>`;
-  el.innerHTML = exportBtn + `<table class="list-table"><thead><tr>
+  el.innerHTML = exportBtn + `<div class="table-scroll"><table class="list-table"><thead><tr>
     <th>Professor</th><th>Login</th><th>E-mail</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Plano</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th>
   </tr></thead><tbody>
     ${teachers.map(t=>{
@@ -453,7 +453,7 @@ async function loadAdminTeachers() {
         </div></td>
       </tr>`;
     }).join('')}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }
 
 async function changeTeacherPlan(login, plan) {
@@ -841,9 +841,9 @@ async function loadAdminStudents(teacherFilter) {
   const exportStudBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
     <button class="btn-sm" onclick="exportStudentsCsv()" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7;font-weight:600">📥 Exportar Excel (.csv)</button>
   </div>`;
-  el.innerHTML = filterBar + exportStudBtn + `<table class="list-table"><thead><tr><th>Aluno</th><th>Matrícula</th><th>Nível</th><th>Professor</th><th>Aulas</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th></tr></thead><tbody>
+  el.innerHTML = filterBar + exportStudBtn + `<div class="table-scroll"><table class="list-table"><thead><tr><th>Aluno</th><th>Matrícula</th><th>Nível</th><th>Professor</th><th>Aulas</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th></tr></thead><tbody>
     ${activeRows}${inactiveRows}${deletedRows}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }
 
 async function reactivateStudent(matricula, name) {

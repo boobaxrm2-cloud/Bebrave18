@@ -170,6 +170,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--g50);color:var(--g800);mi
 .lt-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
 .lt-actions{display:flex;gap:6px}
 
+.table-scroll{overflow-x:auto}
+.table-scroll .list-table th:last-child,
+.table-scroll .list-table td:last-child{
+  position:sticky; right:0; z-index:1; background:var(--white);
+  box-shadow:-6px 0 8px -6px rgba(0,0,0,.15);
+}
+.table-scroll .list-table thead th:last-child{ background:var(--g50); }
+
 /* ── CALENDAR ───────────────────────────────────────────────── */
 .cal-layout{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
 .cal-card{padding:16px}
