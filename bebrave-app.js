@@ -799,6 +799,7 @@ function openMaterialModal() {
   document.getElementById('mat-file-label').textContent = 'Arquivo do material *';
   document.getElementById('mat-save-btn').textContent = 'Enviar';
   document.getElementById('mat-title').value = '';
+  document.getElementById('mat-author').value = '';
   document.getElementById('mat-description').value = '';
   document.getElementById('mat-cover').value = '';
   document.getElementById('mat-file').value = '';
@@ -816,6 +817,7 @@ function openMaterialModalForEdit(id) {
   document.getElementById('mat-file-label').textContent = 'Arquivo do material (deixe em branco para manter)';
   document.getElementById('mat-save-btn').textContent = 'Salvar alterações';
   document.getElementById('mat-title').value = m.title;
+  document.getElementById('mat-author').value = m.author || '';
   document.getElementById('mat-description').value = m.description || '';
   document.getElementById('mat-cover').value = '';
   document.getElementById('mat-file').value = '';
@@ -828,6 +830,7 @@ async function saveMaterial() {
   const id = document.getElementById('mat-id-original').value;
   const isEdit = !!id;
   const title = document.getElementById('mat-title').value.trim();
+  const author = document.getElementById('mat-author').value.trim();
   const description = document.getElementById('mat-description').value.trim();
   const coverInput = document.getElementById('mat-cover');
   const fileInput  = document.getElementById('mat-file');
@@ -841,6 +844,7 @@ async function saveMaterial() {
 
   const formData = new FormData();
   formData.append('title', title);
+  formData.append('author', author);
   formData.append('description', description);
   formData.append('audience', audience);
   languages.forEach(l => formData.append('languages', l));
@@ -865,15 +869,17 @@ async function loadAdminMaterials() {
     _adminMaterialsCache = materials;
     if (!materials.length) { el.innerHTML = '<p class="empty">Nenhum material enviado ainda.</p>'; return; }
     el.innerHTML = materials.map(m => `
-      <div class="lp-teacher-card" style="flex:none">
-        <div class="lp-teacher-photo" style="height:150px;background:var(--g100)">
-          <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}" style="object-fit:contain">
-        </div>
-        <div class="lp-teacher-info">
-          <div class="lp-teacher-name">${escHtml(m.title)}</div>
-          <div style="font-size:12px;color:var(--g500);margin-bottom:8px">${MATERIAL_AUDIENCE_LABEL[m.audience]} · ${(m.languages||[]).map(l=>LANG_LABELS[l]||l).join(', ')}</div>
-          <div style="display:flex;gap:8px">
-            <button class="btn-secondary" style="flex:1" onclick="openMaterialModalForEdit(${m.$loki})">✏️ Editar</button>
+      <div class="mat-card">
+        <div class="mat-cover"><img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}"></div>
+        <div class="mat-body">
+          <div class="mat-title">${escHtml(m.title)}</div>
+          ${m.author ? `<div class="mat-author">${escHtml(m.author)}</div>` : ''}
+          <div class="mat-langs">
+            <span class="mat-lang-pill">${MATERIAL_AUDIENCE_LABEL[m.audience]}</span>
+            ${(m.languages||[]).map(l=>`<span class="mat-lang-pill">${LANG_LABELS[l]||l}</span>`).join('')}
+          </div>
+          <div class="mat-actions">
+            <button class="btn-secondary" onclick="openMaterialModalForEdit(${m.$loki})">✏️ Editar</button>
             <button class="btn-icon danger" title="Excluir material" onclick="deleteMaterial(${m.$loki},'${escJs(m.title)}')">🗑</button>
           </div>
         </div>
@@ -896,12 +902,14 @@ function renderMaterialCards(materials, containerId, cardId) {
   if (!materials.length) { card.style.display = 'none'; return; }
   card.style.display = '';
   list.innerHTML = materials.map(m => `
-    <div style="cursor:pointer" onclick="viewMaterial('${m.fileFilename}','${escJs(m.title)}')">
-      <div style="height:130px;border-radius:8px;overflow:hidden;box-shadow:var(--sh-md);margin-bottom:8px;background:var(--g100)">
-        <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}" style="width:100%;height:100%;object-fit:contain">
+    <div class="mat-card">
+      <div class="mat-cover"><img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}"></div>
+      <div class="mat-body">
+        <div class="mat-title">${escHtml(m.title)}</div>
+        ${m.author ? `<div class="mat-author">${escHtml(m.author)}</div>` : ''}
+        <div class="mat-langs">${(m.languages||[]).map(l=>`<span class="mat-lang-pill">${LANG_LABELS[l]||l}</span>`).join('')}</div>
+        <button class="mat-cta" onclick="viewMaterial('${m.fileFilename}','${escJs(m.title)}')">📖 Ler agora</button>
       </div>
-      <div style="font-size:13px;font-weight:600;color:var(--g800);margin-bottom:2px">${escHtml(m.title)}</div>
-      <div style="font-size:12px;color:var(--blue);font-weight:600">👁 Visualizar / ⬇ Baixar</div>
     </div>`).join('');
 }
 

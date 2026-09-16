@@ -1214,7 +1214,7 @@ app.delete('/api/files/:id', auth, (req, res) => {
 //  MATERIAIS DIDÁTICOS (biblioteca curada pelo admin)
 // ════════════════════════════════════════════════════════════
 app.post('/api/admin/materials', auth, isAdmin, upload.fields([{ name: 'cover', maxCount: 1 }, { name: 'file', maxCount: 1 }]), (req, res) => {
-  const { title, description, audience } = req.body;
+  const { title, description, author, audience } = req.body;
   let languages = req.body.languages;
   if (typeof languages === 'string') languages = [languages];
   if (!title?.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
@@ -1225,7 +1225,7 @@ app.post('/api/admin/materials', auth, isAdmin, upload.fields([{ name: 'cover', 
   if (!coverFile)    return res.status(400).json({ error: 'Envie uma foto de capa' });
   if (!materialFile) return res.status(400).json({ error: 'Envie o arquivo do material' });
   const material = Materials.insert({
-    title: title.trim(), description: (description || '').trim(), languages, audience,
+    title: title.trim(), description: (description || '').trim(), author: (author || '').trim(), languages, audience,
     coverFilename: coverFile.filename, fileFilename: materialFile.filename, fileOriginalName: materialFile.originalname,
     createdAt: now(),
   });
@@ -1239,7 +1239,7 @@ app.get('/api/admin/materials', auth, isAdmin, (req, res) => {
 app.put('/api/admin/materials/:id', auth, isAdmin, upload.fields([{ name: 'cover', maxCount: 1 }, { name: 'file', maxCount: 1 }]), (req, res) => {
   const m = Materials.get(parseInt(req.params.id));
   if (!m) return res.status(404).json({ error: 'Material não encontrado' });
-  const { title, description, audience } = req.body;
+  const { title, description, author, audience } = req.body;
   let languages = req.body.languages;
   if (typeof languages === 'string') languages = [languages];
   if (!title?.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
@@ -1247,6 +1247,7 @@ app.put('/api/admin/materials/:id', auth, isAdmin, upload.fields([{ name: 'cover
   if (!['teacher', 'student', 'both'].includes(audience)) return res.status(400).json({ error: 'Selecione o público (professor, aluno ou ambos)' });
   m.title = title.trim();
   m.description = (description || '').trim();
+  m.author = (author || '').trim();
   m.languages = languages;
   m.audience = audience;
   const coverFile    = req.files?.cover?.[0];

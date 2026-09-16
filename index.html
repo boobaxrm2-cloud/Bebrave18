@@ -612,7 +612,7 @@
       <!-- Materiais Didáticos Admin -->
       <section id="adm-materials" class="cs">
         <div class="sh"><div><h2>Materiais Didáticos</h2><p class="sub">Envie livros e materiais para professores e/ou alunos, filtrados por idioma</p></div><button class="btn-primary" onclick="openMaterialModal()">+ Enviar Material</button></div>
-        <div id="adm-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px"></div>
+        <div id="adm-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px"></div>
       </section>
 
       <!-- Promoções Admin -->
@@ -774,7 +774,7 @@
         </div>
         <div class="card mt16" id="t-materials-card" style="display:none">
           <div class="ch"><h3>📚 Materiais Didáticos da Plataforma</h3></div>
-          <div id="t-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px"></div>
+          <div id="t-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"></div>
         </div>
       </section>
 
@@ -971,7 +971,7 @@
         </div>
         <div class="card mt16" id="s-materials-card" style="display:none">
           <div class="ch"><h3>📚 Materiais Didáticos da Plataforma</h3></div>
-          <div id="s-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px"></div>
+          <div id="s-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"></div>
         </div>
       </section>
 
@@ -1222,7 +1222,10 @@
   <div class="modal-card">
     <div class="mh"><h3 id="mat-modal-title">📚 Enviar Material Didático</h3><button class="mc-close" onclick="closeModal('modal-material')">✕</button></div>
     <input type="hidden" id="mat-id-original">
-    <div class="field-group"><label>Nome do material *</label><input id="mat-title" type="text" placeholder="Ex: English A1 — Student Book"></div>
+    <div class="field-row">
+      <div class="field-group"><label>Nome do material *</label><input id="mat-title" type="text" placeholder="Ex: English A1 — Student Book"></div>
+      <div class="field-group"><label>Autor (opcional)</label><input id="mat-author" type="text" placeholder="Ex: Melville, Herman"></div>
+    </div>
     <div class="field-group"><label>Descrição breve</label><textarea id="mat-description" rows="2" placeholder="Ex: Livro de exercícios para nível iniciante"></textarea></div>
     <div class="field-row">
       <div class="field-group">
