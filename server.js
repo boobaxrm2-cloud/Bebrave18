@@ -402,6 +402,7 @@ app.get('/api/check-cpf', (req, res) => {
 app.post('/api/auth/register-teacher', (req, res) => {
   const { name, login: rawLogin, languages, email, whatsapp, password, referralCode } = req.body;
   if (!name || !rawLogin || !email || !whatsapp || !password) return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
+  if (!Array.isArray(languages) || !languages.length) return res.status(400).json({ error: 'Selecione ao menos um idioma que você leciona' });
   if (password.length < 4) return res.status(400).json({ error: 'Senha deve ter ao menos 4 caracteres' });
   const login = rawLogin.trim();
   if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) return res.status(400).json({ error: 'Login deve ter entre 4 e 20 caracteres (letras, números e _)' });
@@ -1543,7 +1544,7 @@ app.get('/api/profile', auth, (req, res) => {
   let extra = {};
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
-    extra = { email: t?.email||'', whatsapp: t?.whatsapp||'', cpf: t?.cpf||'', socialname: t?.socialname||'', photo: t?.photo||'', instagram: t?.instagram||'' };
+    extra = { email: t?.email||'', whatsapp: t?.whatsapp||'', cpf: t?.cpf||'', socialname: t?.socialname||'', photo: t?.photo||'', instagram: t?.instagram||'', languages: t?.languages||[] };
   } else if (u.role === 'student') {
     const s = Students.findOne({ matricula: u.login });
     extra = { email: s?.email||'', whatsapp: s?.whatsapp||'', cpf: s?.cpf||'', socialname: s?.socialname||'', photo: s?.photo||'' };
@@ -1556,7 +1557,7 @@ app.get('/api/profile', auth, (req, res) => {
 // PUT /api/profile — update editable fields
 app.put('/api/profile', auth, (req, res) => {
   const u = req.session.user;
-  const { email, whatsapp, socialname, photo, instagram, currentPassword, newPassword } = req.body;
+  const { email, whatsapp, socialname, photo, instagram, languages, currentPassword, newPassword } = req.body;
 
   // Password change (optional)
   if (newPassword) {
@@ -1583,6 +1584,7 @@ app.put('/api/profile', auth, (req, res) => {
       if (socialname !== undefined) t.socialname = socialname;
       if (photo      !== undefined) t.photo      = photo;
       if (instagram  !== undefined) t.instagram  = instagram;
+      if (Array.isArray(languages)) t.languages  = languages;
       Teachers.update(t);
     }
   } else if (u.role === 'student') {

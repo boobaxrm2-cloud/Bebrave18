@@ -412,7 +412,7 @@ async function loadAdminTeachers() {
     <button class="btn-sm" onclick="exportTeachersCsv()" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7;font-weight:600">📥 Exportar Excel (.csv)</button>
   </div>`;
   el.innerHTML = exportBtn + `<table class="list-table"><thead><tr>
-    <th>Professor</th><th>Login</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Plano</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th>
+    <th>Professor</th><th>Login</th><th>E-mail</th><th>Idiomas</th><th>Senha</th><th>Termo de Uso</th><th>Alunos</th><th>Plano</th><th>Cadastrado em</th><th>Último Login</th><th>Ações</th>
   </tr></thead><tbody>
     ${teachers.map(t=>{
       const termsHtml = t.termsAccepted
@@ -436,6 +436,7 @@ async function loadAdminTeachers() {
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:10px"><div class="lt-av" style="background:${t.bg||'#e8eeff'};color:${t.color||'#3b6ef5'}">${t.initials}</div><div><div>${t.name}</div>${t.blocked?'<span style="font-size:11px;color:#ef4444;font-weight:600">● Bloqueado</span>':''}</div></div></td>
         <td><span class="mat-badge" style="background:var(--navy2)">${t.login}</span></td>
+        <td>${t.email ? `<a href="mailto:${escHtml(t.email)}" style="font-size:13px;color:var(--blue)">${escHtml(t.email)}</a>` : '<span style="color:var(--g400);font-size:12px">—</span>'}</td>
         <td>${langsHtml}</td>
         <td>${pwHtml}</td>
         <td>${termsHtml}</td>
@@ -2411,11 +2412,16 @@ async function openProfile() {
     document.getElementById('profile-email').value    = profile.email    || '';
     document.getElementById('profile-whatsapp').value = profile.whatsapp || '';
     const igWrap = document.getElementById('profile-instagram-wrap');
+    const langWrap = document.getElementById('profile-languages-wrap');
     if (ME && ME.role === 'teacher') {
       igWrap.style.display = '';
       document.getElementById('profile-instagram').value = profile.instagram || '';
+      langWrap.style.display = '';
+      const checkedLangs = profile.languages || [];
+      document.querySelectorAll('#profile-langs-wrap input[type=checkbox]').forEach(cb => cb.checked = checkedLangs.includes(cb.value));
     } else {
       igWrap.style.display = 'none';
+      langWrap.style.display = 'none';
     }
     document.getElementById('profile-pw-current').value = '';
     document.getElementById('profile-pw-new').value     = '';
@@ -2530,7 +2536,10 @@ async function saveProfile() {
   const newPw    = document.getElementById('profile-pw-new').value;
 
   const payload = { email, whatsapp };
-  if (ME && ME.role === 'teacher') payload.instagram = document.getElementById('profile-instagram').value.trim().replace(/^@/, '');
+  if (ME && ME.role === 'teacher') {
+    payload.instagram = document.getElementById('profile-instagram').value.trim().replace(/^@/, '');
+    payload.languages = [...document.querySelectorAll('#profile-langs-wrap input:checked')].map(c => c.value);
+  }
   if (ME && ME.role === 'admin') payload.name = document.getElementById('profile-name').value.trim();
   if (_profilePhotoB64) payload.photo = _profilePhotoB64;
   if (newPw) { payload.currentPassword = curPw; payload.newPassword = newPw; }
@@ -4756,17 +4765,19 @@ async function submitTeacherRegistration() {
   const whatsapp = document.getElementById('reg-whatsapp').value.trim();
   const password = document.getElementById('reg-password').value;
   const referralCode = document.getElementById('reg-referral-code').value.trim();
+  const languages = [...document.querySelectorAll('#reg-langs-wrap input:checked')].map(c => c.value);
 
   if (!name)               { showToast('⚠️ Informe o nome completo'); return; }
   if (!login)              { showToast('⚠️ Crie um login'); return; }
   if (!/^[a-zA-Z0-9_]{4,20}$/.test(login)) { showToast('⚠️ Login deve ter entre 4 e 20 caracteres (letras, números e _)'); return; }
   if (!email || !email.includes('@')) { showToast('⚠️ Informe um e-mail válido'); return; }
   if (!whatsapp)           { showToast('⚠️ Informe o WhatsApp'); return; }
+  if (!languages.length)   { showToast('⚠️ Selecione ao menos um idioma que você leciona'); return; }
   if (password.length < 4) { showToast('⚠️ A senha deve ter ao menos 4 caracteres'); return; }
   if (!document.getElementById('reg-lgpd')?.checked) { showToast('⚠️ Você precisa aceitar os Termos de Uso e a LGPD para continuar'); return; }
 
   try {
-    const r = await api('POST', '/api/auth/register-teacher', { name, login, email, whatsapp, password, referralCode });
+    const r = await api('POST', '/api/auth/register-teacher', { name, login, email, whatsapp, password, referralCode, languages });
     ME = r;
     _sessionExpiredHandled = false;
     showToast('🎉 Bem-vindo(a) à BeBrave, ' + r.name.split(' ')[0] + '!');
