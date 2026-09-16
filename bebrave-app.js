@@ -41,8 +41,39 @@ window.addEventListener('DOMContentLoaded', async () => {
     showPage('page-landing');
     setLandingAudience('teacher');
     trackVisit();
+    loadLandingTeachersShowcase();
   }
 });
+
+async function loadLandingTeachersShowcase() {
+  const section = document.getElementById('lp-teachers-section');
+  const navLink = document.getElementById('lp-nav-teachers-link');
+  try {
+    const teachers = await fetch('/api/public/showcase-teachers').then(r => r.json());
+    if (!Array.isArray(teachers) || !teachers.length) return;
+    const row = document.getElementById('lp-teachers-row');
+    row.innerHTML = teachers.map(t => {
+      const displayName = t.socialname || t.name;
+      const langsTxt = (t.languages || []).slice(0, 2).map(l => LANG_LABELS[l] || l).join(' · ') || '🌐 Idiomas';
+      const photoHtml = t.photo
+        ? `<img src="${t.photo}" alt="${escHtml(displayName)}">`
+        : `${escHtml(t.initials || '')}`;
+      const photoStyle = t.photo ? '' : `background:${t.bg||'#2A5FCC'};color:${t.color||'#fff'}`;
+      return `<div class="lp-teacher-card">
+        <div class="lp-teacher-photo" style="${photoStyle}">
+          <span class="lp-teacher-badge">${langsTxt}</span>
+          ${photoHtml}
+        </div>
+        <div class="lp-teacher-info">
+          <div class="lp-teacher-name">${escHtml(displayName)}</div>
+          <button class="lp-teacher-cta" onclick="openStudentRegister()">Estudar comigo →</button>
+        </div>
+      </div>`;
+    }).join('');
+    section.classList.remove('hidden');
+    if (navLink) navLink.classList.remove('hidden');
+  } catch (e) {}
+}
 
 function copyCredentials(loginId, pwId) {
   const login = document.getElementById(loginId).textContent.trim();
@@ -2413,15 +2444,19 @@ async function openProfile() {
     document.getElementById('profile-whatsapp').value = profile.whatsapp || '';
     const igWrap = document.getElementById('profile-instagram-wrap');
     const langWrap = document.getElementById('profile-languages-wrap');
+    const showcaseWrap = document.getElementById('profile-showcase-wrap');
     if (ME && ME.role === 'teacher') {
       igWrap.style.display = '';
       document.getElementById('profile-instagram').value = profile.instagram || '';
       langWrap.style.display = '';
       const checkedLangs = profile.languages || [];
       document.querySelectorAll('#profile-langs-wrap input[type=checkbox]').forEach(cb => cb.checked = checkedLangs.includes(cb.value));
+      showcaseWrap.style.display = 'flex';
+      document.getElementById('profile-showcase-optin').checked = !!profile.showcaseOptIn;
     } else {
       igWrap.style.display = 'none';
       langWrap.style.display = 'none';
+      showcaseWrap.style.display = 'none';
     }
     document.getElementById('profile-pw-current').value = '';
     document.getElementById('profile-pw-new').value     = '';
@@ -2539,6 +2574,7 @@ async function saveProfile() {
   if (ME && ME.role === 'teacher') {
     payload.instagram = document.getElementById('profile-instagram').value.trim().replace(/^@/, '');
     payload.languages = [...document.querySelectorAll('#profile-langs-wrap input:checked')].map(c => c.value);
+    payload.showcaseOptIn = document.getElementById('profile-showcase-optin').checked;
   }
   if (ME && ME.role === 'admin') payload.name = document.getElementById('profile-name').value.trim();
   if (_profilePhotoB64) payload.photo = _profilePhotoB64;

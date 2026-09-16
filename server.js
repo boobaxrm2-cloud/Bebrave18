@@ -478,6 +478,13 @@ app.post('/api/contact', (req, res) => {
   res.json({ ok: true });
 });
 
+// Vitrine pública de professores (landing page) — só quem optou por aparecer
+app.get('/api/public/showcase-teachers', (req, res) => {
+  const teachers = Teachers.find({ showcaseOptIn: true, blocked: { '$ne': true } })
+    .map(t => ({ name: t.name, socialname: t.socialname || '', photo: t.photo || '', languages: t.languages || [], initials: t.initials, color: t.color, bg: t.bg }));
+  res.json(teachers);
+});
+
 app.get('/api/admin/contact-messages', auth, isAdmin, (req, res) => {
   res.json(ContactMessages.find().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
 });
@@ -1544,7 +1551,7 @@ app.get('/api/profile', auth, (req, res) => {
   let extra = {};
   if (u.role === 'teacher') {
     const t = Teachers.findOne({ login: u.login });
-    extra = { email: t?.email||'', whatsapp: t?.whatsapp||'', cpf: t?.cpf||'', socialname: t?.socialname||'', photo: t?.photo||'', instagram: t?.instagram||'', languages: t?.languages||[] };
+    extra = { email: t?.email||'', whatsapp: t?.whatsapp||'', cpf: t?.cpf||'', socialname: t?.socialname||'', photo: t?.photo||'', instagram: t?.instagram||'', languages: t?.languages||[], showcaseOptIn: !!t?.showcaseOptIn };
   } else if (u.role === 'student') {
     const s = Students.findOne({ matricula: u.login });
     extra = { email: s?.email||'', whatsapp: s?.whatsapp||'', cpf: s?.cpf||'', socialname: s?.socialname||'', photo: s?.photo||'' };
@@ -1557,7 +1564,7 @@ app.get('/api/profile', auth, (req, res) => {
 // PUT /api/profile — update editable fields
 app.put('/api/profile', auth, (req, res) => {
   const u = req.session.user;
-  const { email, whatsapp, socialname, photo, instagram, languages, currentPassword, newPassword } = req.body;
+  const { email, whatsapp, socialname, photo, instagram, languages, showcaseOptIn, currentPassword, newPassword } = req.body;
 
   // Password change (optional)
   if (newPassword) {
@@ -1585,6 +1592,7 @@ app.put('/api/profile', auth, (req, res) => {
       if (photo      !== undefined) t.photo      = photo;
       if (instagram  !== undefined) t.instagram  = instagram;
       if (Array.isArray(languages)) t.languages  = languages;
+      if (showcaseOptIn !== undefined) t.showcaseOptIn = !!showcaseOptIn;
       Teachers.update(t);
     }
   } else if (u.role === 'student') {

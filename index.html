@@ -70,6 +70,7 @@
     <nav class="lp-nav-links">
       <a onclick="scrollToLandingSection('lp-features-section')">Ferramentas</a>
       <a onclick="scrollToLandingSection('lp-shots-section')">Como Funciona</a>
+      <a onclick="scrollToLandingSection('lp-teachers-section')" id="lp-nav-teachers-link" class="hidden">Professores</a>
       <a onclick="scrollToLandingSection('lp-pricing-section')">Começar a usar</a>
     </nav>
     <div class="lp-nav-spacer"></div>
@@ -176,6 +177,13 @@
     <h2 class="lp-section-title">Veja a plataforma em ação</h2>
     <p class="lp-section-sub">Clique em qualquer imagem para ampliar.</p>
     <div class="lp-shots" id="lp-shots"></div>
+  </section>
+
+  <!-- Vitrine de Professores -->
+  <section class="lp-section lp-section-alt lp-mesh-bg hidden" id="lp-teachers-section">
+    <h2 class="lp-section-title">Conheça nossos professores</h2>
+    <p class="lp-section-sub">Aula particular, só você e seu professor. Veja quem já está na plataforma.</p>
+    <div class="lp-teachers-row" id="lp-teachers-row"></div>
   </section>
 
   <!-- Pricing / Free banner -->
@@ -1684,6 +1692,13 @@
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="zh" style="accent-color:var(--blue)"> 🇨🇳 Mandarim</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="ko" style="accent-color:var(--blue)"> 🇰🇷 Coreano</label>
       </div>
+    </div>
+    <div id="profile-showcase-wrap" style="display:none;margin-bottom:16px;padding:12px 14px;background:var(--g50);border-radius:8px;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-weight:600;font-size:13px;color:var(--g700)">Aparecer na vitrine de professores</div>
+        <div style="font-size:12px;color:var(--g500)">Seu nome, foto e idiomas ficam visíveis na página inicial, para futuros alunos conhecerem</div>
+      </div>
+      <label class="tgl-switch" style="flex-shrink:0"><input type="checkbox" id="profile-showcase-optin"><span class="tgl-slider"></span></label>
     </div>
 
     <!-- Password change -->
