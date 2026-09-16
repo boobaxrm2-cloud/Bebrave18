@@ -44,6 +44,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+function copyCredentials(loginId, pwId) {
+  const login = document.getElementById(loginId).textContent.trim();
+  const pw    = document.getElementById(pwId).textContent.trim();
+  const text  = `Acesse a BeBrave: ${window.location.origin}\nLogin: ${login}\nSenha: ${pw}`;
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('✅ Credenciais copiadas!'))
+    .catch(() => showToast('❌ Não foi possível copiar. Copie manualmente.'));
+}
+
 function trackVisit() {
   try {
     let vid = localStorage.getItem('bebrave_vid');

@@ -90,6 +90,9 @@ function genMatricula() {
   while (Students.findOne({ matricula: m }));
   return m;
 }
+function genRandomPassword() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
 function genCertId() {
   return 'CERT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
 }
@@ -919,9 +922,10 @@ app.post('/api/admin/teachers', auth, isAdmin, (req, res) => {
   while (Users.findOne({ login }));
   const { color, bg } = pickColor(Teachers.count());
   const { cpf: tCpf, whatsapp: tWa, socialname: tSocial } = req.body;
-  Users.insert({ login, password: bcrypt.hashSync('1234', 10), role: 'teacher', name: name.trim(), createdAt: now() });
+  const pw = genRandomPassword();
+  Users.insert({ login, password: bcrypt.hashSync(pw, 10), role: 'teacher', name: name.trim(), createdAt: now() });
   Teachers.insert({ login, name: name.trim(), socialname: tSocial||'', email: email || '', cpf: tCpf||'', whatsapp: tWa||'', initials: ini, color, bg, createdAt: now(), plan: getDefaultPlanKey() });
-  res.json({ ok: true, login, defaultPassword: '1234', name: name.trim() });
+  res.json({ ok: true, login, defaultPassword: pw, name: name.trim() });
 });
 
 app.put('/api/admin/reset-password', auth, isAdmin, (req, res) => {
@@ -1027,12 +1031,13 @@ app.post('/api/students', auth, isTeach, requirePlanTool('students'), (req, res)
   const ini = initials(name);
   const { color, bg } = pickColor(Students.count());
   const { lang, cpf, email, whatsapp, payday, price, socialname } = req.body;
-  Users.insert({ login: matricula, password: bcrypt.hashSync('1234', 10), role: 'student', name: name.trim(), createdAt: now() });
+  const pw = genRandomPassword();
+  Users.insert({ login: matricula, password: bcrypt.hashSync(pw, 10), role: 'student', name: name.trim(), createdAt: now() });
   Students.insert({ matricula, name: name.trim(), socialname: socialname||'', initials: ini, level, color, bg,
     teacherLogin: req.session.user.login, teacherName: teacher?.name || req.session.user.name,
     lang: lang || 'en', cpf: cpf || '', email: email || '', whatsapp: whatsapp || '',
     payday: payday || '', price: price || '', active: true, createdAt: now() });
-  res.json({ ok: true, matricula, defaultPassword: '1234', name: name.trim(), level, lang: lang || 'en' });
+  res.json({ ok: true, matricula, defaultPassword: pw, name: name.trim(), level, lang: lang || 'en' });
 });
 
 app.put('/api/students/:matricula', auth, isAdminOrTeach, (req, res) => {
@@ -1634,14 +1639,16 @@ app.post('/api/admin/students/reactivate', auth, isAdmin, (req, res) => {
   if (Students.findOne({ matricula })) return res.status(409).json({ error: 'Matrícula já em uso' });
   // Restore user login
   const existingUser = Users.findOne({ login: matricula });
+  let newPw = null;
   if (!existingUser) {
-    Users.insert({ login: matricula, password: bcrypt.hashSync('1234', 10), role: 'student', name: deleted.name, createdAt: now() });
+    newPw = genRandomPassword();
+    Users.insert({ login: matricula, password: bcrypt.hashSync(newPw, 10), role: 'student', name: deleted.name, createdAt: now() });
   }
   // Restore student record (clean loki meta)
   const { $loki, meta, deletedAt, deletedBy, ...studentData } = deleted;
   Students.insert({ ...studentData, reactivatedAt: now() });
   DeletedStudents.remove(deleted);
-  res.json({ ok: true, name: deleted.name, matricula });
+  res.json({ ok: true, name: deleted.name, matricula, defaultPassword: newPw });
 });
 
 
