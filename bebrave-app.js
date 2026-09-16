@@ -866,8 +866,8 @@ async function loadAdminMaterials() {
     if (!materials.length) { el.innerHTML = '<p class="empty">Nenhum material enviado ainda.</p>'; return; }
     el.innerHTML = materials.map(m => `
       <div class="lp-teacher-card" style="flex:none">
-        <div class="lp-teacher-photo" style="height:150px">
-          <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}">
+        <div class="lp-teacher-photo" style="height:150px;background:var(--g100)">
+          <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}" style="object-fit:contain">
         </div>
         <div class="lp-teacher-info">
           <div class="lp-teacher-name">${escHtml(m.title)}</div>
@@ -897,8 +897,8 @@ function renderMaterialCards(materials, containerId, cardId) {
   card.style.display = '';
   list.innerHTML = materials.map(m => `
     <div style="cursor:pointer" onclick="viewMaterial('${m.fileFilename}','${escJs(m.title)}')">
-      <div style="height:130px;border-radius:8px;overflow:hidden;box-shadow:var(--sh-md);margin-bottom:8px">
-        <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}" style="width:100%;height:100%;object-fit:cover">
+      <div style="height:130px;border-radius:8px;overflow:hidden;box-shadow:var(--sh-md);margin-bottom:8px;background:var(--g100)">
+        <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}" style="width:100%;height:100%;object-fit:contain">
       </div>
       <div style="font-size:13px;font-weight:600;color:var(--g800);margin-bottom:2px">${escHtml(m.title)}</div>
       <div style="font-size:12px;color:var(--blue);font-weight:600">👁 Visualizar / ⬇ Baixar</div>
