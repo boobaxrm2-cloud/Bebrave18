@@ -1236,6 +1236,34 @@ app.get('/api/admin/materials', auth, isAdmin, (req, res) => {
   res.json(Materials.find().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
 });
 
+app.put('/api/admin/materials/:id', auth, isAdmin, upload.fields([{ name: 'cover', maxCount: 1 }, { name: 'file', maxCount: 1 }]), (req, res) => {
+  const m = Materials.get(parseInt(req.params.id));
+  if (!m) return res.status(404).json({ error: 'Material não encontrado' });
+  const { title, description, audience } = req.body;
+  let languages = req.body.languages;
+  if (typeof languages === 'string') languages = [languages];
+  if (!title?.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
+  if (!Array.isArray(languages) || !languages.length) return res.status(400).json({ error: 'Selecione ao menos um idioma' });
+  if (!['teacher', 'student', 'both'].includes(audience)) return res.status(400).json({ error: 'Selecione o público (professor, aluno ou ambos)' });
+  m.title = title.trim();
+  m.description = (description || '').trim();
+  m.languages = languages;
+  m.audience = audience;
+  const coverFile    = req.files?.cover?.[0];
+  const materialFile = req.files?.file?.[0];
+  if (coverFile) {
+    try { fs.unlinkSync(path.join(UPLOADS_DIR, m.coverFilename)); } catch(e) {}
+    m.coverFilename = coverFile.filename;
+  }
+  if (materialFile) {
+    try { fs.unlinkSync(path.join(UPLOADS_DIR, m.fileFilename)); } catch(e) {}
+    m.fileFilename = materialFile.filename;
+    m.fileOriginalName = materialFile.originalname;
+  }
+  Materials.update(m);
+  res.json({ ok: true });
+});
+
 app.delete('/api/admin/materials/:id', auth, isAdmin, (req, res) => {
   const m = Materials.get(parseInt(req.params.id));
   if (!m) return res.status(404).json({ error: 'Material não encontrado' });

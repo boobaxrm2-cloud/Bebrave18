@@ -1220,16 +1220,17 @@
 
 <div id="modal-material" class="modal-ov hidden" onclick="closeModalOv(event,'modal-material')">
   <div class="modal-card">
-    <div class="mh"><h3>📚 Enviar Material Didático</h3><button class="mc-close" onclick="closeModal('modal-material')">✕</button></div>
+    <div class="mh"><h3 id="mat-modal-title">📚 Enviar Material Didático</h3><button class="mc-close" onclick="closeModal('modal-material')">✕</button></div>
+    <input type="hidden" id="mat-id-original">
     <div class="field-group"><label>Nome do material *</label><input id="mat-title" type="text" placeholder="Ex: English A1 — Student Book"></div>
     <div class="field-group"><label>Descrição breve</label><textarea id="mat-description" rows="2" placeholder="Ex: Livro de exercícios para nível iniciante"></textarea></div>
     <div class="field-row">
       <div class="field-group">
-        <label>Foto de capa *</label>
+        <label id="mat-cover-label">Foto de capa *</label>
         <input id="mat-cover" type="file" accept="image/*">
       </div>
       <div class="field-group">
-        <label>Arquivo do material *</label>
+        <label id="mat-file-label">Arquivo do material *</label>
         <input id="mat-file" type="file" accept=".pdf,.doc,.docx">
       </div>
     </div>
@@ -1255,7 +1256,7 @@
       </div>
     </div>
     <p class="modal-info">O material só aparecerá para professores e/ou alunos que tenham o mesmo idioma selecionado em seu cadastro.</p>
-    <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-material')">Cancelar</button><button class="btn-primary" onclick="saveMaterial()">Enviar</button></div>
+    <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-material')">Cancelar</button><button class="btn-primary" id="mat-save-btn" onclick="saveMaterial()">Enviar</button></div>
   </div>
 </div>
 
