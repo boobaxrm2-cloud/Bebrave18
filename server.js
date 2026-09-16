@@ -1022,6 +1022,7 @@ app.get('/api/students/inactive', auth, isTeach, (req, res) => {
 app.post('/api/students', auth, isTeach, requirePlanTool('students'), (req, res) => {
   const { name, level } = req.body;
   if (!name || !level) return res.status(400).json({ error: 'Nome e nível são obrigatórios' });
+  if (!req.body.whatsapp?.trim()) return res.status(400).json({ error: 'WhatsApp é obrigatório' });
   if (studentLimitReached(req.session.user.login)) {
     const plan = getPlan(planKeyOf(req.session.user.login));
     return res.status(403).json({ error: `Você atingiu o limite de ${plan.maxStudents} alunos do plano ${plan.label}. Faça upgrade em "Meu Plano" para cadastrar mais alunos.` });
@@ -1379,6 +1380,10 @@ app.put('/api/contracts/:id/student-sign', auth, async (req, res) => {
     c.studentCpf = student_cpf || c.studentCpf;
     c.status = 'complete';
     Contracts.update(c);
+    if (student_cpf) {
+      const s = Students.findOne({ matricula: c.studentMatricula });
+      if (s && !s.cpf) { s.cpf = student_cpf; Students.update(s); }
+    }
     notify(c.teacherLogin, 'contract_signed', 'Contrato assinado! ✅', `${req.session.user.name} assinou o contrato`);
     res.json({ ok: true, contractId: c.contractId });
   } catch(e) { console.error(e); res.status(500).json({ error: 'Erro ao finalizar contrato' }); }

@@ -1211,17 +1211,17 @@
       <div class="field-group"><label>Nível atual *</label>
         <select id="as-level"><option value="A1">A1 — Iniciante</option><option value="A2">A2 — Básico</option><option value="B1">B1 — Intermediário</option><option value="B2" selected>B2 — Interm. Avançado</option><option value="C1">C1 — Avançado</option><option value="C2">C2 — Proficiente</option></select>
       </div>
-      <div class="field-group"><label>CPF *</label><input id="as-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)"></div>
+      <div class="field-group"><label>CPF</label><input id="as-cpf" type="text" placeholder="000.000.000-00 (opcional)" maxlength="14" oninput="fmtCpf(this)"></div>
     </div>
     <div class="field-row">
-      <div class="field-group"><label>E-mail *</label><input id="as-email" type="email" placeholder="aluno@email.com"></div>
-      <div class="field-group"><label>WhatsApp</label><input id="as-whatsapp" type="text" placeholder="(21) 99999-9999"></div>
+      <div class="field-group"><label>E-mail</label><input id="as-email" type="email" placeholder="aluno@email.com (opcional)"></div>
+      <div class="field-group"><label>WhatsApp *</label><input id="as-whatsapp" type="text" placeholder="(21) 99999-9999"></div>
     </div>
     <div class="field-row">
       <div class="field-group"><label>Dia de vencimento *</label><input id="as-payday" type="number" min="1" max="31" placeholder="Ex: 10"></div>
       <div class="field-group"><label>Valor da mensalidade (R$) *</label><input id="as-price" type="number" placeholder="Ex: 350"></div>
     </div>
-    <p class="modal-info">Será gerada uma <strong>matrícula de 6 dígitos</strong> automaticamente. A senha padrão será <strong>1234</strong>.</p>
+    <p class="modal-info">Será gerada uma <strong>matrícula de 6 dígitos</strong> e uma <strong>senha aleatória</strong> automaticamente. O CPF pode ser preenchido depois, quando o aluno assinar o contrato.</p>
     <div style="margin:16px 0;padding:12px 14px;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#0c4a6e;line-height:1.5">
         <input type="checkbox" id="as-lgpd" style="margin-top:2px;accent-color:var(--blue);flex-shrink:0">

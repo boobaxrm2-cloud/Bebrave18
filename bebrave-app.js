@@ -1242,9 +1242,8 @@ async function teacherAddStudent() {
   const whatsapp   = document.getElementById('as-whatsapp').value.trim();
   const payday     = document.getElementById('as-payday').value.trim();
   const price      = document.getElementById('as-price').value.trim();
-  if (!name)    return showToast('⚠️ Nome é obrigatório');
-  if (!cpf)     return showToast('⚠️ CPF é obrigatório');
-  if (!email)   return showToast('⚠️ E-mail é obrigatório');
+  if (!name)     return showToast('⚠️ Nome é obrigatório');
+  if (!whatsapp) return showToast('⚠️ WhatsApp é obrigatório');
   if (!payday)  return showToast('⚠️ Dia de vencimento é obrigatório');
   if (!price)   return showToast('⚠️ Valor da mensalidade é obrigatório');
   if (!document.getElementById('as-lgpd')?.checked) return showToast('⚠️ É necessário confirmar o consentimento LGPD');
