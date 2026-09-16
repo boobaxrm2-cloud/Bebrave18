@@ -785,6 +785,118 @@ async function deleteContactMessage(id) {
   } catch(e) { showToast('❌ ' + e.message); }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  MATERIAIS DIDÁTICOS (biblioteca curada pelo admin)
+// ══════════════════════════════════════════════════════════════
+
+const MATERIAL_AUDIENCE_LABEL = { teacher: '👩‍🏫 Professores', student: '🎓 Alunos', both: '👥 Ambos' };
+
+function openMaterialModal() {
+  document.getElementById('mat-title').value = '';
+  document.getElementById('mat-description').value = '';
+  document.getElementById('mat-cover').value = '';
+  document.getElementById('mat-file').value = '';
+  document.querySelectorAll('#mat-langs-wrap input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelector('input[name="mat-audience"][value="teacher"]').checked = true;
+  openModal('modal-material');
+}
+
+async function saveMaterial() {
+  const title = document.getElementById('mat-title').value.trim();
+  const description = document.getElementById('mat-description').value.trim();
+  const coverInput = document.getElementById('mat-cover');
+  const fileInput  = document.getElementById('mat-file');
+  const languages  = [...document.querySelectorAll('#mat-langs-wrap input:checked')].map(c => c.value);
+  const audience   = document.querySelector('input[name="mat-audience"]:checked').value;
+
+  if (!title)              return showToast('⚠️ Informe o nome do material');
+  if (!languages.length)   return showToast('⚠️ Selecione ao menos um idioma');
+  if (!coverInput.files[0]) return showToast('⚠️ Envie uma foto de capa');
+  if (!fileInput.files[0])  return showToast('⚠️ Envie o arquivo do material');
+
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('description', description);
+  formData.append('audience', audience);
+  languages.forEach(l => formData.append('languages', l));
+  formData.append('cover', coverInput.files[0]);
+  formData.append('file', fileInput.files[0]);
+
+  try {
+    const r = await fetch('/api/admin/materials', { method: 'POST', body: formData });
+    const json = await r.json();
+    if (!r.ok) throw new Error(json.error || 'Erro ao enviar material');
+    closeModal('modal-material');
+    showToast('✅ Material enviado!');
+    loadAdminMaterials();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function loadAdminMaterials() {
+  const el = document.getElementById('adm-materials-list');
+  el.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const materials = await api('GET', '/api/admin/materials');
+    if (!materials.length) { el.innerHTML = '<p class="empty">Nenhum material enviado ainda.</p>'; return; }
+    el.innerHTML = materials.map(m => `
+      <div class="lp-teacher-card" style="flex:none">
+        <div class="lp-teacher-photo" style="height:150px">
+          <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}">
+        </div>
+        <div class="lp-teacher-info">
+          <div class="lp-teacher-name">${escHtml(m.title)}</div>
+          <div style="font-size:12px;color:var(--g500);margin-bottom:8px">${MATERIAL_AUDIENCE_LABEL[m.audience]} · ${(m.languages||[]).map(l=>LANG_LABELS[l]||l).join(', ')}</div>
+          <button class="btn-icon danger" title="Excluir material" onclick="deleteMaterial(${m.$loki},'${escJs(m.title)}')">🗑 Excluir</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<p class="empty">Erro: ${e.message}</p>`; }
+}
+
+async function deleteMaterial(id, title) {
+  if (!confirm(`Excluir o material "${title}"? Essa ação não pode ser desfeita.`)) return;
+  try {
+    await api('DELETE', `/api/admin/materials/${id}`);
+    showToast('✅ Material excluído!');
+    loadAdminMaterials();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+function renderMaterialCards(materials, containerId, cardId) {
+  const card = document.getElementById(cardId);
+  const list = document.getElementById(containerId);
+  if (!materials.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  list.innerHTML = materials.map(m => `
+    <div style="cursor:pointer" onclick="viewMaterial('${m.fileFilename}','${escJs(m.title)}')">
+      <div style="height:130px;border-radius:8px;overflow:hidden;box-shadow:var(--sh-md);margin-bottom:8px">
+        <img src="/uploads/${m.coverFilename}" alt="${escHtml(m.title)}" style="width:100%;height:100%;object-fit:cover">
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--g800);margin-bottom:2px">${escHtml(m.title)}</div>
+      <div style="font-size:12px;color:var(--blue);font-weight:600">👁 Visualizar / ⬇ Baixar</div>
+    </div>`).join('');
+}
+
+async function loadTeacherMaterials() {
+  try {
+    const materials = await api('GET', '/api/teacher/materials');
+    renderMaterialCards(materials, 't-materials-list', 't-materials-card');
+  } catch(e) {}
+}
+
+async function loadStudentMaterials() {
+  try {
+    const materials = await api('GET', '/api/student/materials');
+    renderMaterialCards(materials, 's-materials-list', 's-materials-card');
+  } catch(e) {}
+}
+
+function viewMaterial(fileFilename, title) {
+  document.getElementById('mat-view-title').textContent = title;
+  document.getElementById('mat-view-frame').src = `/uploads/${fileFilename}`;
+  document.getElementById('mat-view-download').href = `/uploads/${fileFilename}`;
+  openModal('modal-material-view');
+}
+
 let _adminStudentFilter = '';
 let _adminShowDeleted = false;
 
@@ -1107,6 +1219,7 @@ async function refreshTeacherAll() {
   populateStudentSelects(students);
   loadTeacherContracts();
   loadTeacherBebraveContracts();
+  loadTeacherMaterials();
 }
 
 function renderTeacherOverview(students, lessons) {
@@ -1734,6 +1847,7 @@ async function refreshStudentAll() {
   renderStudentFiles(files);
   renderStudentProgress(lessons, notes);
   loadStudentContracts();
+  loadStudentMaterials();
 }
 
 function renderStudentDashboard(lessons, notes) {

@@ -28,7 +28,7 @@ const db = new Loki(DB_PATH, {
   autoloadCallback: dbReady
 });
 
-let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons, PageViews, ContactMessages;
+let Users, Students, Teachers, Lessons, Files, Notes, Certificates, DeletedStudents, Contracts, TeacherContracts, Sessions, ForumPosts, ForumReplies, Suggestions, Payments, Messages, StudyPlans, NetworkRequests, AdminMessages, Notifications, Ratings, ChatMessages, Plans, Coupons, PageViews, ContactMessages, Materials;
 
 function dbReady() {
   Users        = db.getCollection('users')        || db.addCollection('users',        { indices: ['login'] });
@@ -57,6 +57,7 @@ function dbReady() {
   Coupons          = db.getCollection('coupons')          || db.addCollection('coupons',          { indices: ['code'] });
   PageViews        = db.getCollection('pageViews')        || db.addCollection('pageViews',        { indices: ['vid', 'date'] });
   ContactMessages  = db.getCollection('contactMessages')  || db.addCollection('contactMessages',  {});
+  Materials        = db.getCollection('materials')        || db.addCollection('materials',        {});
   seedPlansIfEmpty();
 
   if (!Users.findOne({ role: 'admin' })) {
@@ -1207,6 +1208,55 @@ app.delete('/api/files/:id', auth, (req, res) => {
   if (f.filename) { try { fs.unlinkSync(path.join(UPLOADS_DIR, f.filename)); } catch(e) {} }
   Files.remove(f);
   res.json({ ok: true });
+});
+
+// ════════════════════════════════════════════════════════════
+//  MATERIAIS DIDÁTICOS (biblioteca curada pelo admin)
+// ════════════════════════════════════════════════════════════
+app.post('/api/admin/materials', auth, isAdmin, upload.fields([{ name: 'cover', maxCount: 1 }, { name: 'file', maxCount: 1 }]), (req, res) => {
+  const { title, description, audience } = req.body;
+  let languages = req.body.languages;
+  if (typeof languages === 'string') languages = [languages];
+  if (!title?.trim()) return res.status(400).json({ error: 'Título é obrigatório' });
+  if (!Array.isArray(languages) || !languages.length) return res.status(400).json({ error: 'Selecione ao menos um idioma' });
+  if (!['teacher', 'student', 'both'].includes(audience)) return res.status(400).json({ error: 'Selecione o público (professor, aluno ou ambos)' });
+  const coverFile    = req.files?.cover?.[0];
+  const materialFile = req.files?.file?.[0];
+  if (!coverFile)    return res.status(400).json({ error: 'Envie uma foto de capa' });
+  if (!materialFile) return res.status(400).json({ error: 'Envie o arquivo do material' });
+  const material = Materials.insert({
+    title: title.trim(), description: (description || '').trim(), languages, audience,
+    coverFilename: coverFile.filename, fileFilename: materialFile.filename, fileOriginalName: materialFile.originalname,
+    createdAt: now(),
+  });
+  res.json({ ok: true, id: material.$loki });
+});
+
+app.get('/api/admin/materials', auth, isAdmin, (req, res) => {
+  res.json(Materials.find().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+});
+
+app.delete('/api/admin/materials/:id', auth, isAdmin, (req, res) => {
+  const m = Materials.get(parseInt(req.params.id));
+  if (!m) return res.status(404).json({ error: 'Material não encontrado' });
+  [m.coverFilename, m.fileFilename].forEach(fn => { if (fn) { try { fs.unlinkSync(path.join(UPLOADS_DIR, fn)); } catch(e) {} } });
+  Materials.remove(m);
+  res.json({ ok: true });
+});
+
+app.get('/api/teacher/materials', auth, isTeach, (req, res) => {
+  const t = Teachers.findOne({ login: req.session.user.login });
+  const langs = t?.languages || [];
+  const list = Materials.find().filter(m => ['teacher', 'both'].includes(m.audience) && m.languages.some(l => langs.includes(l)));
+  res.json(list);
+});
+
+app.get('/api/student/materials', auth, (req, res) => {
+  if (req.session.user.role !== 'student') return res.status(403).json({ error: 'Acesso negado' });
+  const s = Students.findOne({ matricula: req.session.user.login });
+  const langs = s?.languages || [];
+  const list = Materials.find().filter(m => ['student', 'both'].includes(m.audience) && m.languages.some(l => langs.includes(l)));
+  res.json(list);
 });
 
 // ════════════════════════════════════════════════════════════

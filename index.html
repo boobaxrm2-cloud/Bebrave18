@@ -558,6 +558,7 @@
         <a class="nav-item" onclick="showAdmin('adm-teachers',this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Professores</a>
         <a class="nav-item" onclick="showAdmin('adm-plans',this);loadAdminPlans()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l3 6 6.5 1-4.7 4.6L18 20l-6-3.4L6 20l1.2-6.4L2.5 9l6.5-1z"/></svg>Planos</a>
         <a class="nav-item" onclick="showAdmin('adm-referrals',this);loadAdminReferrals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>Indicações</a>
+        <a class="nav-item" onclick="showAdmin('adm-materials',this);loadAdminMaterials()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Materiais Didáticos</a>
         <a class="nav-item" onclick="showAdmin('adm-promotions',this);loadAdminCoupons()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.17L4 3a1 1 0 0 0-1 1l.17 5.59a2 2 0 0 0 .66 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>Promoções</a>
         <a class="nav-item" onclick="showAdmin('adm-students',this)"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Alunos</a>
         <a class="nav-item" onclick="showAdmin('adm-passwords',this)"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Senhas</a>
@@ -606,6 +607,12 @@
       <section id="adm-contact" class="cs">
         <div class="sh"><div><h2>Contato do Site</h2><p class="sub">Mensagens enviadas pelo formulário "Fale conosco" da landing page</p></div></div>
         <div id="adm-contact-list"></div>
+      </section>
+
+      <!-- Materiais Didáticos Admin -->
+      <section id="adm-materials" class="cs">
+        <div class="sh"><div><h2>Materiais Didáticos</h2><p class="sub">Envie livros e materiais para professores e/ou alunos, filtrados por idioma</p></div><button class="btn-primary" onclick="openMaterialModal()">+ Enviar Material</button></div>
+        <div id="adm-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px"></div>
       </section>
 
       <!-- Promoções Admin -->
@@ -764,6 +771,10 @@
         <div class="card mt16">
           <div class="ch"><h3>📁 Arquivos Enviados</h3></div>
           <div id="t-files-sent"></div>
+        </div>
+        <div class="card mt16" id="t-materials-card" style="display:none">
+          <div class="ch"><h3>📚 Materiais Didáticos da Plataforma</h3></div>
+          <div id="t-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px"></div>
         </div>
       </section>
 
@@ -957,6 +968,10 @@
               <input type="file" id="s-file-input" hidden onchange="uploadStudentFile(event)">
             </div>
           </div>
+        </div>
+        <div class="card mt16" id="s-materials-card" style="display:none">
+          <div class="ch"><h3>📚 Materiais Didáticos da Plataforma</h3></div>
+          <div id="s-materials-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px"></div>
         </div>
       </section>
 
@@ -1200,6 +1215,58 @@
     </div>
     <div class="field-group"><label>Limite de usos (opcional)</label><input id="coupon-max-uses" type="number" min="1" placeholder="Deixe vazio para ilimitado"></div>
     <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-coupon')">Cancelar</button><button class="btn-primary" onclick="saveCoupon()">Criar Cupom</button></div>
+  </div>
+</div>
+
+<div id="modal-material" class="modal-ov hidden" onclick="closeModalOv(event,'modal-material')">
+  <div class="modal-card">
+    <div class="mh"><h3>📚 Enviar Material Didático</h3><button class="mc-close" onclick="closeModal('modal-material')">✕</button></div>
+    <div class="field-group"><label>Nome do material *</label><input id="mat-title" type="text" placeholder="Ex: English A1 — Student Book"></div>
+    <div class="field-group"><label>Descrição breve</label><textarea id="mat-description" rows="2" placeholder="Ex: Livro de exercícios para nível iniciante"></textarea></div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Foto de capa *</label>
+        <input id="mat-cover" type="file" accept="image/*">
+      </div>
+      <div class="field-group">
+        <label>Arquivo do material *</label>
+        <input id="mat-file" type="file" accept=".pdf,.doc,.docx">
+      </div>
+    </div>
+    <div class="field-group">
+      <label>Idioma(s) do material *</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px" id="mat-langs-wrap">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="en" style="accent-color:var(--blue)"> 🇺🇸 Inglês</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="es" style="accent-color:var(--blue)"> 🇪🇸 Espanhol</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="fr" style="accent-color:var(--blue)"> 🇫🇷 Francês</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="de" style="accent-color:var(--blue)"> 🇩🇪 Alemão</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="it" style="accent-color:var(--blue)"> 🇮🇹 Italiano</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="jp" style="accent-color:var(--blue)"> 🇯🇵 Japonês</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="zh" style="accent-color:var(--blue)"> 🇨🇳 Mandarim</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 12px;border:1.5px solid var(--g200);border-radius:20px"><input type="checkbox" value="ko" style="accent-color:var(--blue)"> 🇰🇷 Coreano</label>
+      </div>
+    </div>
+    <div class="field-group">
+      <label>Para quem é este material? *</label>
+      <div style="display:flex;gap:16px;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="mat-audience" value="teacher" checked> Professores</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="mat-audience" value="student"> Alunos</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="mat-audience" value="both"> Ambos</label>
+      </div>
+    </div>
+    <p class="modal-info">O material só aparecerá para professores e/ou alunos que tenham o mesmo idioma selecionado em seu cadastro.</p>
+    <div class="mf"><button class="btn-secondary" onclick="closeModal('modal-material')">Cancelar</button><button class="btn-primary" onclick="saveMaterial()">Enviar</button></div>
+  </div>
+</div>
+
+<div id="modal-material-view" class="modal-ov hidden" onclick="closeModalOv(event,'modal-material-view')">
+  <div class="modal-card modal-wide" style="padding:0;overflow:hidden">
+    <div class="mh" style="padding:20px 24px 0"><h3 id="mat-view-title">Material</h3><button class="mc-close" onclick="closeModal('modal-material-view')">✕</button></div>
+    <iframe id="mat-view-frame" src="" style="width:100%;height:70vh;border:none;margin-top:12px"></iframe>
+    <div class="mf" style="padding:16px 24px">
+      <a id="mat-view-download" class="btn-secondary" href="" download>⬇ Baixar</a>
+      <button class="btn-primary" onclick="closeModal('modal-material-view')">Fechar</button>
+    </div>
   </div>
 </div>
 
